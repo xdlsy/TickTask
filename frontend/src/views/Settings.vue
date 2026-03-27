@@ -1,0 +1,613 @@
+<template>
+  <div class="settings-page">
+    <div class="page-header">
+      <h1>设置</h1>
+      <p class="page-subtitle">自定义你的工作流程</p>
+    </div>
+
+    <!-- 番茄时钟设置 -->
+    <div class="settings-card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-icon">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+          <span>番茄时钟</span>
+        </div>
+      </div>
+
+      <div class="card-content" v-loading="loading">
+        <div class="settings-grid">
+          <div class="setting-item">
+            <label>工作时长</label>
+            <div class="setting-control">
+              <el-input-number
+                v-model="pomodoroSettings.work_duration"
+                :min="1"
+                :max="60"
+                size="large"
+              />
+              <span class="unit">分钟</span>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label>短休息时长</label>
+            <div class="setting-control">
+              <el-input-number
+                v-model="pomodoroSettings.short_break_duration"
+                :min="1"
+                :max="30"
+                size="large"
+              />
+              <span class="unit">分钟</span>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label>长休息时长</label>
+            <div class="setting-control">
+              <el-input-number
+                v-model="pomodoroSettings.long_break_duration"
+                :min="5"
+                :max="60"
+                size="large"
+              />
+              <span class="unit">分钟</span>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label>长休息间隔</label>
+            <div class="setting-control">
+              <el-input-number
+                v-model="pomodoroSettings.long_break_after"
+                :min="1"
+                :max="10"
+                size="large"
+              />
+              <span class="unit">个番茄</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-toggles">
+          <div class="toggle-item">
+            <div class="toggle-info">
+              <span class="toggle-label">自动开始休息</span>
+              <span class="toggle-desc">工作结束后自动开始休息计时</span>
+            </div>
+            <el-switch v-model="pomodoroSettings.auto_start_break" size="large" />
+          </div>
+
+          <div class="toggle-item">
+            <div class="toggle-info">
+              <span class="toggle-label">自动开始工作</span>
+              <span class="toggle-desc">休息结束后自动开始工作计时</span>
+            </div>
+            <el-switch v-model="pomodoroSettings.auto_start_work" size="large" />
+          </div>
+
+          <div class="toggle-item">
+            <div class="toggle-info">
+              <span class="toggle-label">启用提示音</span>
+              <span class="toggle-desc">计时结束时播放提示音</span>
+            </div>
+            <el-switch v-model="pomodoroSettings.enable_sound" size="large" />
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <el-button type="primary" size="large" @click="savePomodoroSettings" :loading="saving">
+            保存设置
+          </el-button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 设置 -->
+    <div class="settings-card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-icon ai-icon">
+            <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+            <circle cx="8" cy="14" r="1.5"/>
+            <circle cx="16" cy="14" r="1.5"/>
+          </svg>
+          <span>AI 智能助手</span>
+        </div>
+        <el-tag v-if="aiStore.configured" type="success" size="large" effect="dark">已配置</el-tag>
+        <el-tag v-else type="info" size="large">未配置</el-tag>
+      </div>
+
+      <div class="card-content" v-loading="loading">
+        <div class="form-item">
+          <label>服务商</label>
+          <el-select v-model="aiSettings.provider" @change="handleProviderChange" size="large">
+            <el-option label="OpenAI" value="openai" />
+            <el-option label="Anthropic" value="anthropic" />
+            <el-option label="自定义" value="custom" />
+          </el-select>
+        </div>
+
+        <div class="form-item">
+          <label>API Key <span class="required">*</span></label>
+          <el-input
+            v-model="aiSettings.api_key"
+            type="password"
+            placeholder="请输入 API Key"
+            show-password
+            size="large"
+          />
+        </div>
+
+        <div class="form-item" v-if="aiSettings.provider === 'custom' || aiSettings.provider === 'openai'">
+          <label>API 地址</label>
+          <el-input
+            v-model="aiSettings.base_url"
+            placeholder="例如: https://api.openai.com/v1"
+            size="large"
+          />
+          <div class="form-tip">
+            {{ aiSettings.provider === 'openai' ? '默认使用 OpenAI 官方地址，如需代理可修改' : '请输入兼容 OpenAI API 的地址' }}
+          </div>
+        </div>
+
+        <div class="form-item">
+          <label>模型</label>
+          <el-select
+            v-model="aiSettings.model"
+            :placeholder="modelPlaceholder"
+            allow-create
+            filterable
+            size="large"
+          >
+            <el-option
+              v-for="model in availableModels"
+              :key="model"
+              :label="model"
+              :value="model"
+            />
+          </el-select>
+          <div class="form-tip">
+            可选择预设模型或手动输入
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <el-button type="primary" size="large" @click="saveAISettings" :loading="saving">
+            保存设置
+          </el-button>
+          <el-button size="large" @click="testAIConnection" :loading="testing">
+            测试连接
+          </el-button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 关于 -->
+    <div class="settings-card about-card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-icon">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          <span>关于</span>
+        </div>
+      </div>
+
+      <div class="card-content">
+        <div class="about-info">
+          <div class="about-brand">
+            <div class="brand-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+            </div>
+            <div class="brand-info">
+              <h3>TickTask</h3>
+              <p>个人时间管理工具</p>
+            </div>
+          </div>
+          <p class="about-desc">集成番茄工作法、四象限法则和 AI 智能推荐，帮助你高效管理时间</p>
+          <p class="version">版本 1.0.0</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { api } from '@/api/client'
+import { useAIStore } from '@/stores/ai'
+import type { PomodoroSettings, AISettings } from '@/types'
+
+const aiStore = useAIStore()
+
+const loading = ref(false)
+const saving = ref(false)
+const testing = ref(false)
+
+const pomodoroSettings = ref<PomodoroSettings>({
+  work_duration: 25,
+  short_break_duration: 5,
+  long_break_duration: 15,
+  long_break_after: 4,
+  auto_start_break: false,
+  auto_start_work: false,
+  enable_sound: true
+})
+
+const aiSettings = ref<AISettings>({
+  provider: 'openai',
+  api_key: '',
+  base_url: 'https://api.openai.com/v1',
+  model: 'gpt-4o-mini'
+})
+
+const openaiModels = ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo']
+const anthropicModels = ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-opus-latest']
+
+const availableModels = computed(() => {
+  if (aiSettings.value.provider === 'openai') return openaiModels
+  if (aiSettings.value.provider === 'anthropic') return anthropicModels
+  return []
+})
+
+const modelPlaceholder = computed(() => {
+  if (aiSettings.value.provider === 'openai') return '选择或输入 OpenAI 模型'
+  if (aiSettings.value.provider === 'anthropic') return '选择或输入 Anthropic 模型'
+  return '输入模型名称'
+})
+
+function handleProviderChange() {
+  if (aiSettings.value.provider === 'openai') {
+    aiSettings.value.base_url = 'https://api.openai.com/v1'
+    aiSettings.value.model = 'gpt-4o-mini'
+  } else if (aiSettings.value.provider === 'anthropic') {
+    aiSettings.value.base_url = 'https://api.anthropic.com/v1'
+    aiSettings.value.model = 'claude-3-5-sonnet-latest'
+  } else {
+    aiSettings.value.base_url = ''
+    aiSettings.value.model = ''
+  }
+}
+
+async function loadSettings() {
+  loading.value = true
+  try {
+    const res = await api.getSettings()
+    if (res.data.pomodoro) {
+      pomodoroSettings.value = {
+        work_duration: Math.floor(res.data.pomodoro.work_duration / 60),
+        short_break_duration: Math.floor(res.data.pomodoro.short_break_duration / 60),
+        long_break_duration: Math.floor(res.data.pomodoro.long_break_duration / 60),
+        long_break_after: res.data.pomodoro.long_break_after,
+        auto_start_break: res.data.pomodoro.auto_start_break,
+        auto_start_work: res.data.pomodoro.auto_start_work,
+        enable_sound: res.data.pomodoro.enable_sound
+      }
+    }
+    if (res.data.ai) {
+      aiSettings.value = res.data.ai
+    }
+  } catch (error) {
+    ElMessage.error('加载设置失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function savePomodoroSettings() {
+  saving.value = true
+  try {
+    const data = {
+      work_duration: pomodoroSettings.value.work_duration * 60,
+      short_break_duration: pomodoroSettings.value.short_break_duration * 60,
+      long_break_duration: pomodoroSettings.value.long_break_duration * 60,
+      long_break_after: pomodoroSettings.value.long_break_after,
+      auto_start_break: pomodoroSettings.value.auto_start_break,
+      auto_start_work: pomodoroSettings.value.auto_start_work,
+      enable_sound: pomodoroSettings.value.enable_sound
+    }
+    await api.updatePomodoroSettings(data)
+    ElMessage.success('番茄时钟设置已保存')
+  } catch (error) {
+    ElMessage.error('保存失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function saveAISettings() {
+  saving.value = true
+  try {
+    await api.updateAISettings(aiSettings.value)
+    await aiStore.checkStatus()
+    ElMessage.success('AI 设置已保存')
+  } catch (error) {
+    ElMessage.error('保存失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function testAIConnection() {
+  if (!aiSettings.value.api_key) {
+    ElMessage.warning('请先输入 API Key')
+    return
+  }
+
+  testing.value = true
+  try {
+    await api.updateAISettings(aiSettings.value)
+    await aiStore.checkStatus()
+    if (aiStore.configured) {
+      ElMessage.success('AI 服务连接成功')
+    } else {
+      ElMessage.error('AI 服务连接失败，请检查配置')
+    }
+  } catch (error) {
+    ElMessage.error('连接测试失败，请检查 API Key 和网络')
+  } finally {
+    testing.value = false
+  }
+}
+
+onMounted(() => {
+  loadSettings()
+})
+</script>
+
+<style scoped>
+.settings-page {
+  padding: 32px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.page-header {
+  margin-bottom: 32px;
+}
+
+.page-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.page-subtitle {
+  font-size: 15px;
+  color: #64748b;
+  margin: 0;
+}
+
+.settings-card {
+  background: #fff;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.card-icon {
+  width: 20px;
+  height: 20px;
+  color: #3b82f6;
+}
+
+.card-icon.ai-icon {
+  color: #8b5cf6;
+}
+
+.card-content {
+  padding: 24px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-item label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.setting-control {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.setting-control .el-input-number {
+  width: 120px;
+}
+
+.unit {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.settings-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 0;
+  border-top: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 24px;
+}
+
+.toggle-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toggle-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #334155;
+}
+
+.toggle-desc {
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.card-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.card-actions .el-button {
+  min-width: 120px;
+}
+
+.form-item {
+  margin-bottom: 20px;
+}
+
+.form-item:last-of-type {
+  margin-bottom: 24px;
+}
+
+.form-item label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #475569;
+  margin-bottom: 8px;
+}
+
+.form-item .required {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.form-item .el-select,
+.form-item .el-input {
+  width: 100%;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 6px;
+}
+
+.about-card .about-info {
+  text-align: center;
+}
+
+.about-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.brand-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.brand-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.brand-info h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.brand-info p {
+  font-size: 14px;
+  color: #64748b;
+  margin: 2px 0 0 0;
+}
+
+.about-desc {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0 0 16px 0;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.version {
+  font-size: 12px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .settings-page {
+    padding: 20px;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-actions {
+    flex-direction: column;
+  }
+
+  .card-actions .el-button {
+    width: 100%;
+  }
+}
+</style>
