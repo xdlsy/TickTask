@@ -151,3 +151,21 @@
 **Summary:** 完成 AI 排程增强功能的完整实现，覆盖后端 3 个新 AI 端点和打断原因追踪，前端 6 个页面中 4 个有实质性改进。所有变更向后兼容，已有端点无破坏性修改。
 
 **Next:** 无强制后续步骤。Evolution 循环完成。可返回 Scenario 迭代或进入下一轮改善。
+
+---
+
+### 2026-05-25 — AI Provider 扩展：Claude CLI + Anthropic API
+
+**背景:** OpenAI API 不可达，用户建议直接使用 `claude -p` CLI 命令。
+
+**变更内容:**
+- `ai/client.go` — 新增 `CLIClient`（通过 `exec.CommandContext` 调用 `claude -p`）和 `AnthropicClient`（原生 Anthropic Messages API）
+- `service/ai_service.go` — `NewAIService` 根据 `cfg.Provider` 选择客户端：`"claude"` → CLIClient、`"anthropic"` → AnthropicClient、默认 → OpenAIClient
+
+**端到端 AI 闭环验证（Claude CLI provider）:**
+- ✅ `POST /classify-task-text` — "修复登录页面白屏" → 象限1（重要且紧急），理由："登录是核心功能，白屏意味着用户完全无法使用系统"
+- ✅ `POST /reschedule-after-interrupt` — 返回调整后的排程 + 摘要（含task_id/时间/调整类型/原因）
+- ✅ `GET /daily-insights` — 返回生产力评分82分 + 峰值时段 + 成就 + 建议 + 鼓励语
+- ✅ 3 个端点均返回中文，与产品定位一致
+
+**Commit:** `af7b741` — feat: add Claude CLI and Anthropic API client support
