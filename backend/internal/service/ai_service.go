@@ -22,8 +22,16 @@ type AIService struct {
 // NewAIService 创建 AI 服务
 func NewAIService(cfg *model.AISettings, taskRepo repository.TaskRepository, scheduleRepo repository.ScheduleRepository, sessionRepo repository.SessionRepository) *AIService {
 	var client ai.LLMClient
-	if cfg != nil && cfg.APIKey != "" {
-		client = ai.NewOpenAIClient(cfg.APIKey, cfg.BaseURL, cfg.Model)
+	if cfg != nil {
+		switch cfg.Provider {
+		case "claude":
+			client = ai.NewCLIClient()
+		case "anthropic":
+			if cfg.APIKey == "" { break }
+			client = ai.NewAnthropicClient(cfg.APIKey, cfg.Model)
+		default:
+			client = ai.NewOpenAIClient(cfg.APIKey, cfg.BaseURL, cfg.Model)
+		}
 	}
 	return &AIService{
 		client:       client,
