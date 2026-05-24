@@ -24,7 +24,6 @@
         <div v-for="hour in hours" :key="hour" class="time-slot">
           <span class="time-label">{{ formatHour(hour) }}</span>
         </div>
-        <!-- 当前时间线 -->
         <div v-if="isCurrentDay" class="current-time-line" :style="currentTimeStyle">
           <span class="current-time-dot"></span>
           <span class="current-time-label">{{ currentTimeLabel }}</span>
@@ -39,7 +38,6 @@
           @click="onSlotClick(hour)"
         ></div>
 
-        <!-- 日程事件 -->
         <div
           v-for="item in eventLayouts"
           :key="item.event.id"
@@ -60,7 +58,6 @@
       </div>
     </div>
 
-    <!-- Tooltip -->
     <Teleport to="body">
       <div v-if="tooltipVisible" class="event-tooltip" :style="tooltipStyle">
         <div class="tooltip-time">{{ tooltipData.time }}</div>
@@ -91,7 +88,6 @@ let timeUpdateInterval: ReturnType<typeof setInterval> | null = null
 
 const hours = Array.from({ length: 24 }, (_, i) => i)
 
-// 解析 ISO 时间字符串为本地时间组件
 function parseLocalTime(isoString: string): { hours: number; minutes: number; dateStr: string } {
   const date = new Date(isoString)
   const year = date.getFullYear()
@@ -104,7 +100,6 @@ function parseLocalTime(isoString: string): { hours: number; minutes: number; da
   }
 }
 
-// 当前日期信息
 const currentDateString = computed(() => {
   const year = props.currentDate.getFullYear()
   const month = String(props.currentDate.getMonth() + 1).padStart(2, '0')
@@ -152,10 +147,8 @@ function formatHour(hour: number): string {
 function formatEventTime(event: ScheduleEvent): string {
   const startLocal = parseLocalTime(event.start)
   const endLocal = parseLocalTime(event.end)
-
   const startTime = `${startLocal.hours.toString().padStart(2, '0')}:${startLocal.minutes.toString().padStart(2, '0')}`
   const endTime = `${endLocal.hours.toString().padStart(2, '0')}:${endLocal.minutes.toString().padStart(2, '0')}`
-
   return `${startTime} - ${endTime}`
 }
 
@@ -170,15 +163,14 @@ function getStatusLabel(status: string): string {
 
 function getEventColorByType(type: string): string {
   const colors: Record<string, string> = {
-    task: '#3b82f6',
-    pomodoro: '#f59e0b',
-    break: '#22c55e',
-    custom: '#6b7280'
+    task: '#B8452C',
+    pomodoro: '#B8954D',
+    break: '#6B8B6F',
+    custom: '#9C9893'
   }
-  return colors[type] || '#3b82f6'
+  return colors[type] || '#B8452C'
 }
 
-// 计算事件的布局位置，处理重叠事件
 interface EventLayout {
   event: ScheduleEvent
   style: Record<string, string>
@@ -187,14 +179,12 @@ interface EventLayout {
 const eventLayouts = computed<EventLayout[]>(() => {
   if (props.events.length === 0) return []
 
-  // 将事件按开始时间排序
   const sortedEvents = [...props.events].sort((a, b) => {
     const startA = new Date(a.start).getTime()
     const startB = new Date(b.start).getTime()
     return startA - startB
   })
 
-  // 计算每个事件的时间范围（以小时为单位）
   const eventTimes = sortedEvents.map(event => {
     const startLocal = parseLocalTime(event.start)
     const endLocal = parseLocalTime(event.end)
@@ -205,7 +195,6 @@ const eventLayouts = computed<EventLayout[]>(() => {
     }
   })
 
-  // 分组：找出重叠的事件组
   const groups: Array<Array<typeof eventTimes[0]>> = []
   let currentGroup: Array<typeof eventTimes[0]> = []
 
@@ -213,11 +202,9 @@ const eventLayouts = computed<EventLayout[]>(() => {
     if (currentGroup.length === 0) {
       currentGroup.push(item)
     } else {
-      // 检查是否与当前组中的任何事件重叠
       const hasOverlap = currentGroup.some(g => {
         return item.startHour < g.endHour && item.endHour > g.startHour
       })
-
       if (hasOverlap) {
         currentGroup.push(item)
       } else {
@@ -230,16 +217,13 @@ const eventLayouts = computed<EventLayout[]>(() => {
     groups.push(currentGroup)
   }
 
-  // 为每个组计算布局
   const layouts: EventLayout[] = []
-  const margin = 8 // 左右内边距
+  const margin = 8
 
   for (const group of groups) {
-    // 使用列分配算法
     const columns: Array<Array<typeof eventTimes[0]>> = []
 
     for (const item of group) {
-      // 找到第一个可以放置的列
       let placed = false
       for (let i = 0; i < columns.length; i++) {
         const lastInColumn = columns[i][columns[i].length - 1]
@@ -255,7 +239,7 @@ const eventLayouts = computed<EventLayout[]>(() => {
     }
 
     const totalColumns = columns.length
-    const gap = 4 // 列之间的间距（像素）
+    const gap = 4
 
     for (let colIndex = 0; colIndex < columns.length; colIndex++) {
       for (const item of columns[colIndex]) {
@@ -263,7 +247,6 @@ const eventLayouts = computed<EventLayout[]>(() => {
         const height = Math.max((item.endHour - item.startHour) * 60, 30)
         const color = item.event.color || getEventColorByType(item.event.type)
 
-        // 使用 calc 计算位置和宽度
         const leftCalc = `calc(${margin}px + ${colIndex} * ((100% - ${margin * 2}px - ${(totalColumns - 1) * gap}px) / ${totalColumns}) + ${colIndex * gap}px)`
         const widthCalc = `calc((100% - ${margin * 2}px - ${(totalColumns - 1) * gap}px) / ${totalColumns})`
 
@@ -292,18 +275,12 @@ function onEventClick(event: ScheduleEvent) {
   emit('event-click', event)
 }
 
-// Tooltip 相关
 const tooltipVisible = ref(false)
 const tooltipStyle = ref<Record<string, string>>({})
-const tooltipData = ref({
-  time: '',
-  title: '',
-  status: ''
-})
+const tooltipData = ref({ time: '', title: '', status: '' })
 let tooltipTimer: ReturnType<typeof setTimeout> | null = null
 
 function showTooltip(event: MouseEvent, scheduleEvent: ScheduleEvent) {
-  // 延迟 500ms 显示 tooltip
   tooltipTimer = setTimeout(() => {
     const rect = (event.target as HTMLElement).getBoundingClientRect()
     tooltipData.value = {
@@ -322,22 +299,15 @@ function showTooltip(event: MouseEvent, scheduleEvent: ScheduleEvent) {
 }
 
 function hideTooltip() {
-  if (tooltipTimer) {
-    clearTimeout(tooltipTimer)
-    tooltipTimer = null
-  }
+  if (tooltipTimer) { clearTimeout(tooltipTimer); tooltipTimer = null }
   tooltipVisible.value = false
 }
 
-function updateTime() {
-  currentTime.value = new Date()
-}
+function updateTime() { currentTime.value = new Date() }
 
 onMounted(() => {
   updateTime()
-  timeUpdateInterval = setInterval(updateTime, 60000) // 每分钟更新
-
-  // 滚动到当前时间位置
+  timeUpdateInterval = setInterval(updateTime, 60000)
   if (isCurrentDay.value && contentRef.value) {
     const hours = currentTime.value.getHours()
     const scrollPosition = Math.max(0, hours * 60 - 100)
@@ -346,12 +316,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (timeUpdateInterval) {
-    clearInterval(timeUpdateInterval)
-  }
-  if (tooltipTimer) {
-    clearTimeout(tooltipTimer)
-  }
+  if (timeUpdateInterval) clearInterval(timeUpdateInterval)
+  if (tooltipTimer) clearTimeout(tooltipTimer)
 })
 </script>
 
@@ -359,10 +325,10 @@ onUnmounted(() => {
 .day-view {
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border-radius: 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color);
 }
 
 .day-header {
@@ -370,8 +336,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #e5e7eb;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .date-info {
@@ -381,20 +346,21 @@ onUnmounted(() => {
 }
 
 .day-name {
-  font-size: 16px;
-  color: #6b7280;
+  font-size: 15px;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .day-number {
-  font-size: 36px;
-  font-weight: 700;
-  color: #1f2937;
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-display);
 }
 
 .day-date {
-  font-size: 15px;
-  color: #9ca3af;
+  font-size: 14px;
+  color: var(--text-muted);
 }
 
 .day-stats {
@@ -406,12 +372,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
-  color: #6b7280;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
 .stat-item svg {
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
 .day-body {
@@ -424,8 +390,7 @@ onUnmounted(() => {
 .time-axis {
   width: 70px;
   flex-shrink: 0;
-  border-right: 1px solid #e5e7eb;
-  background: #f9fafb;
+  border-right: 1px solid var(--border-color);
   position: relative;
 }
 
@@ -439,95 +404,93 @@ onUnmounted(() => {
 }
 
 .time-label {
-  font-size: 12px;
-  color: #9ca3af;
+  font-size: 11px;
+  color: var(--text-muted);
   font-weight: 500;
+  font-family: var(--font-mono);
 }
 
 .current-time-line {
   position: absolute;
   left: 0;
   right: 0;
-  height: 2px;
-  background: #ef4444;
+  height: 1px;
+  background: var(--accent-primary);
   z-index: 10;
   display: flex;
   align-items: center;
 }
 
 .current-time-dot {
-  width: 10px;
-  height: 10px;
-  background: #ef4444;
+  width: 8px;
+  height: 8px;
+  background: var(--accent-primary);
   border-radius: 50%;
   position: absolute;
-  right: -5px;
-  top: -4px;
+  right: -4px;
+  top: -3.5px;
 }
 
 .current-time-label {
   position: absolute;
-  right: 8px;
-  top: -18px;
-  font-size: 11px;
-  color: #ef4444;
+  right: 6px;
+  top: -16px;
+  font-size: 10px;
+  color: var(--accent-primary);
   font-weight: 600;
-  background: #fff;
-  padding: 2px 6px;
-  border-radius: 4px;
+  font-family: var(--font-mono);
 }
 
 .day-content {
   flex: 1;
   position: relative;
-  min-height: 1440px; /* 24 hours × 60px */
+  min-height: 1440px;
 }
 
 .hour-slot {
   position: relative;
   height: 60px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--border-color);
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background var(--transition-fast);
   z-index: 1;
 }
 
 .hour-slot:hover {
-  background: #f0f9ff;
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .event-block {
   position: absolute;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   overflow: hidden;
-  transition: all 0.2s;
+  transition: opacity var(--transition-fast);
   display: flex;
   color: #fff;
   z-index: 2;
 }
 
 .event-block:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  transform: translateY(-1px);
+  opacity: 0.9;
 }
 
 .event-content {
   flex: 1;
-  padding: 8px 12px;
+  padding: 6px 10px;
   min-width: 0;
 }
 
 .event-time {
   display: block;
   font-size: 11px;
-  opacity: 0.9;
-  margin-bottom: 4px;
+  opacity: 0.85;
+  margin-bottom: 2px;
 }
 
 .event-title {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -537,41 +500,30 @@ onUnmounted(() => {
 .event-status {
   display: inline-block;
   font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-top: 3px;
   background: rgba(255, 255, 255, 0.2);
 }
 </style>
 
 <style>
 .event-tooltip {
-  background: #1e293b;
-  color: #fff;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
   padding: 10px 14px;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-color);
   z-index: 9999;
   pointer-events: none;
   min-width: 150px;
   max-width: 280px;
-  animation: tooltipFadeIn 0.15s ease-out;
-}
-
-@keyframes tooltipFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-100%) translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(-100%) translateY(0);
-  }
 }
 
 .tooltip-time {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--text-secondary);
   margin-bottom: 4px;
 }
 
@@ -584,9 +536,9 @@ onUnmounted(() => {
 
 .tooltip-status {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--text-secondary);
   margin-top: 6px;
   padding-top: 6px;
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--border-color);
 }
 </style>

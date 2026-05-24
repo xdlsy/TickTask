@@ -155,7 +155,7 @@
     <div class="settings-card">
       <div class="card-header">
         <div class="card-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-icon ai-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-icon">
             <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
             <circle cx="8" cy="14" r="1.5"/>
             <circle cx="16" cy="14" r="1.5"/>
@@ -434,7 +434,6 @@ onMounted(() => {
   padding: 0;
   max-width: 900px;
   margin: 0 auto;
-  position: relative;
 }
 
 .page-header {
@@ -442,44 +441,35 @@ onMounted(() => {
   padding-bottom: 24px;
   border-bottom: 1px solid var(--border-color);
   text-align: center;
-  position: relative;
-}
-
-.page-header::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(196, 103, 61, 0.15), transparent);
 }
 
 .page-header h1 {
-  font-size: 32px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 8px 0;
   letter-spacing: -0.5px;
 }
 
 .page-subtitle {
-  font-size: 15px;
-  color: var(--text-secondary);
+  font-size: 14px;
+  color: var(--text-muted);
   margin: 0;
+  font-weight: 400;
 }
 
 .settings-card {
   background: var(--bg-card);
-  border-radius: 20px;
+  border-radius: var(--radius-xl);
   margin-bottom: 28px;
   border: 1px solid var(--border-color);
   overflow: hidden;
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal);
 }
 
 .settings-card:hover {
-  border-color: rgba(196, 103, 61, 0.12);
+  border-color: var(--border-accent);
 }
 
 .card-header {
@@ -493,22 +483,16 @@ onMounted(() => {
 .card-title {
   display: flex;
   align-items: center;
-  gap: 14px;
-  font-size: 18px;
+  gap: 12px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .card-icon {
-  width: 22px;
-  height: 22px;
-  color: var(--accent-primary);
-  filter: drop-shadow(0 0 6px var(--accent-primary));
-}
-
-.card-icon.ai-icon {
-  color: var(--accent-secondary);
-  filter: drop-shadow(0 0 6px var(--accent-secondary));
+  width: 20px;
+  height: 20px;
+  color: var(--text-muted);
 }
 
 .card-content {
@@ -546,7 +530,7 @@ onMounted(() => {
 
 .unit {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .settings-toggles {
@@ -579,7 +563,7 @@ onMounted(() => {
 
 .toggle-desc {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .card-actions {
@@ -637,7 +621,7 @@ onMounted(() => {
 
 .card-actions .el-button {
   min-width: 130px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .form-item {
@@ -657,7 +641,7 @@ onMounted(() => {
 }
 
 .form-item .required {
-  color: var(--accent-crimson);
+  color: var(--accent-primary);
   margin-left: 2px;
 }
 
@@ -686,32 +670,32 @@ onMounted(() => {
 }
 
 .brand-icon {
-  width: 56px;
-  height: 56px;
-  background: var(--gradient-primary);
-  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  background: rgba(184, 69, 44, 0.08);
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  box-shadow: 0 0 24px rgba(196, 103, 61, 0.25);
+  color: var(--accent-primary);
 }
 
 .brand-icon svg {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
 }
 
 .brand-info h3 {
-  font-size: 22px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
   color: var(--text-primary);
   margin: 0;
 }
 
 .brand-info p {
-  font-size: 14px;
-  color: var(--text-secondary);
+  font-size: 13px;
+  color: var(--text-muted);
   margin: 4px 0 0 0;
 }
 
@@ -726,12 +710,11 @@ onMounted(() => {
 }
 
 .version {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
   margin: 0;
 }
 
-/* 响应式 */
 @media (max-width: 768px) {
   .settings-page {
     padding: 0;

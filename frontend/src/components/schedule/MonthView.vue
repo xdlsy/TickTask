@@ -56,7 +56,6 @@ const emit = defineEmits<{
 
 const weekDayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
-// 解析 ISO 时间字符串为本地日期字符串
 function parseLocalDate(isoString: string): string {
   const date = new Date(isoString)
   const year = date.getFullYear()
@@ -65,7 +64,6 @@ function parseLocalDate(isoString: string): string {
   return `${year}-${month}-${day}`
 }
 
-// 获取某日期的事件
 function getEventsForDate(dateStr: string): ScheduleEvent[] {
   return props.events.filter(event => {
     const eventStartDate = parseLocalDate(event.start)
@@ -74,27 +72,21 @@ function getEventsForDate(dateStr: string): ScheduleEvent[] {
   })
 }
 
-// 生成日历网格
 const calendarDays = computed(() => {
   const year = props.currentDate.getFullYear()
   const month = props.currentDate.getMonth()
 
-  // 当月第一天
   const firstDay = new Date(year, month, 1)
-  // 当月最后一天
   const lastDay = new Date(year, month + 1, 0)
 
-  // 计算日历开始日期（从周一开始）
-  const startOffset = (firstDay.getDay() + 6) % 7 // 调整为周一开始
+  const startOffset = (firstDay.getDay() + 6) % 7
   const startDate = new Date(firstDay)
   startDate.setDate(startDate.getDate() - startOffset)
 
-  // 计算日历结束日期（到周日结束）
   const endOffset = (7 - lastDay.getDay()) % 7 || 7
   const endDate = new Date(lastDay)
   endDate.setDate(endDate.getDate() + endOffset)
 
-  // 生成日期数组
   const days: Array<{
     date: Date
     dateStr: string
@@ -121,55 +113,44 @@ const calendarDays = computed(() => {
     })
 
     current.setDate(current.getDate() + 1)
-
-    // 限制最多 6 周
     if (days.length >= 42) break
   }
 
   return days
 })
 
-function onDayClick(day: { dateStr: string; events: ScheduleEvent[] }) {
-  emit('day-click', day.dateStr)
-}
-
-function onEventClick(event: ScheduleEvent) {
-  emit('event-click', event)
-}
+function onDayClick(day: { dateStr: string }) { emit('day-click', day.dateStr) }
+function onEventClick(event: ScheduleEvent) { emit('event-click', event) }
 
 function getEventColor(event: ScheduleEvent): string {
   if (event.color) return event.color
   const colors: Record<string, string> = {
-    task: '#3b82f6',
-    pomodoro: '#f59e0b',
-    break: '#22c55e',
-    custom: '#6b7280'
+    task: '#B8452C', pomodoro: '#B8954D', break: '#6B8B6F', custom: '#9C9893'
   }
-  return colors[event.type] || '#3b82f6'
+  return colors[event.type] || '#B8452C'
 }
 </script>
 
 <style scoped>
 .month-view {
-  background: #fff;
-  border-radius: 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color);
 }
 
 .weekdays-header {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: #f8fafc;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .weekday-cell {
   padding: 12px 8px;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .month-grid {
@@ -179,11 +160,11 @@ function getEventColor(event: ScheduleEvent): string {
 
 .day-cell {
   min-height: 100px;
-  border-right: 1px solid #f3f4f6;
-  border-bottom: 1px solid #f3f4f6;
-  padding: 8px;
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  padding: 10px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background var(--transition-fast);
 }
 
 .day-cell:nth-child(7n) {
@@ -191,23 +172,20 @@ function getEventColor(event: ScheduleEvent): string {
 }
 
 .day-cell:hover {
-  background: #f8fafc;
-}
-
-.day-cell.other-month {
-  background: #f9fafb;
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .day-cell.other-month .day-number {
-  color: #d1d5db;
+  color: var(--text-muted);
+  opacity: 0.5;
 }
 
 .day-cell.is-today {
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  background: rgba(184, 69, 44, 0.04);
 }
 
 .day-cell.is-today .day-number {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: var(--accent-primary);
   color: #fff;
 }
 
@@ -219,24 +197,22 @@ function getEventColor(event: ScheduleEvent): string {
 }
 
 .day-number {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--text-primary);
   border-radius: 50%;
 }
 
 .event-count {
-  font-size: 11px;
-  color: #fff;
-  background: #6b7280;
-  padding: 2px 6px;
-  border-radius: 10px;
+  font-size: 10px;
+  color: var(--text-muted);
   font-weight: 500;
+  font-family: var(--font-mono);
 }
 
 .day-events {
@@ -249,17 +225,16 @@ function getEventColor(event: ScheduleEvent): string {
   display: flex;
   align-items: center;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 3px;
   font-size: 11px;
   color: #fff;
   overflow: hidden;
-  transition: transform 0.2s, box-shadow 0.2s;
   cursor: pointer;
+  transition: opacity var(--transition-fast);
 }
 
 .event-item:hover {
-  transform: scale(1.02);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  opacity: 0.85;
 }
 
 .event-title {
@@ -271,8 +246,7 @@ function getEventColor(event: ScheduleEvent): string {
 
 .more-events {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-muted);
   padding: 2px 6px;
-  text-align: center;
 }
 </style>

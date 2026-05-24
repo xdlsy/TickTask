@@ -102,16 +102,17 @@ function onSaveTask(data: any) {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f0f2f5;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .tasks-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 32px;
-  background: #fff;
-  border-bottom: 1px solid #e2e8f0;
+  padding: 0 0 32px 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 32px;
 }
 
 .header-left {
@@ -121,69 +122,65 @@ function onSaveTask(data: any) {
 }
 
 .page-title h1 {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 2px 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
 }
 
 .page-subtitle {
   font-size: 14px;
-  color: #64748b;
+  color: var(--text-muted);
   margin: 0;
+  font-weight: 400;
 }
 
-/* 视图切换 */
 .view-switch {
   display: flex;
-  background: #f1f5f9;
-  border-radius: 12px;
+  background: var(--bg-card);
+  border-radius: 10px;
   padding: 4px;
+  border: 1px solid var(--border-color);
 }
 
 .view-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 18px;
+  padding: 8px 18px;
   border: none;
   background: transparent;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  color: #64748b;
-  transition: all 0.2s ease;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
 }
 
 .view-btn svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .view-btn:hover {
-  color: #334155;
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .view-btn.active {
-  background: #fff;
-  color: #1e293b;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: var(--accent-primary);
+  color: #fff;
 }
 
 .add-btn {
   height: 44px;
   padding: 0 24px;
-  font-size: 15px;
-  font-weight: 600;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border: none;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
-}
-
-.add-btn:hover {
-  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--radius-md);
 }
 
 .tasks-content {
@@ -191,20 +188,19 @@ function onSaveTask(data: any) {
   overflow: hidden;
 }
 
-/* 响应式 */
 @media (max-width: 768px) {
   .tasks-header {
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
     align-items: flex-start;
-    padding: 20px;
+    padding: 0 0 24px 0;
   }
 
   .header-left {
     width: 100%;
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
+    gap: 20px;
   }
 
   .view-text {

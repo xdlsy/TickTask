@@ -82,7 +82,6 @@ const statusLabels: Record<SessionStatus, string> = {
   abandoned: '已放弃'
 }
 
-// 使用 SVG 图标替代表情
 function getSessionIcon(type: SessionType) {
   if (type === 'work') {
     return {
@@ -162,7 +161,6 @@ onMounted(() => {
 .timer-page {
   max-width: 700px;
   margin: 0 auto;
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -170,99 +168,46 @@ onMounted(() => {
 
 .timer-container {
   background: var(--bg-card);
-  border-radius: 32px;
+  border-radius: var(--radius-2xl);
   padding: 56px 48px;
-  box-shadow: 0 16px 60px rgba(60, 30, 10, 0.1);
   margin-bottom: 32px;
   border: 1px solid var(--border-color);
-  position: relative;
-  overflow: hidden;
   width: 100%;
-}
-
-.timer-container::before {
-  content: '';
-  position: absolute;
-  top: -30%;
-  left: -30%;
-  width: 160%;
-  height: 160%;
-  background: radial-gradient(circle at center, rgba(196, 103, 61, 0.04) 0%, transparent 50%);
-  pointer-events: none;
-  animation: rotate 30s linear infinite;
-}
-
-@keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 .timer-header {
   text-align: center;
   margin-bottom: 48px;
-  position: relative;
-  z-index: 1;
 }
 
 .timer-header h2 {
-  font-size: 32px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
   color: var(--text-primary);
-  margin: 0 0 10px 0;
+  margin: 0 0 8px 0;
   letter-spacing: -0.5px;
 }
 
-.timer-header h2::before {
-  content: '';
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  background: var(--accent-primary);
-  border-radius: 50%;
-  margin-right: 16px;
-  vertical-align: middle;
-  box-shadow: 0 0 16px var(--accent-primary);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.8); opacity: 0.5; }
-}
-
 .subtitle {
-  font-size: 15px;
-  color: var(--text-secondary);
+  font-size: 14px;
+  color: var(--text-muted);
   margin: 0;
+  font-weight: 400;
 }
 
 .timer-main {
   display: flex;
   justify-content: center;
   margin-bottom: 40px;
-  position: relative;
-  z-index: 1;
 }
 
-/* 最近会话区域 */
 .recent-sessions {
   background: var(--bg-card);
-  border-radius: 24px;
+  border-radius: var(--radius-xl);
   padding: 32px;
-  box-shadow: 0 8px 32px rgba(60, 30, 10, 0.08);
   border: 1px solid var(--border-color);
-  position: relative;
   width: 100%;
-}
-
-.recent-sessions::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 32px;
-  right: 32px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(196, 103, 61, 0.2), transparent);
 }
 
 .section-header {
@@ -273,45 +218,31 @@ onMounted(() => {
 }
 
 .section-header h3 {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.section-header h3::before {
-  content: '';
-  width: 4px;
-  height: 20px;
-  background: var(--gradient-primary);
-  border-radius: 2px;
 }
 
 .session-count {
-  font-size: 13px;
-  color: var(--text-secondary);
-  background: rgba(196, 103, 61, 0.05);
-  padding: 6px 14px;
-  border-radius: 20px;
+  font-size: 12px;
+  color: var(--text-muted);
   font-family: var(--font-mono);
 }
 
 .empty-state {
   text-align: center;
   padding: 48px 24px;
-  background: rgba(196, 103, 61, 0.02);
   border-radius: var(--radius-md);
   border: 1px dashed var(--border-color);
 }
 
 .empty-icon {
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   margin: 0 auto 16px;
   color: var(--text-muted);
+  opacity: 0.4;
 }
 
 .empty-icon svg {
@@ -322,6 +253,7 @@ onMounted(() => {
 .empty-state p {
   color: var(--text-secondary);
   margin: 0 0 4px 0;
+  font-size: 14px;
 }
 
 .empty-hint {
@@ -329,11 +261,10 @@ onMounted(() => {
   color: var(--text-muted) !important;
 }
 
-/* 会话列表 */
 .session-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .session-item {
@@ -341,16 +272,14 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 14px 16px;
-  background: rgba(196, 103, 61, 0.02);
   border-radius: var(--radius-md);
-  transition: all var(--transition-normal);
+  transition: background var(--transition-fast);
   border: 1px solid transparent;
 }
 
 .session-item:hover {
-  background: rgba(196, 103, 61, 0.04);
-  border-color: rgba(196, 103, 61, 0.1);
-  transform: translateX(4px);
+  background: rgba(0, 0, 0, 0.02);
+  border-color: var(--border-color);
 }
 
 .session-left {
@@ -360,49 +289,32 @@ onMounted(() => {
 }
 
 .session-icon {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-}
-
-.session-icon::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: var(--radius-sm);
-  background: inherit;
-  filter: blur(8px);
-  opacity: 0.4;
-  z-index: -1;
 }
 
 .session-icon svg {
   width: 18px;
   height: 18px;
-  position: relative;
-  z-index: 1;
 }
 
 .icon-work {
-  background: linear-gradient(135deg, #C4554D, #D4786D);
-  color: #fff;
-  box-shadow: 0 0 12px rgba(196, 85, 77, 0.25);
+  background: rgba(184, 69, 44, 0.08);
+  color: var(--accent-primary);
 }
 
 .icon-short_break {
-  background: linear-gradient(135deg, #6B8B6F, #8BA88E);
-  color: #fff;
-  box-shadow: 0 0 12px rgba(107, 139, 111, 0.25);
+  background: rgba(107, 139, 111, 0.08);
+  color: var(--accent-sage);
 }
 
 .icon-long_break {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  color: #fff;
-  box-shadow: 0 0 12px rgba(196, 103, 61, 0.2);
+  background: rgba(184, 149, 77, 0.08);
+  color: var(--accent-gold);
 }
 
 .session-info {
@@ -421,68 +333,52 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.session-duration {
   color: var(--text-muted);
-  font-family: var(--font-mono);
 }
 
 .session-duration::before {
-  content: '·';
+  content: '\00B7';
   margin-right: 8px;
 }
 
 .interrupt-reason {
-  color: var(--accent-crimson);
+  color: var(--accent-primary);
   font-size: 11px;
 }
 
 .interrupt-reason::before {
-  content: '·';
+  content: '\00B7';
   margin-right: 8px;
+  color: var(--text-muted);
 }
 
-/* 状态标签 */
 .session-status {
-  padding: 5px 12px;
-  border-radius: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .status-completed {
-  background: rgba(107, 139, 111, 0.08);
+  background: rgba(107, 139, 111, 0.06);
   color: var(--accent-sage);
-  border: 1px solid rgba(107, 139, 111, 0.15);
 }
 
 .status-abandoned {
-  background: rgba(196, 85, 77, 0.08);
-  color: var(--accent-crimson);
-  border: 1px solid rgba(196, 85, 77, 0.15);
+  background: rgba(184, 69, 44, 0.06);
+  color: var(--accent-primary);
 }
 
 .status-paused {
-  background: rgba(196, 149, 61, 0.08);
+  background: rgba(184, 149, 77, 0.06);
   color: var(--accent-gold);
-  border: 1px solid rgba(196, 149, 61, 0.15);
 }
 
 .status-running {
-  background: rgba(196, 103, 61, 0.08);
+  background: rgba(184, 69, 44, 0.06);
   color: var(--accent-primary);
-  border: 1px solid rgba(196, 103, 61, 0.15);
-  animation: statusGlow 2s ease-in-out infinite;
 }
 
-@keyframes statusGlow {
-  0%, 100% { box-shadow: 0 0 8px rgba(196, 103, 61, 0.15); }
-  50% { box-shadow: 0 0 16px rgba(196, 103, 61, 0.25); }
-}
-
-/* 响应式 */
 @media (max-width: 640px) {
   .timer-page {
     padding: 20px;
@@ -499,7 +395,7 @@ onMounted(() => {
 
   .recent-sessions {
     padding: 20px;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
   }
 
   .session-item {
@@ -507,8 +403,8 @@ onMounted(() => {
   }
 
   .session-icon {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
   }
 }
 </style>

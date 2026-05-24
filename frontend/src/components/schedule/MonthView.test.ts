@@ -243,7 +243,7 @@ describe('MonthView', () => {
       })
 
       const eventItem = wrapper.find('.event-item')
-      expect(eventItem.attributes('style')).toContain('background-color: rgb(245, 158, 11)')
+      expect(eventItem.attributes('style')).toContain('background-color: rgb(196, 151, 61)')
     })
 
     it('休息类型默认绿色', () => {
@@ -257,7 +257,7 @@ describe('MonthView', () => {
       })
 
       const eventItem = wrapper.find('.event-item')
-      expect(eventItem.attributes('style')).toContain('background-color: rgb(34, 197, 94)')
+      expect(eventItem.attributes('style')).toContain('background-color: rgb(107, 139, 111)')
     })
   })
 

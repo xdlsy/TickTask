@@ -120,11 +120,10 @@ const form = ref({
   start_time: '09:00',
   end_time: '10:00',
   type: 'task' as ScheduleType,
-  color: '#3b82f6',
+  color: '#B8452C',
   description: ''
 })
 
-// 重置表单到初始状态
 function resetForm() {
   form.value = {
     title: '',
@@ -132,15 +131,13 @@ function resetForm() {
     start_time: '09:00',
     end_time: '10:00',
     type: 'task' as ScheduleType,
-    color: '#3b82f6',
+    color: '#B8452C',
     description: ''
   }
 }
 
-// 初始化表单（编辑或新建模式）
 function initForm() {
   if (props.event) {
-    // 编辑模式：从事件读取数据
     form.value.title = props.event.title
     form.value.date = new Date(props.event.start)
     form.value.start_time = formatTimeForInput(props.event.start)
@@ -149,7 +146,6 @@ function initForm() {
     form.value.color = props.event.color
     form.value.description = ''
   } else {
-    // 新建模式：使用默认值
     resetForm()
     if (props.defaultDate) {
       form.value.date = new Date(props.defaultDate)
@@ -162,9 +158,7 @@ function initForm() {
 }
 
 watch(() => props.visible, (visible) => {
-  if (visible) {
-    initForm()
-  }
+  if (visible) initForm()
 }, { immediate: true })
 
 function formatTimeForInput(dateStr: string): string {
@@ -172,15 +166,8 @@ function formatTimeForInput(dateStr: string): string {
   return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 
-function onStartTimeChange(val: string) {
-  // 确保开始时间值被正确保存
-  form.value.start_time = val
-}
-
-function onEndTimeChange(val: string) {
-  // 确保结束时间值被正确保存
-  form.value.end_time = val
-}
+function onStartTimeChange(val: string) { form.value.start_time = val }
+function onEndTimeChange(val: string) { form.value.end_time = val }
 
 function combineDateTime(date: Date, time: string): string {
   const [hours, minutes] = time.split(':').map(Number)
@@ -219,9 +206,7 @@ function handleSave() {
 }
 
 function handleDelete() {
-  if (props.event) {
-    emit('delete', props.event.id)
-  }
+  if (props.event) emit('delete', props.event.id)
 }
 </script>
 
@@ -237,30 +222,31 @@ function handleDelete() {
 }
 
 .time-separator {
-  color: #6b7280;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .color-picker {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .color-option {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: opacity var(--transition-fast);
   border: 2px solid transparent;
 }
 
 .color-option:hover {
-  transform: scale(1.1);
+  opacity: 0.8;
 }
 
 .color-option.active {
-  border-color: #1f2937;
-  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1f2937;
+  border-color: var(--text-primary);
+  opacity: 1;
 }
 </style>

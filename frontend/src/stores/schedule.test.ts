@@ -300,29 +300,24 @@ describe('Schedule Store', () => {
   describe('navigation', () => {
     it('should navigate to previous week', () => {
       const store = useScheduleStore()
-      const initialDate = new Date(store.currentDate)
+      const initialTime = store.currentDate.getTime()
 
       store.goToPrevious()
 
-      const expectedDate = new Date(initialDate)
-      expectedDate.setDate(expectedDate.getDate() - 7)
-
-      // Check if the date changed by approximately 7 days
-      const diffDays = Math.abs(store.currentDate.getDate() - initialDate.getDate())
-      expect(diffDays).toBeCloseTo(7, -1) // Allow some tolerance for month boundaries
+      const diffMs = initialTime - store.currentDate.getTime()
+      const diffDays = diffMs / (1000 * 60 * 60 * 24)
+      expect(diffDays).toBeCloseTo(7, 0)
     })
 
     it('should navigate to next week', () => {
       const store = useScheduleStore()
-      const initialDate = new Date(store.currentDate)
+      const initialTime = store.currentDate.getTime()
 
       store.goToNext()
 
-      const expectedDate = new Date(initialDate)
-      expectedDate.setDate(expectedDate.getDate() + 7)
-
-      const diffDays = Math.abs(store.currentDate.getDate() - initialDate.getDate())
-      expect(diffDays).toBeCloseTo(7, -1)
+      const diffMs = store.currentDate.getTime() - initialTime
+      const diffDays = diffMs / (1000 * 60 * 60 * 24)
+      expect(diffDays).toBeCloseTo(7, 0)
     })
 
     it('should navigate to today', () => {

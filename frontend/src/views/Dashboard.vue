@@ -91,14 +91,7 @@
         <!-- AI 日程生成 -->
         <div class="card ai-section" v-if="aiStore.configured">
           <div class="card-header">
-            <h3>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ai-icon">
-                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
-                <circle cx="8" cy="14" r="1.5"/>
-                <circle cx="16" cy="14" r="1.5"/>
-              </svg>
-              AI 日程助手
-            </h3>
+            <h3>AI 日程助手</h3>
           </div>
           <div class="schedule-form">
             <div class="time-inputs">
@@ -142,17 +135,9 @@
           </div>
         </div>
 
-        <!-- AI 未配置提示 -->
         <div class="card ai-section ai-not-configured" v-else>
           <div class="card-header">
-            <h3>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ai-icon">
-                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
-                <circle cx="8" cy="14" r="1.5"/>
-                <circle cx="16" cy="14" r="1.5"/>
-              </svg>
-              AI 日程助手
-            </h3>
+            <h3>AI 日程助手</h3>
           </div>
           <div class="ai-placeholder">
             <p>配置 AI API Key 以解锁智能日程生成功能</p>
@@ -181,7 +166,6 @@
           </div>
         </div>
 
-        <!-- AI 优先级建议 -->
         <div class="card priority-card" v-if="aiStore.configured">
           <div class="card-header">
             <h3>优先级建议</h3>
@@ -323,55 +307,59 @@ onMounted(async () => {
 
 <style scoped>
 .dashboard {
-  padding: 32px;
-  max-width: 1400px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 
 .page-header {
-  margin-bottom: 32px;
+  margin-bottom: 48px;
 }
 
 .page-header h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 4px 0;
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
 }
 
 .page-subtitle {
-  font-size: 15px;
-  color: #64748b;
+  font-size: 14px;
+  color: var(--text-muted);
   margin: 0;
+  font-weight: 400;
 }
 
+/* 统计卡片 */
 .stats-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 32px;
+  gap: 16px;
+  margin-bottom: 48px;
 }
 
 .stat-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 24px;
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
+  padding: 24px 20px;
   display: flex;
   align-items: center;
   gap: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-normal);
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border-color: var(--border-accent);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
 }
 
 .stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -379,46 +367,56 @@ onMounted(async () => {
 }
 
 .stat-icon svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
 }
 
 .stat-icon.pomodoro {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-  color: #fff;
+  background: rgba(184, 69, 44, 0.08);
+  color: var(--accent-primary);
 }
 
 .stat-icon.focus {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  color: #fff;
+  background: rgba(184, 149, 77, 0.08);
+  color: var(--accent-gold);
 }
 
 .stat-icon.completed {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  color: #fff;
+  background: rgba(107, 139, 111, 0.08);
+  color: var(--accent-sage);
 }
 
 .stat-icon.pending {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: #fff;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-secondary);
+}
+
+.stat-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 44px;
 }
 
 .stat-value {
-  font-size: 32px;
-  font-weight: 700;
-  color: #1e293b;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary);
   line-height: 1;
+  font-family: var(--font-mono);
+  letter-spacing: -0.5px;
 }
 
 .stat-label {
-  font-size: 14px;
-  color: #64748b;
+  font-size: 12px;
+  color: var(--text-muted);
   margin-top: 4px;
+  font-weight: 400;
 }
 
 .dashboard-content {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: 1fr 300px;
   gap: 24px;
 }
 
@@ -431,14 +429,19 @@ onMounted(async () => {
 .side-column {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 .card {
-  background: #fff;
-  border-radius: 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius-xl);
   padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color);
+  transition: border-color var(--transition-normal);
+}
+
+.card:hover {
+  border-color: var(--border-accent);
 }
 
 .card-header {
@@ -449,59 +452,76 @@ onMounted(async () => {
 }
 
 .card-header h3 {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-primary);
   margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ai-icon {
-  width: 20px;
-  height: 20px;
-  color: #8b5cf6;
+  letter-spacing: -0.2px;
 }
 
 .empty-state {
   text-align: center;
-  padding: 48px 24px;
+  padding: 48px 32px;
+  border-radius: var(--radius-md);
 }
 
 .empty-icon {
-  width: 64px;
-  height: 64px;
-  color: #cbd5e1;
-  margin-bottom: 16px;
+  width: 48px;
+  height: 48px;
+  color: var(--text-muted);
+  margin: 0 auto 16px;
+  opacity: 0.5;
 }
 
 .empty-state p {
-  color: #64748b;
+  color: var(--text-muted);
   margin-bottom: 16px;
+  font-size: 14px;
 }
 
 .task-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
 }
 
 .quick-actions-card .quick-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   align-items: stretch;
 }
 
 .quick-actions .el-button {
   width: 100%;
   height: 48px;
-  font-size: 15px;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all var(--transition-normal);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  margin-left: 0;
+}
+
+.quick-actions .el-button:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: var(--border-accent);
+}
+
+.quick-actions .el-button--primary {
+  background: var(--accent-primary);
+  border: none;
+  color: #fff;
+}
+
+.quick-actions .el-button--primary:hover {
+  background: var(--accent-secondary);
 }
 
 .quick-actions .el-button .el-icon {
@@ -511,8 +531,8 @@ onMounted(async () => {
 .ai-section .schedule-form {
   display: flex;
   gap: 12px;
-  align-items: flex-end;
-  margin-bottom: 20px;
+  align-items: center;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
@@ -523,126 +543,125 @@ onMounted(async () => {
 }
 
 .time-separator {
-  color: #64748b;
-  font-size: 14px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
 .schedule-result {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 
 .schedule-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
-  background: #f8fafc;
-  border-radius: 10px;
-  margin-bottom: 8px;
-  transition: all 0.2s ease;
+  padding: 12px 14px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
+  transition: all var(--transition-fast);
 }
 
 .schedule-item:hover {
-  background: #f1f5f9;
+  background: var(--bg-secondary);
 }
 
 .schedule-time {
-  font-size: 13px;
-  color: #3b82f6;
-  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
   min-width: 100px;
+  font-family: var(--font-mono);
 }
 
 .schedule-task {
   flex: 1;
   font-weight: 500;
-  color: #334155;
-}
-
-.schedule-pomodoros {
-  font-size: 12px;
-  color: #64748b;
-  background: #e0f2fe;
-  padding: 2px 8px;
-  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 13px;
 }
 
 .ai-placeholder {
   text-align: center;
-  padding: 32px 24px;
-  background: #f8fafc;
-  border-radius: 12px;
-  border: 1px dashed #cbd5e1;
+  padding: 28px 20px;
+  border-radius: var(--radius-md);
 }
 
 .ai-placeholder p {
-  color: #64748b;
-  margin-bottom: 16px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  font-size: 13px;
 }
 
 .priority-card .priority-list {
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .priority-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid #f1f5f9;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+  transition: padding var(--transition-fast);
 }
 
 .priority-item:last-child {
   border-bottom: none;
 }
 
+.priority-item:hover {
+  padding-left: 4px;
+}
+
 .priority-rank {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   flex-shrink: 0;
+  font-family: var(--font-mono);
 }
 
 .priority-rank.rank-1 {
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-  color: #fff;
+  background: rgba(184, 69, 44, 0.10);
+  color: var(--accent-primary);
 }
 
 .priority-rank.rank-2 {
-  background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
-  color: #fff;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-secondary);
 }
 
 .priority-rank.rank-3 {
-  background: linear-gradient(135deg, #cd7f32 0%, #b8860b 100%);
-  color: #fff;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-secondary);
 }
 
 .priority-rank.rank-4,
 .priority-rank.rank-5 {
-  background: #e2e8f0;
-  color: #475569;
+  background: transparent;
+  color: var(--text-muted);
 }
 
 .priority-title {
   flex: 1;
-  font-size: 14px;
-  color: #334155;
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
 .priority-empty {
   text-align: center;
-  padding: 24px;
-  color: #94a3b8;
-  font-size: 14px;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 13px;
 }
 
-/* 响应式 */
 @media (max-width: 1200px) {
   .stats-cards {
     grid-template-columns: repeat(2, 1fr);
@@ -662,10 +681,6 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .dashboard {
-    padding: 20px;
-  }
-
   .stats-cards {
     grid-template-columns: 1fr;
   }

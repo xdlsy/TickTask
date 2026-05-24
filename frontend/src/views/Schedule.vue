@@ -277,30 +277,38 @@ async function loadSchedules() {
 
 <style scoped>
 .schedule-page {
-  padding: 32px;
+  padding: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
 }
 
 .header-left h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 4px 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
 }
 
 .page-subtitle {
-  font-size: 15px;
-  color: #64748b;
+  font-size: 14px;
+  color: var(--text-muted);
   margin: 0;
+  font-weight: 400;
 }
 
 .header-actions {
@@ -311,120 +319,123 @@ async function loadSchedules() {
 
 .view-switch {
   display: flex;
-  background: #f1f5f9;
-  border-radius: 12px;
-  padding: 4px;
+  background: var(--bg-elevated);
+  border-radius: 14px;
+  padding: 6px;
+  border: 1px solid var(--border-color);
 }
 
 .view-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
+  gap: 8px;
+  padding: 10px 20px;
   border: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  color: #64748b;
-  transition: all 0.2s ease;
+  color: var(--text-secondary);
+  transition: all var(--transition-normal);
 }
 
 .view-btn:hover {
-  color: #334155;
+  color: var(--text-primary);
 }
 
 .view-btn.active {
-  background: #fff;
-  color: #1e293b;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: var(--accent-primary);
+  color: #fff;
 }
 
 .create-btn {
   height: 44px;
-  padding: 0 20px;
-  font-size: 15px;
-  font-weight: 600;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border: none;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  padding: 0 24px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.create-btn:hover {
-  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
 }
 
 .schedule-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .navigation {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .nav-btn {
-  width: 36px;
-  height: 36px;
-  border: none;
-  background: #fff;
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  border-radius: 12px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.2s;
+  transition: all var(--transition-normal);
 }
 
 .nav-btn:hover {
-  background: #f1f5f9;
+  background: rgba(0, 0, 0, 0.03);
+  border-color: var(--border-accent);
 }
 
 .nav-btn svg {
   width: 20px;
   height: 20px;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .current-period {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  color: #1e293b;
-  min-width: 180px;
+  color: var(--text-primary);
+  min-width: 200px;
   text-align: center;
 }
 
 .today-btn {
-  padding: 8px 16px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  border-radius: 8px;
+  padding: 10px 20px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  border-radius: 10px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  color: #475569;
-  transition: all 0.2s;
+  color: var(--text-secondary);
+  transition: all var(--transition-normal);
 }
 
 .today-btn:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
+  background: rgba(0, 0, 0, 0.03);
+  border-color: var(--border-accent);
+  color: var(--text-primary);
 }
 
 .toolbar-actions .el-button {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+}
+
+.toolbar-actions .el-button:hover {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: var(--border-accent);
 }
 
 .schedule-content {

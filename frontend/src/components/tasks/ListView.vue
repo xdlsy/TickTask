@@ -1,6 +1,5 @@
 <template>
   <div class="list-view">
-    <!-- 筛选和排序栏 -->
     <div class="list-toolbar">
       <div class="filter-group">
         <el-select v-model="statusFilter" placeholder="状态筛选" clearable size="small" style="width: 120px">
@@ -28,10 +27,16 @@
       </div>
     </div>
 
-    <!-- 任务列表 -->
     <div class="task-list">
       <div v-if="filteredTasks.length === 0" class="empty-state">
-        <div class="empty-icon">📋</div>
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="9" y1="9" x2="15" y2="9"/>
+            <line x1="9" y1="13" x2="15" y2="13"/>
+            <line x1="9" y1="17" x2="12" y2="17"/>
+          </svg>
+        </div>
         <p>暂无任务</p>
         <p class="empty-hint">点击右上角添加你的第一个任务</p>
       </div>
@@ -42,12 +47,12 @@
         class="task-item"
         :class="{ completed: task.status === 'completed' }"
       >
-        <!-- 完成勾选 -->
         <div class="task-checkbox" @click="onCompleteTask(task.id)">
-          <span v-if="task.status === 'completed'" class="check-icon">✓</span>
+          <svg v-if="task.status === 'completed'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14" class="check-icon">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
         </div>
 
-        <!-- 任务内容 -->
         <div class="task-main" @click="onEditTask(task)">
           <div class="task-header">
             <span class="task-title">{{ task.title }}</span>
@@ -60,28 +65,29 @@
             <span v-if="task.description" class="task-desc">{{ task.description }}</span>
             <div class="task-tags">
               <span v-if="task.deadline" class="tag deadline" :class="{ overdue: isOverdue(task.deadline) }">
-                📅 {{ formatDate(task.deadline) }}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13" class="tag-icon"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                {{ formatDate(task.deadline) }}
               </span>
               <span v-if="task.estimated_time" class="tag time">
-                ⏱ {{ task.estimated_time }} 分钟
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13" class="tag-icon"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                {{ task.estimated_time }} 分钟
               </span>
             </div>
           </div>
         </div>
 
-        <!-- 操作按钮 -->
         <div class="task-actions">
           <el-dropdown trigger="click" @command="(cmd: string) => handleCommand(cmd, task)">
-            <span class="action-btn">⋯</span>
+            <span class="action-btn">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+            </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item v-if="task.status !== 'completed'" command="startTimer">
-                  🍅 开始番茄
-                </el-dropdown-item>
+                <el-dropdown-item v-if="task.status !== 'completed'" command="startTimer">开始番茄</el-dropdown-item>
                 <el-dropdown-item command="edit">编辑</el-dropdown-item>
                 <el-dropdown-item v-if="task.status !== 'completed'" command="complete">标记完成</el-dropdown-item>
                 <el-dropdown-item v-if="task.status === 'completed'" command="reopen">重新打开</el-dropdown-item>
-                <el-dropdown-item command="delete" divided style="color: #ef4444">删除</el-dropdown-item>
+                <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -89,7 +95,6 @@
       </div>
     </div>
 
-    <!-- 任务表单 -->
     <TaskForm
       v-if="showForm"
       :visible="showForm"
@@ -116,29 +121,23 @@ const timerStore = useTimerStore()
 const showForm = ref(false)
 const editingTask = ref<Task | null>(null)
 
-// 筛选和排序
 const statusFilter = ref('')
 const quadrantFilter = ref('')
 const sortBy = ref('created')
 
-// 获取任务列表
 const tasks = computed(() => taskStore.tasks)
 
-// 筛选后的任务
 const filteredTasks = computed(() => {
   let result = [...tasks.value]
 
-  // 状态筛选
   if (statusFilter.value) {
     result = result.filter(t => t.status === statusFilter.value)
   }
 
-  // 象限筛选
   if (quadrantFilter.value) {
     result = result.filter(t => t.quadrant === parseInt(quadrantFilter.value))
   }
 
-  // 排序
   if (sortBy.value === 'created') {
     result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   } else if (sortBy.value === 'deadline') {
@@ -181,7 +180,6 @@ function onEditTask(task: Task) {
 async function onCompleteTask(id: string) {
   const task = tasks.value.find(t => t.id === id)
   if (task?.status === 'completed') {
-    // 已完成，重新打开
     await taskStore.updateTask(id, { status: 'todo' })
   } else {
     await taskStore.markCompleted(id)
@@ -229,7 +227,6 @@ async function startTimerForTask(task: Task) {
   }
 }
 
-// 暴露添加任务方法
 function onAddTask() {
   editingTask.value = null
   showForm.value = true
@@ -242,20 +239,19 @@ defineExpose({
 
 <style scoped>
 .list-view {
-  padding: 16px 24px;
+  padding: 20px 24px;
   height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-/* 工具栏 */
 .list-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .filter-group,
@@ -264,7 +260,6 @@ defineExpose({
   gap: 12px;
 }
 
-/* 任务列表 */
 .task-list {
   flex: 1;
   overflow-y: auto;
@@ -275,83 +270,80 @@ defineExpose({
 
 .empty-state {
   text-align: center;
-  padding: 60px 24px;
+  padding: 64px 24px;
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-color);
 }
 
 .empty-icon {
-  font-size: 48px;
   margin-bottom: 16px;
+  color: var(--text-muted);
+  opacity: 0.4;
 }
 
 .empty-state p {
-  color: #6b7280;
+  color: var(--text-secondary);
   margin: 0 0 4px 0;
+  font-size: 14px;
 }
 
 .empty-hint {
   font-size: 13px;
-  color: #9ca3af !important;
+  color: var(--text-muted) !important;
 }
 
-/* 任务项 */
 .task-item {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  gap: 14px;
+  padding: 14px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color var(--transition-fast);
 }
 
 .task-item:hover {
-  border-color: #d1d5db;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-color: var(--border-accent);
 }
 
 .task-item.completed {
-  background: #f9fafb;
-  opacity: 0.7;
+  opacity: 0.5;
 }
 
 .task-item.completed .task-title {
   text-decoration: line-through;
-  color: #9ca3af;
+  color: var(--text-muted);
 }
 
-/* 勾选框 */
 .task-checkbox {
   width: 20px;
   height: 20px;
-  border: 2px solid #d1d5db;
+  border: 2px solid var(--border-accent);
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  margin-top: 2px;
-  transition: all 0.2s ease;
+  margin-top: 1px;
+  transition: all var(--transition-fast);
 }
 
 .task-checkbox:hover {
-  border-color: #3b82f6;
+  border-color: var(--accent-primary);
 }
 
 .task-item.completed .task-checkbox {
-  background: #22c55e;
-  border-color: #22c55e;
+  background: var(--accent-sage);
+  border-color: var(--accent-sage);
 }
 
 .check-icon {
   color: #fff;
-  font-size: 12px;
-  font-weight: bold;
 }
 
-/* 任务主体 */
 .task-main {
   flex: 1;
   min-width: 0;
@@ -361,13 +353,13 @@ defineExpose({
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .task-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  color: #1f2937;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -376,40 +368,40 @@ defineExpose({
 .task-quadrant {
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-weight: 500;
   flex-shrink: 0;
 }
 
 .task-quadrant.quadrant-1 {
-  background: #fef2f2;
-  color: #dc2626;
+  background: rgba(184, 69, 44, 0.06);
+  color: var(--accent-primary);
 }
 
 .task-quadrant.quadrant-2 {
-  background: #fffbeb;
-  color: #d97706;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-secondary);
 }
 
 .task-quadrant.quadrant-3 {
-  background: #eff6ff;
-  color: #2563eb;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-secondary);
 }
 
 .task-quadrant.quadrant-4 {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: rgba(0, 0, 0, 0.03);
+  color: var(--text-muted);
 }
 
 .task-meta {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .task-desc {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -417,24 +409,26 @@ defineExpose({
 
 .task-tags {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .tag {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.tag.deadline {
-  color: #6b7280;
+.tag-icon {
+  flex-shrink: 0;
 }
 
 .tag.deadline.overdue {
-  color: #ef4444;
+  color: var(--accent-primary);
 }
 
-/* 操作按钮 */
 .task-actions {
   flex-shrink: 0;
 }
@@ -447,17 +441,15 @@ defineExpose({
   height: 28px;
   border-radius: 6px;
   cursor: pointer;
-  color: #9ca3af;
-  font-weight: bold;
-  letter-spacing: 2px;
+  color: var(--text-muted);
+  transition: all var(--transition-fast);
 }
 
 .action-btn:hover {
-  background: #f3f4f6;
-  color: #6b7280;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-primary);
 }
 
-/* 响应式 */
 @media (max-width: 640px) {
   .list-view {
     padding: 12px 16px;
