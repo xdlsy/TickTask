@@ -69,11 +69,11 @@ export const useTimerStore = defineStore('timer', () => {
     }
   }
 
-  async function controlSession(action: 'pause' | 'resume' | 'complete' | 'abandon') {
+  async function controlSession(action: 'pause' | 'resume' | 'complete' | 'abandon', interruptReason?: string) {
     if (!currentSession.value) return
 
     try {
-      await api.controlSession(currentSession.value.id, action)
+      await api.controlSession(currentSession.value.id, action, interruptReason)
 
       // 更新本地状态
       if (action === 'pause') {
@@ -84,6 +84,9 @@ export const useTimerStore = defineStore('timer', () => {
         currentSession.value.end_time = now.toISOString()
       } else if (action === 'abandon') {
         currentSession.value.status = 'abandoned'
+        if (interruptReason) {
+          currentSession.value.interrupt_reason = interruptReason
+        }
         currentSession.value = null
       }
 

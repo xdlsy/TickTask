@@ -32,9 +32,11 @@ type Schedule struct {
 	EndTime     time.Time     `gorm:"not null" json:"end_time"`
 	Type        ScheduleType  `gorm:"not null;size:20;default:'task'" json:"type"`
 	Status      ScheduleStatus `gorm:"not null;size:20;default:'planned'" json:"status"`
-	Color       string        `gorm:"size:20" json:"color"`
-	CreatedAt   time.Time     `json:"created_at"`
-	UpdatedAt   time.Time     `json:"updated_at"`
+	Color          string        `gorm:"size:20" json:"color"`
+	AIAdjusted     bool          `gorm:"default:false" json:"ai_adjusted"`
+	AdjustmentType string        `gorm:"size:20" json:"adjustment_type"` // postponed/shortened/unchanged
+	CreatedAt      time.Time     `json:"created_at"`
+	UpdatedAt      time.Time     `json:"updated_at"`
 }
 
 // TableName 指定表名

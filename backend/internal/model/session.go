@@ -30,6 +30,7 @@ type PomodoroSession struct {
 	PlannedDuration int           `gorm:"not null" json:"planned_duration"` // 秒
 	ActualDuration  *int          `json:"actual_duration"`                  // 秒
 	Interruptions   int           `gorm:"default:0" json:"interruptions"`
+	InterruptReason *string       `gorm:"size:50" json:"interrupt_reason"` // meeting/call/urgent/other
 	CreatedAt       time.Time     `json:"created_at"`
 }
 

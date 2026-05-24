@@ -61,7 +61,7 @@ func main() {
 	if err != nil {
 		aiSettings = nil
 	}
-	aiService := service.NewAIService(aiSettings, taskRepo)
+	aiService := service.NewAIService(aiSettings, taskRepo, scheduleRepo, sessionRepo)
 
 	// 初始化 Schedule Service
 	scheduleService := service.NewScheduleService(scheduleRepo, taskRepo, aiService)
@@ -81,3 +81,4 @@ func ensureDataDir(path string) error {
 	// 简化处理，确保目录存在
 	return nil
 }
+

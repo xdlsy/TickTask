@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"ticktask/internal/service"
 	"time"
 
@@ -142,6 +143,126 @@ func (h *AIHandler) GetPrioritySuggestions(c *gin.Context) {
 	defer cancel()
 
 	result, err := h.aiService.GetPrioritySuggestions(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// ClassifyByTextRequest 根据文本分类请求
+type ClassifyByTextRequest struct {
+	Title       string `json:"title" binding:"required"`
+	Description string `json:"description"`
+}
+
+// RescheduleRequest 重排程请求
+type RescheduleRequest struct {
+	TaskID           string `json:"task_id" binding:"required"`
+	CompletedMinutes int    `json:"completed_minutes"`
+	PlannedMinutes   int    `json:"planned_minutes" binding:"required"`
+	InterruptReason  string `json:"interrupt_reason"`
+	WorkEndTime      string `json:"work_end_time" binding:"required"`
+}
+
+// DailyInsightsRequest 每日洞察请求
+type DailyInsightsRequest struct {
+	Date                 string `json:"date"`
+	CompletedPomodoros   int    `json:"completed_pomodoros"`
+	TotalFocusMinutes    int    `json:"total_focus_minutes"`
+	CompletedTasks       int    `json:"completed_tasks"`
+	TotalInterruptions   int    `json:"total_interruptions"`
+	TaskDistribution     string `json:"task_distribution"`
+}
+
+// ClassifyTaskByText 根据文本智能分类任务
+func (h *AIHandler) ClassifyTaskByText(c *gin.Context) {
+	if !h.aiService.IsConfigured() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "AI service not configured. Please set API key in settings.",
+		})
+		return
+	}
+
+	var req ClassifyByTextRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx, cancel := service.GetAIServiceWithTimeout(30 * time.Second)
+	defer cancel()
+
+	result, err := h.aiService.ClassifyTaskByText(ctx, req.Title, req.Description)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// RescheduleAfterInterrupt 被打断后 AI 重新排程
+func (h *AIHandler) RescheduleAfterInterrupt(c *gin.Context) {
+	if !h.aiService.IsConfigured() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "AI service not configured. Please set API key in settings.",
+		})
+		return
+	}
+
+	var req RescheduleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	currentTime := time.Now().Format("15:04")
+
+	ctx, cancel := service.GetAIServiceWithTimeout(60 * time.Second)
+	defer cancel()
+
+	result, err := h.aiService.RescheduleAfterInterrupt(
+		ctx, req.TaskID, req.CompletedMinutes, req.PlannedMinutes,
+		req.InterruptReason, currentTime, req.WorkEndTime,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// GetDailyInsights 获取每日 AI 洞察
+func (h *AIHandler) GetDailyInsights(c *gin.Context) {
+	if !h.aiService.IsConfigured() {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": "AI service not configured. Please set API key in settings.",
+		})
+		return
+	}
+
+	date := c.Query("date")
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+
+	// 从查询参数读取统计数据
+	completedPomodoros, _ := strconv.Atoi(c.DefaultQuery("completed_pomodoros", "0"))
+	totalFocusMinutes, _ := strconv.Atoi(c.DefaultQuery("total_focus_minutes", "0"))
+	completedTasks, _ := strconv.Atoi(c.DefaultQuery("completed_tasks", "0"))
+	totalInterruptions, _ := strconv.Atoi(c.DefaultQuery("total_interruptions", "0"))
+	taskDistribution := c.DefaultQuery("task_distribution", "")
+
+	ctx, cancel := service.GetAIServiceWithTimeout(30 * time.Second)
+	defer cancel()
+
+	result, err := h.aiService.GetDailyInsights(
+		ctx, date, completedPomodoros, totalFocusMinutes,
+		completedTasks, totalInterruptions, taskDistribution,
+	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

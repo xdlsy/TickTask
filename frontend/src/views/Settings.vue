@@ -98,6 +98,51 @@
           </div>
         </div>
 
+        <!-- AI 排程偏好 -->
+        <div class="ai-preference-section">
+          <div class="section-label">AI 排程偏好</div>
+
+          <div class="setting-item full-width">
+            <label>打断缓冲比例</label>
+            <div class="buffer-control">
+              <el-slider
+                v-model="pomodoroSettings.buffer_ratio"
+                :step="10"
+                :min="10"
+                :max="30"
+                :marks="{ 10: '10%', 20: '20%', 30: '30%' }"
+                show-stops
+              />
+              <span class="buffer-hint">约每天预留 {{ Math.round(pomodoroSettings.work_duration * pomodoroSettings.buffer_ratio / 100) }} 分钟应对打断</span>
+            </div>
+          </div>
+
+          <div class="setting-item full-width">
+            <label>任务类型时段偏好</label>
+            <div class="time-preference-grid">
+              <div class="pref-row">
+                <span class="pref-label">管理类任务</span>
+                <el-select v-model="taskTimePrefs.management" size="default" style="width: 160px">
+                  <el-option label="上午" value="morning" />
+                  <el-option label="下午" value="afternoon" />
+                  <el-option label="无所谓" value="any" />
+                </el-select>
+              </div>
+              <div class="pref-row">
+                <span class="pref-label">开发类任务</span>
+                <el-select v-model="taskTimePrefs.dev" size="default" style="width: 160px">
+                  <el-option label="上午" value="morning" />
+                  <el-option label="下午" value="afternoon" />
+                  <el-option label="无所谓" value="any" />
+                </el-select>
+              </div>
+            </div>
+            <div class="form-tip">
+              AI 会根据你的历史执行数据不断优化排程，越用越精准
+            </div>
+          </div>
+        </div>
+
         <div class="card-actions">
           <el-button type="primary" size="large" @click="savePomodoroSettings" :loading="saving">
             保存设置
@@ -241,7 +286,9 @@ const pomodoroSettings = ref<PomodoroSettings>({
   long_break_after: 4,
   auto_start_break: false,
   auto_start_work: false,
-  enable_sound: true
+  enable_sound: true,
+  buffer_ratio: 20,
+  task_time_preferences: '{"management":"any","dev":"any"}'
 })
 
 const aiSettings = ref<AISettings>({
@@ -264,6 +311,19 @@ const modelPlaceholder = computed(() => {
   if (aiSettings.value.provider === 'openai') return '选择或输入 OpenAI 模型'
   if (aiSettings.value.provider === 'anthropic') return '选择或输入 Anthropic 模型'
   return '输入模型名称'
+})
+
+const taskTimePrefs = computed({
+  get: () => {
+    try {
+      return JSON.parse(pomodoroSettings.value.task_time_preferences)
+    } catch {
+      return { management: 'any', dev: 'any' }
+    }
+  },
+  set: (val) => {
+    pomodoroSettings.value.task_time_preferences = JSON.stringify(val)
+  }
 })
 
 function handleProviderChange() {
@@ -291,7 +351,9 @@ async function loadSettings() {
         long_break_after: res.data.pomodoro.long_break_after,
         auto_start_break: res.data.pomodoro.auto_start_break,
         auto_start_work: res.data.pomodoro.auto_start_work,
-        enable_sound: res.data.pomodoro.enable_sound
+        enable_sound: res.data.pomodoro.enable_sound,
+        buffer_ratio: res.data.pomodoro.buffer_ratio || 20,
+        task_time_preferences: res.data.pomodoro.task_time_preferences || '{"management":"any","dev":"any"}'
       }
     }
     if (res.data.ai) {
@@ -314,7 +376,9 @@ async function savePomodoroSettings() {
       long_break_after: pomodoroSettings.value.long_break_after,
       auto_start_break: pomodoroSettings.value.auto_start_break,
       auto_start_work: pomodoroSettings.value.auto_start_work,
-      enable_sound: pomodoroSettings.value.enable_sound
+      enable_sound: pomodoroSettings.value.enable_sound,
+      buffer_ratio: pomodoroSettings.value.buffer_ratio,
+      task_time_preferences: pomodoroSettings.value.task_time_preferences
     }
     await api.updatePomodoroSettings(data)
     ElMessage.success('番茄时钟设置已保存')
@@ -367,109 +431,132 @@ onMounted(() => {
 
 <style scoped>
 .settings-page {
-  padding: 32px;
-  max-width: 800px;
+  padding: 0;
+  max-width: 900px;
   margin: 0 auto;
+  position: relative;
 }
 
 .page-header {
-  margin-bottom: 32px;
+  margin-bottom: 36px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: center;
+  position: relative;
+}
+
+.page-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(196, 103, 61, 0.15), transparent);
 }
 
 .page-header h1 {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 4px 0;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
 }
 
 .page-subtitle {
   font-size: 15px;
-  color: #64748b;
+  color: var(--text-secondary);
   margin: 0;
 }
 
 .settings-card {
-  background: #fff;
-  border-radius: 16px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: var(--bg-card);
+  border-radius: 20px;
+  margin-bottom: 28px;
+  border: 1px solid var(--border-color);
   overflow: hidden;
+  transition: all var(--transition-normal);
+}
+
+.settings-card:hover {
+  border-color: rgba(196, 103, 61, 0.12);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #f1f5f9;
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .card-title {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 16px;
+  gap: 14px;
+  font-size: 18px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .card-icon {
-  width: 20px;
-  height: 20px;
-  color: #3b82f6;
+  width: 22px;
+  height: 22px;
+  color: var(--accent-primary);
+  filter: drop-shadow(0 0 6px var(--accent-primary));
 }
 
 .card-icon.ai-icon {
-  color: #8b5cf6;
+  color: var(--accent-secondary);
+  filter: drop-shadow(0 0 6px var(--accent-secondary));
 }
 
 .card-content {
-  padding: 24px;
+  padding: 28px;
 }
 
 .settings-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  margin-bottom: 24px;
+  gap: 24px;
+  margin-bottom: 28px;
 }
 
 .setting-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .setting-item label {
   font-size: 14px;
   font-weight: 500;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .setting-control {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .setting-control .el-input-number {
-  width: 120px;
+  width: 130px;
 }
 
 .unit {
   font-size: 14px;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .settings-toggles {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 20px 0;
-  border-top: 1px solid #f1f5f9;
-  border-bottom: 1px solid #f1f5f9;
-  margin-bottom: 24px;
+  gap: 18px;
+  padding: 24px 0;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 28px;
 }
 
 .toggle-item {
@@ -481,47 +568,96 @@ onMounted(() => {
 .toggle-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .toggle-label {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
-  color: #334155;
+  color: var(--text-primary);
 }
 
 .toggle-desc {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--text-secondary);
 }
 
 .card-actions {
   display: flex;
-  gap: 12px;
+  gap: 14px;
 }
 
-.card-actions .el-button {
-  min-width: 120px;
+.ai-preference-section {
+  padding: 24px 0;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 28px;
 }
 
-.form-item {
+.section-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
   margin-bottom: 20px;
 }
 
-.form-item:last-of-type {
+.setting-item.full-width {
+  margin-bottom: 20px;
+}
+
+.buffer-control {
+  margin-top: 4px;
+}
+
+.buffer-hint {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.time-preference-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.pref-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 400px;
+}
+
+.pref-label {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.card-actions .el-button {
+  min-width: 130px;
+  border-radius: 10px;
+}
+
+.form-item {
   margin-bottom: 24px;
+}
+
+.form-item:last-of-type {
+  margin-bottom: 28px;
 }
 
 .form-item label {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #475569;
-  margin-bottom: 8px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
 }
 
 .form-item .required {
-  color: #ef4444;
+  color: var(--accent-crimson);
   margin-left: 2px;
 }
 
@@ -531,71 +667,74 @@ onMounted(() => {
 }
 
 .form-tip {
-  font-size: 12px;
-  color: #94a3b8;
-  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 8px;
 }
 
 .about-card .about-info {
   text-align: center;
+  padding: 20px 0;
 }
 
 .about-brand {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 18px;
+  margin-bottom: 20px;
 }
 
 .brand-icon {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border-radius: 12px;
+  width: 56px;
+  height: 56px;
+  background: var(--gradient-primary);
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
+  box-shadow: 0 0 24px rgba(196, 103, 61, 0.25);
 }
 
 .brand-icon svg {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
 }
 
 .brand-info h3 {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .brand-info p {
   font-size: 14px;
-  color: #64748b;
-  margin: 2px 0 0 0;
+  color: var(--text-secondary);
+  margin: 4px 0 0 0;
 }
 
 .about-desc {
   font-size: 14px;
-  color: #64748b;
-  margin: 0 0 16px 0;
-  max-width: 400px;
+  color: var(--text-secondary);
+  margin: 0 0 20px 0;
+  max-width: 450px;
   margin-left: auto;
   margin-right: auto;
+  line-height: 1.6;
 }
 
 .version {
-  font-size: 12px;
-  color: #94a3b8;
+  font-size: 13px;
+  color: var(--text-muted);
   margin: 0;
 }
 
 /* 响应式 */
 @media (max-width: 768px) {
   .settings-page {
-    padding: 20px;
+    padding: 0;
   }
 
   .settings-grid {

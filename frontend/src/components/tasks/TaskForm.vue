@@ -42,7 +42,6 @@
         </el-radio-group>
       </el-form-item>
 
-      <!-- AI 推荐结果 -->
       <div v-if="aiRecommendation" class="ai-recommendation">
         <div class="recommendation-header">
           <span>AI 推荐象限</span>
@@ -58,7 +57,7 @@
 
       <el-form-item label="预估时间">
         <el-input-number v-model="formData.estimated_time" :min="0" :step="5" />
-        <span style="margin-left: 8px; color: #6b7280">分钟</span>
+        <span style="margin-left: 8px; color: var(--text-secondary)">分钟</span>
       </el-form-item>
 
       <el-form-item label="截止时间">
@@ -190,9 +189,10 @@ async function getAIRecommendation() {
 
   aiClassifying.value = true
   try {
-    // 由于任务还未创建，我们使用临时 ID 调用分类
-    // 后端会根据标题和描述进行分类
-    const result = await aiStore.classifyTask('temp')
+    const result = await aiStore.classifyTaskByText(
+      formData.value.title,
+      formData.value.description
+    )
     if (result) {
       aiRecommendation.value = result
     }
@@ -232,39 +232,40 @@ function onSave() {
 
 <style scoped>
 .tags-list {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .title-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .ai-recommendation {
-  background: #f0f9ff;
-  border: 1px solid #bae6fd;
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 16px;
+  background: rgba(196, 103, 61, 0.06);
+  border: 1px solid rgba(196, 103, 61, 0.2);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 18px;
 }
 
 .recommendation-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 
 .recommendation-header span:first-child {
-  font-weight: 500;
-  color: #0369a1;
+  font-weight: 600;
+  color: var(--accent-primary);
+  font-size: 14px;
 }
 
 .recommendation-reason {
-  margin: 0 0 12px 0;
+  margin: 0 0 14px 0;
   font-size: 13px;
-  color: #0c4a6e;
-  line-height: 1.5;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
 </style>

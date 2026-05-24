@@ -19,7 +19,7 @@ func setupAITestServices() (*service.AIService, *service.TaskService, *mockSetti
 
 	// Get AI settings from the repository
 	aiSettings, _ := settingRepo.GetAISettings()
-	aiService := service.NewAIService(aiSettings, taskRepo)
+	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
 
 	return aiService, taskService, settingRepo
 }
@@ -64,7 +64,7 @@ func TestAIHandler_GetAIStatus_Configured(t *testing.T) {
 	// Re-create AI service with new settings
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
-	aiService = service.NewAIService(aiSettings, taskRepo)
+	aiService = service.NewAIService(aiSettings, taskRepo, nil, nil)
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -130,7 +130,7 @@ func TestAIHandler_ClassifyTask_MissingTaskID(t *testing.T) {
 
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
-	aiService := service.NewAIService(aiSettings, taskRepo)
+	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
 	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
 
 	handler := NewAIHandler(aiService, taskService)
@@ -162,7 +162,7 @@ func TestAIHandler_ClassifyTask_TaskNotFound(t *testing.T) {
 
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
-	aiService := service.NewAIService(aiSettings, taskRepo)
+	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
 	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
 
 	handler := NewAIHandler(aiService, taskService)
@@ -220,7 +220,7 @@ func TestAIHandler_ClassifyTasks_MissingTaskIDs(t *testing.T) {
 
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
-	aiService := service.NewAIService(aiSettings, taskRepo)
+	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
 	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
 
 	handler := NewAIHandler(aiService, taskService)
@@ -277,7 +277,7 @@ func TestAIHandler_GenerateSchedule_MissingTime(t *testing.T) {
 
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
-	aiService := service.NewAIService(aiSettings, taskRepo)
+	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
 	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
 
 	handler := NewAIHandler(aiService, taskService)

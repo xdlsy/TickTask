@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api } from '@/api/client'
-import type { ClassificationResult, PrioritySuggestion, ScheduleEvent } from '@/types'
+import type { ClassificationResult, PrioritySuggestion, ScheduleEvent, RescheduleResult, DailyInsights } from '@/types'
 
 export const useAIStore = defineStore('ai', () => {
   // State
@@ -49,6 +49,20 @@ export const useAIStore = defineStore('ai', () => {
     }
   }
 
+  async function classifyTaskByText(title: string, description?: string): Promise<ClassificationResult | null> {
+    loading.value = true
+    try {
+      const res = await api.classifyTaskByText(title, description)
+      lastClassification.value = res.data
+      return res.data
+    } catch (error) {
+      console.error('Failed to classify task by text:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
   async function generateSchedule(startTime: string, endTime: string): Promise<ScheduleEvent[] | null> {
     loading.value = true
     try {
@@ -56,6 +70,25 @@ export const useAIStore = defineStore('ai', () => {
       return res.data.events
     } catch (error) {
       console.error('Failed to generate schedule:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function rescheduleAfterInterrupt(data: {
+    task_id: string
+    completed_minutes?: number
+    planned_minutes: number
+    interrupt_reason?: string
+    work_end_time: string
+  }): Promise<RescheduleResult | null> {
+    loading.value = true
+    try {
+      const res = await api.rescheduleAfterInterrupt(data)
+      return res.data
+    } catch (error) {
+      console.error('Failed to reschedule after interrupt:', error)
       throw error
     } finally {
       loading.value = false
@@ -75,6 +108,26 @@ export const useAIStore = defineStore('ai', () => {
     }
   }
 
+  async function getDailyInsights(params?: {
+    date?: string
+    completed_pomodoros?: number
+    total_focus_minutes?: number
+    completed_tasks?: number
+    total_interruptions?: number
+    task_distribution?: string
+  }): Promise<DailyInsights | null> {
+    loading.value = true
+    try {
+      const res = await api.getDailyInsights(params)
+      return res.data
+    } catch (error) {
+      console.error('Failed to get daily insights:', error)
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     // State
     configured,
@@ -84,7 +137,10 @@ export const useAIStore = defineStore('ai', () => {
     checkStatus,
     classifyTask,
     classifyTasks,
+    classifyTaskByText,
     generateSchedule,
-    getPrioritySuggestions
+    rescheduleAfterInterrupt,
+    getPrioritySuggestions,
+    getDailyInsights
   }
 })

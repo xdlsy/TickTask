@@ -24,7 +24,8 @@ type CreateSessionInput struct {
 }
 
 type ControlSessionInput struct {
-	Action string `json:"action" binding:"required"` // pause, resume, complete, abandon
+	Action          string `json:"action" binding:"required"` // pause, resume, complete, abandon
+	InterruptReason string `json:"interrupt_reason"`          // meeting/call/urgent/other
 }
 
 // GetActiveSession 获取当前活跃会话
@@ -70,7 +71,7 @@ func (h *TimerHandler) ControlSession(c *gin.Context) {
 		return
 	}
 
-	if err := h.timerService.ControlSession(id, input.Action); err != nil {
+	if err := h.timerService.ControlSession(id, input.Action, input.InterruptReason); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

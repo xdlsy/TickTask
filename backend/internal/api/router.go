@@ -68,8 +68,11 @@ func SetupRouter(
 			ai.GET("/status", aiHandler.GetAIStatus)
 			ai.POST("/classify", aiHandler.ClassifyTask)
 			ai.POST("/classify/batch", aiHandler.ClassifyTasks)
+			ai.POST("/classify-task-text", aiHandler.ClassifyTaskByText)
 			ai.POST("/schedule", aiHandler.GenerateSchedule)
+			ai.POST("/reschedule-after-interrupt", aiHandler.RescheduleAfterInterrupt)
 			ai.GET("/priority", aiHandler.GetPrioritySuggestions)
+			ai.GET("/daily-insights", aiHandler.GetDailyInsights)
 		}
 
 		// 设置

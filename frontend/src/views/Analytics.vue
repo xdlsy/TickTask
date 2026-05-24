@@ -149,6 +149,44 @@
             </div>
           </div>
         </div>
+
+        <!-- AI 每日洞察 -->
+        <div class="card ai-insights-card" v-if="aiStore.configured">
+          <div class="card-header">
+            <h3>AI 每日洞察</h3>
+            <button class="insight-btn" @click="fetchAIInsights" :disabled="insightsLoading">
+              {{ insightsLoading ? '分析中...' : aiInsights ? '刷新' : '获取洞察' }}
+            </button>
+          </div>
+          <div v-if="aiInsights" class="insights-content">
+            <div class="score-row">
+              <span class="score-label">生产力评分</span>
+              <span class="score-value" :class="getScoreClass(aiInsights.productivity_score)">
+                {{ aiInsights.productivity_score }}
+              </span>
+            </div>
+            <div class="insight-block">
+              <div class="insight-label">高产时段</div>
+              <div class="insight-text">{{ aiInsights.peak_hours }}</div>
+            </div>
+            <div class="insight-block">
+              <div class="insight-label">亮点</div>
+              <ul class="insight-list">
+                <li v-for="(item, i) in aiInsights.achievements" :key="'a'+i">{{ item }}</li>
+              </ul>
+            </div>
+            <div class="insight-block">
+              <div class="insight-label">建议</div>
+              <ul class="insight-list">
+                <li v-for="(item, i) in aiInsights.suggestions" :key="'s'+i">{{ item }}</li>
+              </ul>
+            </div>
+            <div class="insight-motivation">{{ aiInsights.motivation }}</div>
+          </div>
+          <div v-else class="insights-empty">
+            <p>点击"获取洞察"，AI 将分析今日数据并给出建议</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -158,9 +196,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '@/api/client'
 import { QUADRANT_INFO } from '@/types'
-import type { TaskTimeStats, DailySummary, TrendDataPoint, DistributionStats } from '@/types'
+import { useAIStore } from '@/stores/ai'
+import type { TaskTimeStats, DailySummary, TrendDataPoint, DistributionStats, DailyInsights } from '@/types'
 
+const aiStore = useAIStore()
 const quadrantInfo = QUADRANT_INFO
+
+const aiInsights = ref<DailyInsights | null>(null)
+const insightsLoading = ref(false)
 
 const timeFilters: Array<{ label: string; value: 'today' | 'week' | 'month' }> = [
   { label: '今日', value: 'today' },
@@ -285,8 +328,39 @@ async function fetchData() {
   }
 }
 
+function getScoreClass(score: number): string {
+  if (score >= 80) return 'score-high'
+  if (score >= 60) return 'score-mid'
+  return 'score-low'
+}
+
 function changeFilter(filter: 'today' | 'week' | 'month') {
   currentFilter.value = filter
+}
+
+async function fetchAIInsights() {
+  if (!aiStore.configured) return
+  insightsLoading.value = true
+  try {
+    const distSummary = Object.entries(distribution.value.quadrant_stats)
+      .map(([q, stats]) => `${quadrantInfo[Number(q) as 1|2|3|4]?.name}: ${stats.total}个`)
+      .join(', ')
+    const result = await aiStore.getDailyInsights({
+      date: formatDate(getDateRange().start),
+      completed_pomodoros: summary.value.completed_pomodoros,
+      total_focus_minutes: Math.floor(summary.value.total_focus_time / 60),
+      completed_tasks: summary.value.completed_tasks,
+      total_interruptions: 0,
+      task_distribution: distSummary
+    })
+    if (result) {
+      aiInsights.value = result
+    }
+  } catch (error) {
+    console.error('Failed to fetch AI insights:', error)
+  } finally {
+    insightsLoading.value = false
+  }
 }
 
 watch(currentFilter, () => {
@@ -300,138 +374,172 @@ onMounted(() => {
 
 <style scoped>
 .analytics-page {
-  padding: 32px;
-  max-width: 1400px;
+  padding: 0;
+  max-width: 1200px;
   margin: 0 auto;
+  position: relative;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 32px;
+  margin-bottom: 36px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.page-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(196, 103, 61, 0.15), transparent);
 }
 
 .header-left h1 {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 4px 0;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.5px;
 }
 
 .page-subtitle {
   font-size: 15px;
-  color: #64748b;
+  color: var(--text-secondary);
   margin: 0;
 }
 
 .time-filter {
   display: flex;
   gap: 8px;
-  background: #fff;
-  padding: 4px;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: var(--bg-elevated);
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
 }
 
 .filter-btn {
-  padding: 8px 20px;
+  padding: 10px 22px;
   border: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  color: #64748b;
-  transition: all 0.2s ease;
+  color: var(--text-secondary);
+  transition: all var(--transition-normal);
 }
 
 .filter-btn:hover {
-  color: #334155;
+  color: var(--text-primary);
 }
 
 .filter-btn.active {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: var(--gradient-primary);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 16px rgba(196, 103, 61, 0.2);
 }
 
 /* 概览卡片 */
 .overview-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 32px;
+  gap: 24px;
+  margin-bottom: 36px;
 }
 
 .overview-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 24px;
+  background: var(--bg-card);
+  border-radius: 20px;
+  padding: 28px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  gap: 20px;
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-normal);
 }
 
 .overview-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  transform: translateY(-6px);
+  border-color: rgba(196, 103, 61, 0.2);
+  box-shadow: 0 16px 48px rgba(60, 30, 10, 0.1);
 }
 
 .card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  position: relative;
+}
+
+.card-icon::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 14px;
+  background: inherit;
+  filter: blur(12px);
+  opacity: 0.4;
+  z-index: -1;
 }
 
 .card-icon svg {
   width: 24px;
   height: 24px;
+  position: relative;
+  z-index: 1;
 }
 
 .card-icon.pomodoro {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  background: linear-gradient(135deg, #C4554D, #D4786D);
   color: #fff;
+  box-shadow: 0 0 24px rgba(196, 85, 77, 0.25);
 }
 
 .card-icon.time {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  background: linear-gradient(135deg, #C4973D, #D4AD5E);
   color: #fff;
+  box-shadow: 0 0 24px rgba(196, 149, 61, 0.25);
 }
 
 .card-icon.completed {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  background: linear-gradient(135deg, #6B8B6F, #8BA88E);
   color: #fff;
+  box-shadow: 0 0 24px rgba(107, 139, 111, 0.25);
 }
 
 .card-icon.created {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   color: #fff;
+  box-shadow: 0 0 24px rgba(196, 103, 61, 0.2);
 }
 
 .card-value {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 700;
-  color: #1e2937;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
 }
 
 .card-label {
   font-size: 14px;
-  color: #64748b;
-  margin-top: 2px;
+  color: var(--text-secondary);
+  margin-top: 4px;
 }
 
 /* 主内容区域 */
 .analytics-content {
   display: grid;
-  grid-template-columns: 1fr 360px;
-  gap: 24px;
+  grid-template-columns: 1fr 340px;
+  gap: 28px;
 }
 
 .right-column {
@@ -441,32 +549,38 @@ onMounted(() => {
 }
 
 .card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: var(--bg-card);
+  border-radius: 20px;
+  padding: 28px;
+  border: 1px solid var(--border-color);
+  transition: all var(--transition-normal);
+}
+
+.card:hover {
+  border-color: rgba(196, 103, 61, 0.12);
+  box-shadow: 0 8px 32px rgba(60, 30, 10, 0.06);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .card-header h3 {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .trend-summary {
-  font-size: 12px;
-  color: #94a3b8;
-  background: #f1f5f9;
-  padding: 4px 10px;
-  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: rgba(196, 103, 61, 0.05);
+  padding: 6px 12px;
+  border-radius: 12px;
 }
 
 /* 趋势图表 */
@@ -498,7 +612,7 @@ onMounted(() => {
 .chart-bar {
   width: 100%;
   max-width: 32px;
-  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+  background: var(--gradient-primary);
   border-radius: 6px 6px 0 0;
   transition: all 0.3s ease;
   position: relative;
@@ -507,7 +621,8 @@ onMounted(() => {
 }
 
 .chart-bar:hover {
-  background: linear-gradient(180deg, #93c5fd 0%, #60a5fa 100%);
+  filter: brightness(1.2);
+  box-shadow: 0 0 16px rgba(196, 103, 61, 0.25);
 }
 
 .chart-bar:hover .bar-tooltip {
@@ -520,16 +635,18 @@ onMounted(() => {
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  background: #1e293b;
-  color: #fff;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s ease;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(60, 30, 10, 0.1);
 }
 
 .bar-tooltip::after {
@@ -539,12 +656,12 @@ onMounted(() => {
   left: 50%;
   transform: translateX(-50%);
   border: 5px solid transparent;
-  border-top-color: #1e293b;
+  border-top-color: var(--bg-elevated);
 }
 
 .chart-label {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--text-secondary);
   margin-top: 10px;
   height: 16px;
 }
@@ -569,14 +686,14 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.quadrant-indicator.quadrant-1 { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
-.quadrant-indicator.quadrant-2 { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
-.quadrant-indicator.quadrant-3 { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
-.quadrant-indicator.quadrant-4 { background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%); }
+.quadrant-indicator.quadrant-1 { background: linear-gradient(135deg, #C4554D, #D4786D); box-shadow: 0 0 8px rgba(196, 85, 77, 0.25); }
+.quadrant-indicator.quadrant-2 { background: linear-gradient(135deg, #C4973D, #D4AD5E); box-shadow: 0 0 8px rgba(196, 149, 61, 0.25); }
+.quadrant-indicator.quadrant-3 { background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); box-shadow: 0 0 8px rgba(196, 103, 61, 0.2); }
+.quadrant-indicator.quadrant-4 { background: linear-gradient(135deg, var(--text-muted), var(--text-secondary)); }
 
 .quadrant-name {
   font-size: 13px;
-  color: #475569;
+  color: var(--text-secondary);
   width: 80px;
   flex-shrink: 0;
 }
@@ -584,22 +701,23 @@ onMounted(() => {
 .quadrant-bar-wrapper {
   flex: 1;
   height: 8px;
-  background: #f1f5f9;
+  background: var(--bg-elevated);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .quadrant-bar {
   height: 100%;
-  background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+  background: var(--gradient-primary);
   border-radius: 4px;
   transition: width 0.3s ease;
+  box-shadow: 0 0 8px rgba(196, 103, 61, 0.2);
 }
 
 .quadrant-stat .count {
   font-weight: 600;
   font-size: 14px;
-  color: #334155;
+  color: var(--text-primary);
   width: 28px;
   text-align: right;
 }
@@ -610,28 +728,32 @@ onMounted(() => {
   align-items: center;
   margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--border-color);
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .completion-rate {
   font-weight: 600;
-  color: #22c55e;
+  color: var(--accent-sage);
   font-size: 15px;
+  text-shadow: 0 0 8px rgba(107, 139, 111, 0.25);
 }
 
 /* 任务投入列表 */
 .empty-state {
   text-align: center;
   padding: 32px 24px;
+  background: rgba(196, 103, 61, 0.02);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-color);
 }
 
 .empty-icon {
   width: 56px;
   height: 56px;
   margin: 0 auto 16px;
-  color: #cbd5e1;
+  color: var(--text-muted);
 }
 
 .empty-icon svg {
@@ -641,12 +763,12 @@ onMounted(() => {
 
 .empty-state p {
   margin: 0 0 4px 0;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .empty-state .hint {
   font-size: 13px;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .task-stats-list {
@@ -659,7 +781,7 @@ onMounted(() => {
 
 .task-stat-item {
   padding: 14px 0;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .task-stat-item:last-child {
@@ -676,7 +798,7 @@ onMounted(() => {
 .task-stat-title {
   font-size: 14px;
   font-weight: 500;
-  color: #1e293b;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -685,15 +807,15 @@ onMounted(() => {
 
 .task-stat-count {
   font-size: 12px;
-  color: #94a3b8;
-  background: #f1f5f9;
+  color: var(--text-secondary);
+  background: rgba(196, 103, 61, 0.05);
   padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .task-stat-time {
   height: 6px;
-  background: #f1f5f9;
+  background: var(--bg-elevated);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 8px;
@@ -702,16 +824,128 @@ onMounted(() => {
 .time-bar {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #ef4444 0%, #f97316 100%);
+  background: linear-gradient(90deg, #C4554D, #C4673D);
   border-radius: 3px;
   transition: width 0.3s ease;
+  box-shadow: 0 0 8px rgba(196, 85, 77, 0.25);
 }
 
 .task-stat-duration {
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-secondary);
   text-align: right;
   font-weight: 500;
+}
+
+/* AI 洞察 */
+.ai-insights-card {
+  border-color: rgba(196, 103, 61, 0.15);
+}
+
+.insight-btn {
+  padding: 6px 16px;
+  border: 1px solid rgba(196, 103, 61, 0.3);
+  background: rgba(196, 103, 61, 0.06);
+  color: var(--accent-primary);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-body);
+  transition: all var(--transition-normal);
+}
+
+.insight-btn:hover:not(:disabled) {
+  background: rgba(196, 103, 61, 0.12);
+  border-color: rgba(196, 103, 61, 0.5);
+}
+
+.insight-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.insights-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.score-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(196, 103, 61, 0.04);
+  border-radius: var(--radius-md);
+}
+
+.score-label {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.score-value {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.score-high { color: var(--accent-sage); text-shadow: 0 0 12px rgba(107, 139, 111, 0.3); }
+.score-mid { color: var(--accent-gold); text-shadow: 0 0 12px rgba(196, 149, 61, 0.3); }
+.score-low { color: var(--accent-crimson); text-shadow: 0 0 12px rgba(196, 85, 77, 0.3); }
+
+.insight-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.insight-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.insight-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.insight-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.insight-list li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 2px;
+}
+
+.insight-motivation {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--accent-primary);
+  text-align: center;
+  padding: 12px;
+  background: rgba(196, 103, 61, 0.04);
+  border-radius: var(--radius-md);
+  font-style: italic;
+}
+
+.insights-empty {
+  text-align: center;
+  padding: 24px 16px;
+}
+
+.insights-empty p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
 }
 
 /* 响应式 */

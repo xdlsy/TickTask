@@ -13,19 +13,23 @@ import (
 
 // AIService AI 服务
 type AIService struct {
-	client   ai.LLMClient
-	taskRepo repository.TaskRepository
+	client       ai.LLMClient
+	taskRepo     repository.TaskRepository
+	scheduleRepo repository.ScheduleRepository
+	sessionRepo  repository.SessionRepository
 }
 
 // NewAIService 创建 AI 服务
-func NewAIService(cfg *model.AISettings, taskRepo repository.TaskRepository) *AIService {
+func NewAIService(cfg *model.AISettings, taskRepo repository.TaskRepository, scheduleRepo repository.ScheduleRepository, sessionRepo repository.SessionRepository) *AIService {
 	var client ai.LLMClient
 	if cfg != nil && cfg.APIKey != "" {
 		client = ai.NewOpenAIClient(cfg.APIKey, cfg.BaseURL, cfg.Model)
 	}
 	return &AIService{
-		client:   client,
-		taskRepo: taskRepo,
+		client:       client,
+		taskRepo:     taskRepo,
+		scheduleRepo: scheduleRepo,
+		sessionRepo:  sessionRepo,
 	}
 }
 
@@ -202,6 +206,130 @@ func (s *AIService) GetPrioritySuggestions(ctx context.Context) (*PrioritySugges
 	}
 
 	return result, nil
+}
+
+// ClassifyTaskByText 根据文本分类任务（无需任务 ID）
+func (s *AIService) ClassifyTaskByText(ctx context.Context, title, description string) (*ClassificationResult, error) {
+	if s.client == nil {
+		return nil, fmt.Errorf("AI service not configured")
+	}
+
+	prompt := fmt.Sprintf(ai.ClassifyByTextPrompt, title, description)
+
+	response, err := s.client.ChatCompletion(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("AI request failed: %w", err)
+	}
+
+	result, err := parseClassifyResponse(response)
+	if err != nil {
+		return nil, err
+	}
+
+	result.Quadrant = calculateQuadrant(result.Important, result.Urgent)
+
+	return result, nil
+}
+
+// RescheduleResult 重排程结果
+type RescheduleResult struct {
+	AdjustedSchedule []AdjustedItem `json:"adjusted_schedule"`
+	Summary          string         `json:"summary"`
+}
+
+// AdjustedItem 调整后的日程项
+type AdjustedItem struct {
+	TaskID     string `json:"task_id"`
+	Title      string `json:"title"`
+	StartTime  string `json:"start_time"`
+	EndTime    string `json:"end_time"`
+	Adjustment string `json:"adjustment"`
+	Reason     string `json:"reason"`
+}
+
+// RescheduleAfterInterrupt 被打断后重新排程
+func (s *AIService) RescheduleAfterInterrupt(ctx context.Context, interruptedTaskID string, completedMinutes, plannedMinutes int, interruptReason, currentTime, workEndTime string) (*RescheduleResult, error) {
+	if s.client == nil {
+		return nil, fmt.Errorf("AI service not configured")
+	}
+
+	// 获取被打断的任务信息
+	interruptedTitle := "未知任务"
+	if task, err := s.taskRepo.GetByID(interruptedTaskID); err == nil {
+		interruptedTitle = task.Title
+	}
+
+	// 获取今日剩余待办任务
+	tasks, err := s.taskRepo.GetByStatus(model.StatusTodo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tasks: %w", err)
+	}
+
+	var taskList strings.Builder
+	for _, t := range tasks {
+		if t.ID == interruptedTaskID {
+			continue
+		}
+		deadline := "无"
+		if t.Deadline != nil {
+			deadline = t.Deadline.Format("2006-01-02")
+		}
+		taskList.WriteString(fmt.Sprintf("- ID: %s, 标题: %s, 预估: %d分钟, 截止: %s\n",
+			t.ID, t.Title, t.EstimatedTime, deadline))
+	}
+
+	prompt := fmt.Sprintf(ai.ReschedulePrompt,
+		interruptedTitle, completedMinutes, plannedMinutes,
+		interruptReason, currentTime, currentTime, workEndTime,
+		taskList.String(),
+	)
+
+	response, err := s.client.ChatCompletion(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("AI request failed: %w", err)
+	}
+
+	jsonStr := extractJSON(response)
+	var result RescheduleResult
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse reschedule response: %w", err)
+	}
+
+	return &result, nil
+}
+
+// DailyInsights 每日洞察
+type DailyInsights struct {
+	ProductivityScore int      `json:"productivity_score"`
+	PeakHours         string   `json:"peak_hours"`
+	Achievements      []string `json:"achievements"`
+	Suggestions       []string `json:"suggestions"`
+	Motivation        string   `json:"motivation"`
+}
+
+// GetDailyInsights 获取每日 AI 洞察
+func (s *AIService) GetDailyInsights(ctx context.Context, date string, completedPomodoros, totalFocusMinutes, completedTasks, totalInterruptions int, taskDistribution string) (*DailyInsights, error) {
+	if s.client == nil {
+		return nil, fmt.Errorf("AI service not configured")
+	}
+
+	prompt := fmt.Sprintf(ai.DailyInsightsPrompt,
+		date, completedPomodoros, totalFocusMinutes,
+		completedTasks, totalInterruptions, taskDistribution,
+	)
+
+	response, err := s.client.ChatCompletion(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("AI request failed: %w", err)
+	}
+
+	jsonStr := extractJSON(response)
+	var result DailyInsights
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse insights response: %w", err)
+	}
+
+	return &result, nil
 }
 
 // IsConfigured 检查 AI 是否已配置

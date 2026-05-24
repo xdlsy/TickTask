@@ -226,7 +226,7 @@ func (s *TimerService) CompleteSession(sessionID string) error {
 }
 
 // AbandonSession 放弃会话
-func (s *TimerService) AbandonSession(sessionID string) error {
+func (s *TimerService) AbandonSession(sessionID string, interruptReason string) error {
 	s.stopTimer()
 
 	session, err := s.sessionRepo.GetByID(sessionID)
@@ -237,6 +237,9 @@ func (s *TimerService) AbandonSession(sessionID string) error {
 	now := time.Now()
 	session.Status = model.SessionAbandoned
 	session.EndTime = &now
+	if interruptReason != "" {
+		session.InterruptReason = &interruptReason
+	}
 	s.sessionRepo.Update(session)
 
 	s.wsHub.BroadcastSessionState(session.ID, string(model.SessionAbandoned))
@@ -316,7 +319,7 @@ type TaskTimeStats struct {
 }
 
 // ControlSession 控制会话（统一接口）
-func (s *TimerService) ControlSession(sessionID string, action string) error {
+func (s *TimerService) ControlSession(sessionID string, action string, interruptReason string) error {
 	switch action {
 	case "pause":
 		return s.PauseSession(sessionID)
@@ -325,7 +328,7 @@ func (s *TimerService) ControlSession(sessionID string, action string) error {
 	case "complete":
 		return s.CompleteSession(sessionID)
 	case "abandon":
-		return s.AbandonSession(sessionID)
+		return s.AbandonSession(sessionID, interruptReason)
 	default:
 		logger.Logger.Error("unknown action", "action", action)
 		return nil

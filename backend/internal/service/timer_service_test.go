@@ -186,7 +186,7 @@ func TestTimerService_ControlSession_Complete(t *testing.T) {
 	// Wait a moment then complete
 	time.Sleep(100 * time.Millisecond)
 
-	err := service.ControlSession(session.ID, "complete")
+	err := service.ControlSession(session.ID, "complete", "")
 	if err != nil {
 		t.Fatalf("ControlSession complete failed: %v", err)
 	}
@@ -220,7 +220,7 @@ func TestTimerService_ControlSession_Abandon(t *testing.T) {
 		Duration: 1500,
 	})
 
-	err := service.ControlSession(session.ID, "abandon")
+	err := service.ControlSession(session.ID, "abandon", "meeting")
 	if err != nil {
 		t.Fatalf("ControlSession abandon failed: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestTimerService_GetRecentSessions(t *testing.T) {
 
 	// Create multiple sessions
 	service.StartSession(CreateSessionRequest{Type: model.SessionWork, Duration: 1500})
-	service.ControlSession("test", "complete") // This will fail but that's ok for this test
+	service.ControlSession("test", "complete", "") // This will fail but that's ok for this test
 
 	recent, err := service.GetRecentSessions(10)
 	if err != nil {

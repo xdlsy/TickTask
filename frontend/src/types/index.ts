@@ -33,6 +33,7 @@ export interface PomodoroSession {
   planned_duration: number
   actual_duration: number | null
   interruptions: number
+  interrupt_reason: string | null
   created_at: string
 }
 
@@ -44,6 +45,8 @@ export interface PomodoroSettings {
   auto_start_break: boolean
   auto_start_work: boolean
   enable_sound: boolean
+  buffer_ratio: number
+  task_time_preferences: string
 }
 
 export interface QuadrantInfo {
@@ -180,6 +183,32 @@ export interface ScheduleEvent {
   task_id?: string
   allDay: boolean
   editable: boolean
+  ai_adjusted: boolean
+  adjustment_type: string
+}
+
+// AI 重排程结果
+export interface AdjustedItem {
+  task_id: string
+  title: string
+  start_time: string
+  end_time: string
+  adjustment: string
+  reason: string
+}
+
+export interface RescheduleResult {
+  adjusted_schedule: AdjustedItem[]
+  summary: string
+}
+
+// AI 每日洞察
+export interface DailyInsights {
+  productivity_score: number
+  peak_hours: string
+  achievements: string[]
+  suggestions: string[]
+  motivation: string
 }
 
 export interface CreateScheduleDTO {

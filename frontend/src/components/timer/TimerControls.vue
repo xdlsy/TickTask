@@ -1,63 +1,77 @@
 <template>
   <div class="timer-controls">
-    <!-- 未开始状态 -->
     <div v-if="!timerStore.currentSession || timerStore.currentSession.status === 'completed' || timerStore.currentSession.status === 'abandoned'" class="control-main">
-      <el-button type="primary" size="large" class="start-btn" @click="startWork">
-        <span class="btn-icon">🎯</span>
+      <button class="start-btn" @click="startWork">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="btn-svg">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 6v6l4 2"/>
+        </svg>
         <span>开始专注</span>
         <span class="btn-duration">25 分钟</span>
-      </el-button>
+      </button>
     </div>
 
-    <!-- 运行中/暂停状态 -->
     <template v-else>
       <div class="control-actions">
-        <el-button
+        <button
           v-if="timerStore.isRunning"
-          type="warning"
-          round
+          class="ctrl-btn pause-btn"
           @click="pause"
         >
-          <span class="btn-icon">⏸</span> 暂停
-        </el-button>
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" class="btn-svg">
+            <rect x="6" y="4" width="4" height="16" rx="1"/>
+            <rect x="14" y="4" width="4" height="16" rx="1"/>
+          </svg>
+          暂停
+        </button>
 
-        <el-button
+        <button
           v-if="timerStore.isPaused"
-          type="primary"
-          round
+          class="ctrl-btn resume-btn"
           @click="resume"
         >
-          <span class="btn-icon">▶</span> 继续
-        </el-button>
+          <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" class="btn-svg">
+            <polygon points="5,3 19,12 5,21"/>
+          </svg>
+          继续
+        </button>
 
-        <el-button
-          type="success"
-          round
+        <button
+          class="ctrl-btn complete-btn"
           @click="complete"
         >
-          <span class="btn-icon">✓</span> 完成
-        </el-button>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-svg">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          完成
+        </button>
 
-        <el-button
-          type="danger"
-          round
-          plain
+        <button
+          class="ctrl-btn abandon-btn"
           @click="abandon"
         >
-          <span class="btn-icon">✕</span> 放弃
-        </el-button>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-svg">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+          放弃
+        </button>
       </div>
     </template>
 
-    <!-- 快捷操作 -->
     <div class="quick-actions">
       <button class="quick-btn short" @click="startShortBreak">
-        <span class="quick-icon">☕</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="quick-svg">
+          <path d="M17 8h1a4 4 0 1 1 0 8h-1"/>
+          <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/>
+        </svg>
         <span class="quick-text">短休息</span>
         <span class="quick-time">5分钟</span>
       </button>
       <button class="quick-btn long" @click="startLongBreak">
-        <span class="quick-icon">🌴</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="quick-svg">
+          <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+        </svg>
         <span class="quick-text">长休息</span>
         <span class="quick-time">15分钟</span>
       </button>
@@ -67,7 +81,7 @@
 
 <script setup lang="ts">
 import { useTimerStore } from '@/stores/timer'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const timerStore = useTimerStore()
 
@@ -114,7 +128,7 @@ async function resume() {
 async function complete() {
   try {
     await timerStore.controlSession('complete')
-    ElMessage.success('🎉 番茄完成！')
+    ElMessage.success('番茄完成!')
   } catch (error) {
     ElMessage.error('完成失败')
   }
@@ -122,9 +136,17 @@ async function complete() {
 
 async function abandon() {
   try {
-    await timerStore.controlSession('abandon')
+    await ElMessageBox.confirm(
+      '放弃当前计时？AI 将记录此次打断并调整后续排程',
+      '放弃计时',
+      { confirmButtonText: '确认放弃', cancelButtonText: '返回', type: 'warning' }
+    )
+    await timerStore.controlSession('abandon', 'other')
   } catch (error) {
-    ElMessage.error('放弃失败')
+    // User cancelled or API error
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error('放弃失败')
+    }
   }
 }
 </script>
@@ -134,7 +156,9 @@ async function abandon() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 22px;
+  position: relative;
+  z-index: 1;
 }
 
 .control-main {
@@ -143,41 +167,106 @@ async function abandon() {
 
 .start-btn {
   width: 100%;
-  height: 56px;
-  font-size: 16px;
-  border-radius: 16px;
+  height: 54px;
+  font-size: 15px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
+  background: var(--gradient-primary);
+  border: none;
+  font-weight: 600;
+  font-family: var(--font-body);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(196, 103, 61, 0.3);
+  transition: all var(--transition-normal);
 }
 
-.start-btn .btn-icon {
-  font-size: 18px;
+.start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(196, 103, 61, 0.4);
+}
+
+.start-btn .btn-svg {
+  width: 18px;
+  height: 18px;
 }
 
 .btn-duration {
-  font-size: 13px;
-  opacity: 0.85;
+  font-size: 12px;
+  opacity: 0.8;
   margin-left: 4px;
+  font-family: var(--font-mono);
 }
 
 .control-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   justify-content: center;
 }
 
-.control-actions .el-button {
-  min-width: 90px;
+.ctrl-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 22px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--transition-normal);
 }
 
-.btn-icon {
-  margin-right: 4px;
+.ctrl-btn .btn-svg {
+  width: 16px;
+  height: 16px;
 }
 
-/* 快捷操作 */
+.pause-btn {
+  background: rgba(196, 149, 61, 0.1);
+  border-color: rgba(196, 149, 61, 0.25);
+  color: var(--accent-gold);
+}
+
+.pause-btn:hover {
+  background: rgba(196, 149, 61, 0.18);
+}
+
+.resume-btn {
+  background: rgba(196, 103, 61, 0.1);
+  border-color: rgba(196, 103, 61, 0.25);
+  color: var(--accent-primary);
+}
+
+.resume-btn:hover {
+  background: rgba(196, 103, 61, 0.18);
+}
+
+.complete-btn {
+  background: rgba(107, 139, 111, 0.1);
+  border-color: rgba(107, 139, 111, 0.25);
+  color: var(--accent-sage);
+}
+
+.complete-btn:hover {
+  background: rgba(107, 139, 111, 0.18);
+}
+
+.abandon-btn {
+  background: rgba(196, 85, 77, 0.06);
+  border-color: rgba(196, 85, 77, 0.2);
+  color: var(--accent-crimson);
+}
+
+.abandon-btn:hover {
+  background: rgba(196, 85, 77, 0.12);
+}
+
 .quick-actions {
   display: flex;
   gap: 12px;
@@ -189,62 +278,57 @@ async function abandon() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 16px 12px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  gap: 6px;
+  padding: 18px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal);
+  font-family: var(--font-body);
 }
 
 .quick-btn:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(60, 30, 10, 0.06);
 }
 
 .quick-btn.short:hover {
-  background: #f0fdf4;
-  border-color: #86efac;
+  background: rgba(107, 139, 111, 0.06);
+  border-color: rgba(107, 139, 111, 0.3);
 }
 
 .quick-btn.long:hover {
-  background: #eff6ff;
-  border-color: #93c5fd;
+  background: rgba(196, 103, 61, 0.06);
+  border-color: rgba(196, 103, 61, 0.3);
 }
 
-.quick-icon {
-  font-size: 20px;
+.quick-svg {
+  width: 22px;
+  height: 22px;
+  color: var(--text-secondary);
 }
 
 .quick-text {
   font-size: 14px;
-  font-weight: 500;
-  color: #374151;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .quick-time {
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 
-/* 响应式 */
 @media (max-width: 480px) {
-  .control-actions {
-    gap: 8px;
-  }
-
-  .control-actions .el-button {
-    min-width: 80px;
+  .ctrl-btn {
+    padding: 10px 16px;
     font-size: 13px;
   }
 
   .quick-btn {
-    padding: 12px 8px;
-  }
-
-  .quick-icon {
-    font-size: 18px;
+    padding: 14px 10px;
   }
 
   .quick-text {
