@@ -201,7 +201,7 @@ describe('WeekView', () => {
       })
 
       const eventBlock = wrapper.find('.event-block')
-      expect(eventBlock.attributes('style')).toContain('background-color: rgb(196, 151, 61)')
+      expect(eventBlock.attributes('style')).toContain('background-color: rgb(184, 149, 77)')
     })
 
     it('休息类型默认绿色', () => {

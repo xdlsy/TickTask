@@ -248,7 +248,7 @@ describe('Schedule Store', () => {
   })
 
   describe('generateSchedule', () => {
-    it('should generate schedule and update events', async () => {
+    it('should replace events and update store', async () => {
       const generatedEvents = [
         {
           id: 'gen-1',
@@ -259,7 +259,8 @@ describe('Schedule Store', () => {
           status: 'planned',
           color: '#3b82f6',
           allDay: false,
-          editable: true
+          editable: true,
+          task_id: 'task-1'
         }
       ]
       ;(api.generateScheduleFromTasks as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -464,59 +465,76 @@ describe('Schedule Store', () => {
   })
 
   describe('generateSchedule', () => {
-    it('should append generated events to existing events', async () => {
-      const existingEvent = {
-        id: 'existing-1',
-        title: '现有日程',
+    it('should deduplicate by task_id and preserve custom events', async () => {
+      const existingTaskEvent = {
+        id: 'old-task-1',
+        title: '旧任务日程',
         start: '2026-03-18T09:00:00Z',
         end: '2026-03-18T10:00:00Z',
         type: 'task',
         status: 'planned',
         color: '#3b82f6',
         allDay: false,
+        editable: true,
+        task_id: 'task-1'
+      }
+      const customEvent = {
+        id: 'custom-1',
+        title: '手动创建的日程',
+        start: '2026-03-18T14:00:00Z',
+        end: '2026-03-18T15:00:00Z',
+        type: 'custom',
+        status: 'planned',
+        color: '#9C9893',
+        allDay: false,
         editable: true
       }
 
-      const generatedEvents = [
+      const freshEvents = [
         {
           id: 'gen-1',
-          title: '生成的日程',
+          title: '新生成的任务日程',
           start: '2026-03-18T11:00:00Z',
           end: '2026-03-18T12:00:00Z',
           type: 'task',
           status: 'planned',
           color: '#3b82f6',
           allDay: false,
-          editable: true
+          editable: true,
+          task_id: 'task-1'
         }
       ]
 
       ;(api.generateScheduleFromTasks as ReturnType<typeof vi.fn>).mockResolvedValue({
-        data: { events: generatedEvents }
+        data: { events: freshEvents }
       })
 
       const store = useScheduleStore()
-      store.events = [existingEvent]
+      store.events = [existingTaskEvent, customEvent]
 
       await store.generateSchedule('09:00', '18:00')
 
+      // 旧的任务日程被新日程替换，手动日程保留
       expect(store.events.length).toBe(2)
+      expect(store.events.find(e => e.id === 'gen-1')).toBeTruthy()
+      expect(store.events.find(e => e.id === 'custom-1')).toBeTruthy()
+      expect(store.events.find(e => e.id === 'old-task-1')).toBeFalsy()
     })
 
     it('should set loading state during generation', async () => {
-      let resolveFn: (value: unknown) => void
-      const promise = new Promise((resolve) => {
-        resolveFn = resolve
+      let genResolveFn: (value: unknown) => void
+      const genPromise = new Promise((resolve) => {
+        genResolveFn = resolve
       })
-      ;(api.generateScheduleFromTasks as ReturnType<typeof vi.fn>).mockReturnValue(promise)
+      ;(api.generateScheduleFromTasks as ReturnType<typeof vi.fn>).mockReturnValue(genPromise)
 
       const store = useScheduleStore()
-      const genPromise = store.generateSchedule('09:00', '18:00')
+      const resultPromise = store.generateSchedule('09:00', '18:00')
 
       expect(store.loading).toBe(true)
 
-      resolveFn!({ data: { events: [] } })
-      await genPromise
+      genResolveFn!({ data: { events: [] } })
+      await resultPromise
 
       expect(store.loading).toBe(false)
     })

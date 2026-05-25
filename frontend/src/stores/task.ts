@@ -54,6 +54,12 @@ export const useTaskStore = defineStore('task', () => {
     is_urgent?: boolean
     estimated_time?: number
     deadline?: string
+    start_date?: string | null
+    due_date?: string | null
+    is_recurring?: boolean
+    recurrence_pattern?: string
+    preferred_start_time?: string | null
+    preferred_end_time?: string | null
     tags?: string[]
   }) {
     try {

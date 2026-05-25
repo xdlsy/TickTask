@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"ticktask/internal/model"
 	"ticktask/internal/repository"
+	"ticktask/pkg/logger"
 	"time"
 
 	"github.com/google/uuid"
@@ -201,6 +202,18 @@ func (s *ScheduleService) UpdateScheduleStatus(id string, status model.ScheduleS
 
 // GenerateScheduleWithAI AI生成日程
 func (s *ScheduleService) GenerateScheduleWithAI(startTime, endTime string) ([]ScheduleEvent, error) {
+	start, err := time.Parse("15:04", startTime)
+	if err != nil {
+		return nil, err
+	}
+
+	// 清理当天已有的任务日程（避免重复）
+	now := time.Now()
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	dayEnd := dayStart.Add(24 * time.Hour)
+	deleted, _ := s.scheduleRepo.DeleteTaskSchedulesByDateRange(dayStart, dayEnd)
+	logger.Logger.Info("cleaned old task schedules before AI generation", "deleted", deleted)
+
 	// 获取待办任务
 	tasks, err := s.taskRepo.GetByStatus(model.StatusTodo)
 	if err != nil {
@@ -208,47 +221,114 @@ func (s *ScheduleService) GenerateScheduleWithAI(startTime, endTime string) ([]S
 	}
 
 	// 简单按优先级安排日程
-	return s.simpleSchedule(tasks, startTime, endTime)
+	return s.simpleScheduleWithStart(tasks, start)
 }
 
-func (s *ScheduleService) simpleSchedule(tasks []model.Task, startTime, endTime string) ([]ScheduleEvent, error) {
-	// 简单的日程安排逻辑
+type timeSlot struct {
+	start time.Time
+	end   time.Time
+}
+
+func (s *ScheduleService) simpleScheduleWithStart(tasks []model.Task, start time.Time) ([]ScheduleEvent, error) {
 	var events []ScheduleEvent
+	now := time.Now()
+	loc := now.Location()
 
-	start, err := time.Parse("15:04", startTime)
-	if err != nil {
-		return nil, err
-	}
+	var occupied []timeSlot
 
+	// 第一轮：安排有固定时段偏好的任务
 	for _, task := range tasks {
-		duration := 30 * time.Minute // 默认 30 分钟
-		if task.EstimatedTime > 0 {
-			duration = time.Duration(task.EstimatedTime) * time.Minute
+		if task.PreferredStartTime == "" || task.PreferredEndTime == "" {
+			continue
 		}
 
-		now := time.Now()
-		scheduleStart := time.Date(now.Year(), now.Month(), now.Day(), start.Hour(), start.Minute(), 0, 0, now.Location())
-		scheduleEnd := scheduleStart.Add(duration)
-
-		dto := &CreateScheduleDTO{
-			TaskID:    task.ID,
-			Title:     task.Title,
-			StartTime: scheduleStart.Format(time.RFC3339),
-			EndTime:   scheduleEnd.Format(time.RFC3339),
-			Type:      "task",
-			Color:     s.getQuadrantColor(task.Quadrant),
+		slotStart, err := time.Parse("15:04", task.PreferredStartTime)
+		if err != nil {
+			continue
 		}
-
-		schedule, err := s.CreateSchedule(dto)
+		slotEnd, err := time.Parse("15:04", task.PreferredEndTime)
 		if err != nil {
 			continue
 		}
 
-		events = append(events, s.toEvent(schedule))
-		start = scheduleEnd
+		scheduleStart := time.Date(now.Year(), now.Month(), now.Day(), slotStart.Hour(), slotStart.Minute(), 0, 0, loc)
+		scheduleEnd := time.Date(now.Year(), now.Month(), now.Day(), slotEnd.Hour(), slotEnd.Minute(), 0, 0, loc)
+
+		if !scheduleEnd.After(scheduleStart) {
+			continue
+		}
+
+		event, err := s.createScheduleEvent(task, scheduleStart, scheduleEnd)
+		if err != nil {
+			continue
+		}
+		events = append(events, event)
+		occupied = append(occupied, timeSlot{scheduleStart, scheduleEnd})
+	}
+
+	// 第二轮：用光标法，在空闲时段中安排无时段偏好的任务
+	cursor := time.Date(now.Year(), now.Month(), now.Day(), start.Hour(), start.Minute(), 0, 0, loc)
+
+	for _, task := range tasks {
+		if task.PreferredStartTime != "" && task.PreferredEndTime != "" {
+			continue
+		}
+
+		duration := 30 * time.Minute
+		if task.EstimatedTime > 0 {
+			duration = time.Duration(task.EstimatedTime) * time.Minute
+		}
+
+		scheduleStart, scheduleEnd := findNextAvailableSlot(cursor, duration, occupied)
+		event, err := s.createScheduleEvent(task, scheduleStart, scheduleEnd)
+		if err != nil {
+			continue
+		}
+		events = append(events, event)
+		occupied = append(occupied, timeSlot{scheduleStart, scheduleEnd})
+		cursor = scheduleEnd
 	}
 
 	return events, nil
+}
+
+// findNextAvailableSlot finds the next unoccupied time window starting from cursor.
+func findNextAvailableSlot(cursor time.Time, duration time.Duration, occupied []timeSlot) (time.Time, time.Time) {
+	candidateStart := cursor
+	candidateEnd := candidateStart.Add(duration)
+
+	for {
+		collision := false
+		for _, slot := range occupied {
+			if candidateStart.Before(slot.end) && candidateEnd.After(slot.start) {
+				candidateStart = slot.end
+				candidateEnd = candidateStart.Add(duration)
+				collision = true
+				break
+			}
+		}
+		if !collision {
+			return candidateStart, candidateEnd
+		}
+	}
+}
+
+func (s *ScheduleService) createScheduleEvent(task model.Task, scheduleStart, scheduleEnd time.Time) (ScheduleEvent, error) {
+	dto := &CreateScheduleDTO{
+		TaskID:    task.ID,
+		Title:     task.Title,
+		StartTime: scheduleStart.Format(time.RFC3339),
+		EndTime:   scheduleEnd.Format(time.RFC3339),
+		Type:      "task",
+		Color:     s.getQuadrantColor(task.Quadrant),
+	}
+
+	schedule, err := s.CreateSchedule(dto)
+	if err != nil {
+		return ScheduleEvent{}, err
+	}
+
+	return s.toEvent(schedule), nil
 }
 
 func (s *ScheduleService) toEvent(schedule *model.Schedule) ScheduleEvent {

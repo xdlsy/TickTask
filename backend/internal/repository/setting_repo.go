@@ -38,16 +38,17 @@ func (r *settingRepository) Set(key, value string) error {
 }
 
 func (r *settingRepository) GetPomodoroSettings() (*model.PomodoroSettings, error) {
+	settings := model.DefaultPomodoroSettings()
+
 	setting, err := r.Get("pomodoro.settings")
 	if err != nil {
-		return model.DefaultPomodoroSettings(), nil
+		return settings, nil
 	}
 
-	var settings model.PomodoroSettings
-	if err := json.Unmarshal([]byte(setting.Value), &settings); err != nil {
+	if err := json.Unmarshal([]byte(setting.Value), settings); err != nil {
 		return model.DefaultPomodoroSettings(), nil
 	}
-	return &settings, nil
+	return settings, nil
 }
 
 func (r *settingRepository) UpdatePomodoroSettings(settings *model.PomodoroSettings) error {

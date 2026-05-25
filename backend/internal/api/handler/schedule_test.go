@@ -89,6 +89,18 @@ func (m *mockScheduleRepositoryForService) UpdateStatus(id string, status model.
 	return repository.ErrNotFound
 }
 
+func (m *mockScheduleRepositoryForService) DeleteTaskSchedulesByDateRange(start, end time.Time) (int64, error) {
+	var count int64
+	for id, s := range m.schedules {
+		if s.TaskID != nil && *s.TaskID != "" &&
+			!s.StartTime.Before(start) && s.StartTime.Before(end) {
+			delete(m.schedules, id)
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (m *mockScheduleRepositoryForService) Move(id string, startTime, endTime time.Time) error {
 	if schedule, ok := m.schedules[id]; ok {
 		schedule.StartTime = startTime

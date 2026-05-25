@@ -27,44 +27,62 @@ func NewTaskService(
 }
 
 type CreateTaskRequest struct {
-	Title         string             `json:"title" binding:"required"`
-	Description   string             `json:"description"`
-	Quadrant      model.Quadrant     `json:"quadrant"`
-	IsImportant   bool               `json:"is_important"`
-	IsUrgent      bool               `json:"is_urgent"`
-	EstimatedTime int                `json:"estimated_time"`
-	Deadline      *time.Time         `json:"deadline"`
-	Tags          []string           `json:"tags"`
+	Title              string             `json:"title" binding:"required"`
+	Description        string             `json:"description"`
+	Quadrant           model.Quadrant     `json:"quadrant"`
+	IsImportant        bool               `json:"is_important"`
+	IsUrgent           bool               `json:"is_urgent"`
+	EstimatedTime      int                `json:"estimated_time"`
+	Deadline           *time.Time         `json:"deadline"`
+	StartDate          *time.Time         `json:"start_date"`
+	DueDate            *time.Time         `json:"due_date"`
+	IsRecurring        bool               `json:"is_recurring"`
+	RecurrencePattern  string             `json:"recurrence_pattern"`
+	PreferredStartTime string             `json:"preferred_start_time"`
+	PreferredEndTime   string             `json:"preferred_end_time"`
+	Tags               []string           `json:"tags"`
 }
 
 type UpdateTaskRequest struct {
-	Title         *string            `json:"title"`
-	Description   *string            `json:"description"`
-	Quadrant      *model.Quadrant    `json:"quadrant"`
-	IsImportant   *bool              `json:"is_important"`
-	IsUrgent      *bool              `json:"is_urgent"`
-	Status        *model.TaskStatus  `json:"status"`
-	EstimatedTime *int               `json:"estimated_time"`
-	Deadline      *time.Time         `json:"deadline"`
-	Tags          []string           `json:"tags"`
-	Order         *int               `json:"order"`
+	Title              *string            `json:"title"`
+	Description        *string            `json:"description"`
+	Quadrant           *model.Quadrant    `json:"quadrant"`
+	IsImportant        *bool              `json:"is_important"`
+	IsUrgent           *bool              `json:"is_urgent"`
+	Status             *model.TaskStatus  `json:"status"`
+	EstimatedTime      *int               `json:"estimated_time"`
+	Deadline           *time.Time         `json:"deadline"`
+	StartDate          *time.Time         `json:"start_date"`
+	DueDate            *time.Time         `json:"due_date"`
+	IsRecurring        *bool              `json:"is_recurring"`
+	RecurrencePattern  *string            `json:"recurrence_pattern"`
+	PreferredStartTime *string            `json:"preferred_start_time"`
+	PreferredEndTime   *string            `json:"preferred_end_time"`
+	Tags               []string           `json:"tags"`
+	Order              *int               `json:"order"`
 }
 
 func (s *TaskService) CreateTask(req CreateTaskRequest) (*model.Task, error) {
 	task := &model.Task{
-		ID:            uuid.New().String(),
-		Title:         req.Title,
-		Description:   req.Description,
-		Quadrant:      req.Quadrant,
-		IsImportant:   req.IsImportant,
-		IsUrgent:      req.IsUrgent,
-		Status:        model.StatusTodo,
-		EstimatedTime: req.EstimatedTime,
-		Deadline:      req.Deadline,
-		Tags:          encodeTags(req.Tags),
-		Order:         0,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
+		ID:                 uuid.New().String(),
+		Title:              req.Title,
+		Description:        req.Description,
+		Quadrant:           req.Quadrant,
+		IsImportant:        req.IsImportant,
+		IsUrgent:           req.IsUrgent,
+		Status:             model.StatusTodo,
+		EstimatedTime:      req.EstimatedTime,
+		Deadline:           req.Deadline,
+		StartDate:          req.StartDate,
+		DueDate:            req.DueDate,
+		IsRecurring:        req.IsRecurring,
+		RecurrencePattern:  req.RecurrencePattern,
+		PreferredStartTime: req.PreferredStartTime,
+		PreferredEndTime:   req.PreferredEndTime,
+		Tags:               encodeTags(req.Tags),
+		Order:              0,
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
 	}
 
 	if err := s.taskRepo.Create(task); err != nil {
@@ -114,6 +132,24 @@ func (s *TaskService) UpdateTask(id string, req UpdateTaskRequest) error {
 	}
 	if req.Deadline != nil {
 		task.Deadline = req.Deadline
+	}
+	if req.StartDate != nil {
+		task.StartDate = req.StartDate
+	}
+	if req.DueDate != nil {
+		task.DueDate = req.DueDate
+	}
+	if req.IsRecurring != nil {
+		task.IsRecurring = *req.IsRecurring
+	}
+	if req.RecurrencePattern != nil {
+		task.RecurrencePattern = *req.RecurrencePattern
+	}
+	if req.PreferredStartTime != nil {
+		task.PreferredStartTime = *req.PreferredStartTime
+	}
+	if req.PreferredEndTime != nil {
+		task.PreferredEndTime = *req.PreferredEndTime
 	}
 	if req.Tags != nil {
 		task.Tags = encodeTags(req.Tags)

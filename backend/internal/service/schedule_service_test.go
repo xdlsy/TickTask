@@ -82,6 +82,18 @@ func (m *mockScheduleRepo) UpdateStatus(id string, status model.ScheduleStatus) 
 	return repository.ErrNotFound
 }
 
+func (m *mockScheduleRepo) DeleteTaskSchedulesByDateRange(start, end time.Time) (int64, error) {
+	var count int64
+	for id, s := range m.schedules {
+		if s.TaskID != nil && *s.TaskID != "" &&
+			!s.StartTime.Before(start) && s.StartTime.Before(end) {
+			delete(m.schedules, id)
+			count++
+		}
+	}
+	return count, nil
+}
+
 func (m *mockScheduleRepo) Move(id string, startTime, endTime time.Time) error {
 	if schedule, ok := m.schedules[id]; ok {
 		schedule.StartTime = startTime
@@ -546,5 +558,113 @@ func TestScheduleService_GenerateScheduleWithAI_InvalidTime(t *testing.T) {
 	_, err := svc.GenerateScheduleWithAI("invalid", "18:00")
 	if err == nil {
 		t.Error("expected error for invalid time format")
+	}
+}
+
+// Test GenerateScheduleWithAI respects preferred time slots
+func TestScheduleService_GenerateScheduleWithAI_PreferredTimeSlots(t *testing.T) {
+	scheduleRepo := newMockScheduleRepo()
+	taskRepo := newMockTaskRepoForSchedule()
+
+	// Task A with preferred time 10:00-11:00
+	taskRepo.Create(&model.Task{
+		ID:                 "task-a",
+		Title:              "固定时段任务",
+		Quadrant:           model.Quadrant1,
+		Status:             model.StatusTodo,
+		EstimatedTime:      60,
+		PreferredStartTime: "10:00",
+		PreferredEndTime:   "11:00",
+	})
+	// Task B without time preference
+	taskRepo.Create(&model.Task{
+		ID:            "task-b",
+		Title:         "无时段任务",
+		Quadrant:      model.Quadrant2,
+		Status:        model.StatusTodo,
+		EstimatedTime: 30,
+	})
+
+	svc := NewScheduleService(scheduleRepo, taskRepo, nil)
+
+	events, err := svc.GenerateScheduleWithAI("09:00", "18:00")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(events) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(events))
+	}
+
+	// Find the fixed-time task event
+	var taskAEvent, taskBEvent *ScheduleEvent
+	for i := range events {
+		switch events[i].Title {
+		case "固定时段任务":
+			taskAEvent = &events[i]
+		case "无时段任务":
+			taskBEvent = &events[i]
+		}
+	}
+
+	if taskAEvent == nil || taskBEvent == nil {
+		t.Fatal("missing expected events")
+	}
+
+	// Task A should be scheduled at its preferred time 10:00
+	startTime, _ := time.Parse(time.RFC3339, taskAEvent.Start)
+	if startTime.Hour() != 10 || startTime.Minute() != 0 {
+		t.Errorf("task A should start at 10:00, got %02d:%02d", startTime.Hour(), startTime.Minute())
+	}
+
+	// Task B should NOT overlap with task A (09:00-10:00 or after 11:00)
+	taskBStart, _ := time.Parse(time.RFC3339, taskBEvent.Start)
+	taskBEnd, _ := time.Parse(time.RFC3339, taskBEvent.End)
+
+	// Task A occupies 10:00-11:00, so task B should be 09:00-09:30
+	if taskBStart.Hour() == 10 {
+		t.Error("task B should not overlap with task A's preferred slot")
+	}
+	_ = taskBEnd
+}
+
+// Test GenerateScheduleWithAI with all tasks having no time preference (backward compat)
+func TestScheduleService_GenerateScheduleWithAI_NoPreferences(t *testing.T) {
+	scheduleRepo := newMockScheduleRepo()
+	taskRepo := newMockTaskRepoForSchedule()
+
+	taskRepo.Create(&model.Task{
+		ID:            "task-1",
+		Title:         "任务1",
+		Quadrant:      model.Quadrant1,
+		Status:        model.StatusTodo,
+		EstimatedTime: 30,
+	})
+	taskRepo.Create(&model.Task{
+		ID:            "task-2",
+		Title:         "任务2",
+		Quadrant:      model.Quadrant2,
+		Status:        model.StatusTodo,
+		EstimatedTime: 30,
+	})
+
+	svc := NewScheduleService(scheduleRepo, taskRepo, nil)
+
+	events, err := svc.GenerateScheduleWithAI("09:00", "18:00")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if len(events) != 2 {
+		t.Errorf("expected 2 events, got %d", len(events))
+	}
+
+	// Both should be scheduled sequentially from 09:00
+	if len(events) >= 2 {
+		start1, _ := time.Parse(time.RFC3339, events[0].Start)
+		start2, _ := time.Parse(time.RFC3339, events[1].Start)
+		if !start2.After(start1) {
+			t.Error("tasks without preferences should be scheduled sequentially")
+		}
 	}
 }

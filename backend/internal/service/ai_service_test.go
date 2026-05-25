@@ -3,9 +3,12 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"ticktask/internal/ai"
+	"ticktask/internal/model"
+	"ticktask/internal/repository"
 	"testing"
 	"time"
 )
@@ -236,5 +239,264 @@ func TestAIService_ChatCompletion_Timeout(t *testing.T) {
 	_, err := client.ChatCompletion(ctx, "Test prompt")
 	if err == nil {
 		t.Error("expected timeout error")
+	}
+}
+
+// mockLLMClient implements ai.LLMClient for service testing
+type mockLLMClient struct {
+	response string
+	err      error
+}
+
+func (m *mockLLMClient) ChatCompletion(ctx context.Context, prompt string) (string, error) {
+	return m.response, m.err
+}
+
+// mockTaskRepository is a minimal in-memory repo for service tests
+type mockTaskRepo struct {
+	tasks map[string]*model.Task
+}
+
+func newMockTaskRepo() *mockTaskRepo {
+	return &mockTaskRepo{tasks: make(map[string]*model.Task)}
+}
+
+func (m *mockTaskRepo) Create(task *model.Task) error        { m.tasks[task.ID] = task; return nil }
+func (m *mockTaskRepo) Update(task *model.Task) error        { m.tasks[task.ID] = task; return nil }
+func (m *mockTaskRepo) Delete(id string) error               { delete(m.tasks, id); return nil }
+func (m *mockTaskRepo) GetByID(id string) (*model.Task, error) {
+	if t, ok := m.tasks[id]; ok { return t, nil }
+	return nil, repository.ErrNotFound
+}
+func (m *mockTaskRepo) GetAll() ([]model.Task, error) {
+	result := make([]model.Task, 0, len(m.tasks))
+	for _, t := range m.tasks { result = append(result, *t) }
+	return result, nil
+}
+func (m *mockTaskRepo) GetByStatus(status model.TaskStatus) ([]model.Task, error) {
+	var result []model.Task
+	for _, t := range m.tasks {
+		if t.Status == status { result = append(result, *t) }
+	}
+	return result, nil
+}
+func (m *mockTaskRepo) GetByQuadrant(quadrant model.Quadrant) ([]model.Task, error) { return nil, nil }
+func (m *mockTaskRepo) GetAllByQuadrant() (map[model.Quadrant][]model.Task, error) { return nil, nil }
+
+func TestAIService_RescheduleAfterInterrupt_NotConfigured(t *testing.T) {
+	taskRepo := newMockTaskRepo()
+	service := &AIService{client: nil, taskRepo: taskRepo}
+
+	ctx := context.Background()
+	_, err := service.RescheduleAfterInterrupt(ctx, "task-1", 10, 25, "meeting", "14:00", "18:00")
+	if err == nil {
+		t.Error("expected error when AI not configured")
+	}
+	if err.Error() != "AI service not configured" {
+		t.Errorf("expected 'AI service not configured', got '%s'", err.Error())
+	}
+}
+
+func TestAIService_RescheduleAfterInterrupt_Success(t *testing.T) {
+	taskRepo := newMockTaskRepo()
+
+	// Add the interrupted task
+	taskRepo.Create(&model.Task{
+		ID: "task-1", Title: "代码审查", Status: model.StatusTodo,
+		EstimatedTime: 25, Quadrant: model.Quadrant2,
+	})
+
+	// Add another pending task
+	taskRepo.Create(&model.Task{
+		ID: "task-2", Title: "写周报", Status: model.StatusTodo,
+		EstimatedTime: 30, Quadrant: model.Quadrant3,
+	})
+
+	mockResponse := `{
+		"adjusted_schedule": [
+			{
+				"task_id": "task-1",
+				"title": "代码审查（调整后）",
+				"start_time": "14:00",
+				"end_time": "14:15",
+				"adjustment": "shortened",
+				"reason": "被打断后剩余15分钟"
+			},
+			{
+				"task_id": "task-2",
+				"title": "写周报",
+				"start_time": "14:15",
+				"end_time": "14:45",
+				"adjustment": "postponed",
+				"reason": "前序任务被打断导致推迟"
+			}
+		],
+		"summary": "调整了2个任务的排程"
+	}`
+
+	mockClient := &mockLLMClient{response: mockResponse, err: nil}
+	service := &AIService{client: mockClient, taskRepo: taskRepo}
+
+	ctx := context.Background()
+	result, err := service.RescheduleAfterInterrupt(ctx, "task-1", 10, 25, "同事临时会议", "14:00", "18:00")
+	if err != nil {
+		t.Fatalf("RescheduleAfterInterrupt failed: %v", err)
+	}
+
+	if result.Summary != "调整了2个任务的排程" {
+		t.Errorf("expected summary '调整了2个任务的排程', got '%s'", result.Summary)
+	}
+
+	if len(result.AdjustedSchedule) != 2 {
+		t.Fatalf("expected 2 adjusted items, got %d", len(result.AdjustedSchedule))
+	}
+
+	if result.AdjustedSchedule[0].Adjustment != "shortened" {
+		t.Errorf("expected first adjustment 'shortened', got '%s'", result.AdjustedSchedule[0].Adjustment)
+	}
+
+	if result.AdjustedSchedule[1].Adjustment != "postponed" {
+		t.Errorf("expected second adjustment 'postponed', got '%s'", result.AdjustedSchedule[1].Adjustment)
+	}
+
+	if result.AdjustedSchedule[0].TaskID != "task-1" {
+		t.Errorf("expected first task_id 'task-1', got '%s'", result.AdjustedSchedule[0].TaskID)
+	}
+}
+
+func TestAIService_RescheduleAfterInterrupt_LLMError(t *testing.T) {
+	taskRepo := newMockTaskRepo()
+	taskRepo.Create(&model.Task{
+		ID: "task-1", Title: "测试任务", Status: model.StatusTodo,
+		EstimatedTime: 25,
+	})
+
+	mockClient := &mockLLMClient{response: "", err: errors.New("LLM service timeout")}
+	service := &AIService{client: mockClient, taskRepo: taskRepo}
+
+	ctx := context.Background()
+	_, err := service.RescheduleAfterInterrupt(ctx, "task-1", 10, 25, "打断", "14:00", "18:00")
+	if err == nil {
+		t.Error("expected error when LLM fails")
+	}
+}
+
+func TestAIService_RescheduleAfterInterrupt_MalformedJSON(t *testing.T) {
+	taskRepo := newMockTaskRepo()
+	taskRepo.Create(&model.Task{
+		ID: "task-1", Title: "测试", Status: model.StatusTodo,
+		EstimatedTime: 25,
+	})
+
+	// Return non-JSON text
+	mockClient := &mockLLMClient{response: "Sorry, I cannot help with that.", err: nil}
+	service := &AIService{client: mockClient, taskRepo: taskRepo}
+
+	ctx := context.Background()
+	_, err := service.RescheduleAfterInterrupt(ctx, "task-1", 10, 25, "meeting", "14:00", "18:00")
+	if err == nil {
+		t.Error("expected parse error for malformed response")
+	}
+}
+
+func TestAIService_RescheduleAfterInterrupt_NoRemainingTasks(t *testing.T) {
+	taskRepo := newMockTaskRepo()
+
+	mockResponse := `{
+		"adjusted_schedule": [
+			{
+				"task_id": "task-1",
+				"title": "唯一的任务（调整后）",
+				"start_time": "14:00",
+				"end_time": "14:15",
+				"adjustment": "shortened",
+				"reason": "被打断后调整剩余时间"
+			}
+		],
+		"summary": "无其他任务，仅调整当前任务时长"
+	}`
+
+	mockClient := &mockLLMClient{response: mockResponse, err: nil}
+	service := &AIService{client: mockClient, taskRepo: taskRepo}
+
+	ctx := context.Background()
+	result, err := service.RescheduleAfterInterrupt(ctx, "task-1", 5, 20, "紧急会议", "15:00", "18:00")
+	if err != nil {
+		t.Fatalf("RescheduleAfterInterrupt failed: %v", err)
+	}
+
+	if len(result.AdjustedSchedule) != 1 {
+		t.Errorf("expected 1 adjusted item, got %d", len(result.AdjustedSchedule))
+	}
+}
+
+func TestAIService_RescheduleAfterInterrupt_JSONWithMarkdown(t *testing.T) {
+	taskRepo := newMockTaskRepo()
+
+	// Response wrapped in markdown code fences (AI sometimes does this)
+	markdownResponse := "```json\n{\n  \"adjusted_schedule\": [],\n  \"summary\": \"无需调整，当前没有其他待办任务\"\n}\n```"
+
+	mockClient := &mockLLMClient{response: markdownResponse, err: nil}
+	service := &AIService{client: mockClient, taskRepo: taskRepo}
+
+	ctx := context.Background()
+	result, err := service.RescheduleAfterInterrupt(ctx, "task-x", 0, 30, "电话", "10:00", "18:00")
+	if err != nil {
+		t.Fatalf("RescheduleAfterInterrupt with markdown JSON failed: %v", err)
+	}
+
+	if result.Summary != "无需调整，当前没有其他待办任务" {
+		t.Errorf("expected summary, got '%s'", result.Summary)
+	}
+}
+
+func TestAIService_GenerateDailySchedule_NotConfigured(t *testing.T) {
+	taskRepo := newMockTaskRepo()
+	service := &AIService{client: nil, taskRepo: taskRepo}
+
+	ctx := context.Background()
+	_, err := service.GenerateDailySchedule(ctx, "09:00", "18:00", nil)
+	if err == nil {
+		t.Error("expected error when AI not configured")
+	}
+}
+
+func TestAIService_GenerateDailySchedule_EmptyTasks(t *testing.T) {
+	taskRepo := newMockTaskRepo()
+	mockClient := &mockLLMClient{response: "", err: nil}
+	service := &AIService{client: mockClient, taskRepo: taskRepo}
+
+	ctx := context.Background()
+	result, err := service.GenerateDailySchedule(ctx, "09:00", "18:00", &model.PomodoroSettings{
+		WorkDuration: 1500, ShortBreakDuration: 300, LongBreakAfter: 4,
+	})
+	if err != nil {
+		t.Fatalf("GenerateDailySchedule failed: %v", err)
+	}
+
+	if len(result.Schedule) != 0 {
+		t.Errorf("expected empty schedule when no tasks exist, got %d items", len(result.Schedule))
+	}
+}
+
+func TestAIService_GetPrioritySuggestions_NotConfigured(t *testing.T) {
+	taskRepo := newMockTaskRepo()
+	service := &AIService{client: nil, taskRepo: taskRepo}
+
+	ctx := context.Background()
+	_, err := service.GetPrioritySuggestions(ctx)
+	if err == nil {
+		t.Error("expected error when AI not configured")
+	}
+}
+
+func TestAIService_GetDailyInsights_NotConfigured(t *testing.T) {
+	taskRepo := newMockTaskRepo()
+	service := &AIService{client: nil, taskRepo: taskRepo}
+
+	ctx := context.Background()
+	_, err := service.GetDailyInsights(ctx, "2026-05-26", 8, 200, 3, 2, "")
+	if err == nil {
+		t.Error("expected error when AI not configured")
 	}
 }

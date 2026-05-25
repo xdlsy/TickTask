@@ -270,3 +270,64 @@ func TestTaskHandler_GetTask_NotFound(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusNotFound, w.Code)
 	}
 }
+
+func TestTaskHandler_CreateTask_WithNewFields(t *testing.T) {
+	taskService := service.NewTaskService(
+		newMockTaskRepository(),
+		newMockAnalyticsRepository(),
+		newMockSettingRepository(),
+	)
+
+	handler := NewTaskHandler(taskService)
+	router := setupTestRouter()
+	router.POST("/api/tasks", handler.CreateTask)
+
+	body := map[string]interface{}{
+		"title":                "Recurring Task",
+		"description":          "A task with all new fields",
+		"quadrant":             2,
+		"estimated_time":       45,
+		"is_recurring":         true,
+		"recurrence_pattern":   "daily",
+		"preferred_start_time": "09:00",
+		"preferred_end_time":   "10:30",
+		"start_date":           "2026-06-01T00:00:00Z",
+		"due_date":             "2026-06-30T00:00:00Z",
+	}
+	jsonBody, _ := json.Marshal(body)
+
+	req, _ := http.NewRequest("POST", "/api/tasks", bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, w.Code, w.Body.String())
+	}
+
+	var task model.Task
+	json.Unmarshal(w.Body.Bytes(), &task)
+
+	if task.Title != "Recurring Task" {
+		t.Errorf("expected title 'Recurring Task', got %s", task.Title)
+	}
+	if !task.IsRecurring {
+		t.Error("expected is_recurring to be true")
+	}
+	if task.RecurrencePattern != "daily" {
+		t.Errorf("expected recurrence_pattern 'daily', got %s", task.RecurrencePattern)
+	}
+	if task.PreferredStartTime != "09:00" {
+		t.Errorf("expected preferred_start_time '09:00', got %s", task.PreferredStartTime)
+	}
+	if task.PreferredEndTime != "10:30" {
+		t.Errorf("expected preferred_end_time '10:30', got %s", task.PreferredEndTime)
+	}
+	if task.StartDate == nil {
+		t.Error("expected start_date to be set")
+	}
+	if task.DueDate == nil {
+		t.Error("expected due_date to be set")
+	}
+}

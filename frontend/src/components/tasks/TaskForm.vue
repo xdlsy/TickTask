@@ -60,6 +60,46 @@
         <span style="margin-left: 8px; color: var(--text-secondary)">分钟</span>
       </el-form-item>
 
+      <el-form-item label="偏好时段">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <el-time-picker
+            v-model="formData.preferred_start_time"
+            format="HH:mm"
+            value-format="HH:mm"
+            placeholder="开始"
+            style="width: 130px"
+          />
+          <span style="color: var(--text-muted)">—</span>
+          <el-time-picker
+            v-model="formData.preferred_end_time"
+            format="HH:mm"
+            value-format="HH:mm"
+            placeholder="结束"
+            style="width: 130px"
+          />
+        </div>
+      </el-form-item>
+
+      <el-form-item label="开始日期">
+        <el-date-picker
+          v-model="formData.start_date"
+          type="date"
+          placeholder="选择开始日期"
+          style="width: 100%"
+          value-format="YYYY-MM-DD"
+        />
+      </el-form-item>
+
+      <el-form-item label="截止日期">
+        <el-date-picker
+          v-model="formData.due_date"
+          type="date"
+          placeholder="选择截止日期"
+          style="width: 100%"
+          value-format="YYYY-MM-DD"
+        />
+      </el-form-item>
+
       <el-form-item label="截止时间">
         <el-date-picker
           v-model="formData.deadline"
@@ -67,6 +107,18 @@
           placeholder="选择截止时间"
           style="width: 100%"
         />
+      </el-form-item>
+
+      <el-form-item label="重复任务">
+        <el-switch v-model="formData.is_recurring" />
+      </el-form-item>
+
+      <el-form-item v-if="formData.is_recurring" label="重复模式">
+        <el-select v-model="formData.recurrence_pattern" placeholder="选择重复模式" style="width: 100%">
+          <el-option label="每日" value="daily" />
+          <el-option label="每周" value="weekly" />
+          <el-option label="每月" value="monthly" />
+        </el-select>
       </el-form-item>
 
       <el-form-item label="标签">
@@ -121,7 +173,13 @@ const formData = ref({
   description: '',
   quadrant: 2 as Quadrant,
   estimated_time: 0,
+  preferred_start_time: null as string | null,
+  preferred_end_time: null as string | null,
+  start_date: null as string | null,
+  due_date: null as string | null,
   deadline: null as Date | null,
+  is_recurring: false,
+  recurrence_pattern: '' as string,
   tags: [] as string[]
 })
 
@@ -132,13 +190,19 @@ watch(() => props.task, (task) => {
       description: task.description,
       quadrant: task.quadrant,
       estimated_time: task.estimated_time,
+      preferred_start_time: task.preferred_start_time || null,
+      preferred_end_time: task.preferred_end_time || null,
+      start_date: task.start_date ? task.start_date.substring(0, 10) : null,
+      due_date: task.due_date ? task.due_date.substring(0, 10) : null,
       deadline: task.deadline ? new Date(task.deadline) : null,
+      is_recurring: task.is_recurring || false,
+      recurrence_pattern: task.recurrence_pattern || '',
       tags: task.tags
     }
   } else {
     resetForm()
   }
-})
+}, { immediate: true })
 
 function resetForm() {
   formData.value = {
@@ -146,7 +210,13 @@ function resetForm() {
     description: '',
     quadrant: 2,
     estimated_time: 0,
+    preferred_start_time: null,
+    preferred_end_time: null,
+    start_date: null,
+    due_date: null,
     deadline: null,
+    is_recurring: false,
+    recurrence_pattern: '',
     tags: []
   }
   aiRecommendation.value = null
@@ -221,7 +291,13 @@ function onSave() {
     description: formData.value.description,
     quadrant: formData.value.quadrant,
     estimated_time: formData.value.estimated_time,
+    preferred_start_time: formData.value.preferred_start_time || null,
+    preferred_end_time: formData.value.preferred_end_time || null,
+    start_date: formData.value.start_date ? formData.value.start_date + 'T00:00:00Z' : null,
+    due_date: formData.value.due_date ? formData.value.due_date + 'T00:00:00Z' : null,
     deadline: formData.value.deadline?.toISOString() || null,
+    is_recurring: formData.value.is_recurring,
+    recurrence_pattern: formData.value.recurrence_pattern,
     tags: formData.value.tags
   }
 

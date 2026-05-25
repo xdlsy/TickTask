@@ -192,7 +192,7 @@ describe('DayView', () => {
       })
 
       const eventBlock = wrapper.find('.event-block')
-      expect(eventBlock.attributes('style')).toContain('background-color: rgb(196, 151, 61)')
+      expect(eventBlock.attributes('style')).toContain('background-color: rgb(184, 149, 77)')
     })
 
     it('任务类型默认蓝色', () => {
@@ -206,7 +206,7 @@ describe('DayView', () => {
       })
 
       const eventBlock = wrapper.find('.event-block')
-      expect(eventBlock.attributes('style')).toContain('background-color: rgb(196, 103, 61)')
+      expect(eventBlock.attributes('style')).toContain('background-color: rgb(184, 69, 44)')
     })
 
     it('休息类型默认绿色', () => {

@@ -80,6 +80,7 @@ export const useTimerStore = defineStore('timer', () => {
         currentSession.value.status = 'paused'
       } else if (action === 'complete') {
         currentSession.value.status = 'completed'
+        remainingTime.value = 0
         const now = new Date()
         currentSession.value.end_time = now.toISOString()
       } else if (action === 'abandon') {
@@ -88,6 +89,7 @@ export const useTimerStore = defineStore('timer', () => {
           currentSession.value.interrupt_reason = interruptReason
         }
         currentSession.value = null
+        remainingTime.value = 0
       }
 
       await fetchRecentSessions()

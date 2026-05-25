@@ -78,8 +78,14 @@ export const useScheduleStore = defineStore('schedule', () => {
     loading.value = true
     try {
       const res = await api.generateScheduleFromTasks(startTime, endTime)
-      events.value = [...events.value, ...res.data.events]
-      return res.data.events
+      const generatedEvents = res.data.events as ScheduleEvent[]
+      // 收集新生成事件的 task_id，用于去重
+      const newTaskIds = new Set(generatedEvents.map(e => e.task_id).filter(Boolean))
+      // 删除旧的任务日程，保留自定义日程（无 task_id）
+      events.value = events.value.filter(e => !e.task_id || !newTaskIds.has(e.task_id))
+      // 添加新日程
+      events.value = [...events.value, ...generatedEvents]
+      return generatedEvents
     } catch (error) {
       console.error('Failed to generate schedule:', error)
       throw error

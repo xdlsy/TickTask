@@ -30,6 +30,7 @@ func NewAIService(cfg *model.AISettings, taskRepo repository.TaskRepository, sch
 			if cfg.APIKey == "" { break }
 			client = ai.NewAnthropicClient(cfg.APIKey, cfg.Model)
 		default:
+			if cfg.APIKey == "" { break }
 			client = ai.NewOpenAIClient(cfg.APIKey, cfg.BaseURL, cfg.Model)
 		}
 	}

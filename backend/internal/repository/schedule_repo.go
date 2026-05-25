@@ -17,6 +17,7 @@ type ScheduleRepository interface {
 	Delete(id string) error
 	UpdateStatus(id string, status model.ScheduleStatus) error
 	Move(id string, startTime, endTime time.Time) error
+	DeleteTaskSchedulesByDateRange(start, end time.Time) (int64, error)
 }
 
 type scheduleRepository struct {
@@ -81,4 +82,10 @@ func (r *scheduleRepository) Move(id string, startTime, endTime time.Time) error
 		"start_time": startTime,
 		"end_time":   endTime,
 	}).Error
+}
+
+func (r *scheduleRepository) DeleteTaskSchedulesByDateRange(start, end time.Time) (int64, error) {
+	result := r.db.Where("task_id IS NOT NULL AND task_id != '' AND start_time >= ? AND start_time < ?", start, end).
+		Delete(&model.Schedule{})
+	return result.RowsAffected, result.Error
 }

@@ -73,7 +73,7 @@
               <path d="M9 12l2 2 4-4"/>
             </svg>
             <p>暂无任务</p>
-            <el-button type="primary" @click="$emit('add-task')">创建第一个任务</el-button>
+            <el-button type="primary" @click="router.push('/tasks?add=true')">创建第一个任务</el-button>
           </div>
           <div v-else class="task-list">
             <TaskCard
@@ -87,66 +87,6 @@
             />
           </div>
         </div>
-
-        <!-- AI 日程生成 -->
-        <div class="card ai-section" v-if="aiStore.configured">
-          <div class="card-header">
-            <h3>AI 日程助手</h3>
-          </div>
-          <div class="schedule-form">
-            <div class="time-inputs">
-              <el-time-select
-                v-model="scheduleStartTime"
-                placeholder="开始时间"
-                start="06:00"
-                step="00:30"
-                end="22:00"
-              />
-              <span class="time-separator">至</span>
-              <el-time-select
-                v-model="scheduleEndTime"
-                placeholder="结束时间"
-                start="06:00"
-                step="00:30"
-                end="23:00"
-              />
-            </div>
-            <el-button
-              type="primary"
-              :loading="aiStore.loading"
-              @click="generateSchedule"
-            >
-              <el-icon class="el-icon--left"><MagicStick /></el-icon>
-              生成今日日程
-            </el-button>
-          </div>
-
-          <div v-if="generatedSchedule" class="schedule-result">
-            <div
-              v-for="item in generatedSchedule"
-              :key="item.id"
-              class="schedule-item"
-            >
-              <div class="schedule-time">
-                {{ formatScheduleTime(item.start) }} - {{ formatScheduleTime(item.end) }}
-              </div>
-              <div class="schedule-task">{{ item.title }}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card ai-section ai-not-configured" v-else>
-          <div class="card-header">
-            <h3>AI 日程助手</h3>
-          </div>
-          <div class="ai-placeholder">
-            <p>配置 AI API Key 以解锁智能日程生成功能</p>
-            <el-button type="primary" @click="$router.push('/settings')">
-              前往设置
-              <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-            </el-button>
-          </div>
-        </div>
       </div>
 
       <div class="side-column">
@@ -155,11 +95,11 @@
             <h3>快速操作</h3>
           </div>
           <div class="quick-actions">
-            <el-button type="primary" size="large" @click="$emit('add-task')">
+            <el-button type="primary" size="large" @click="router.push('/tasks?add=true')">
               <el-icon><Plus /></el-icon>
               <span>创建任务</span>
             </el-button>
-            <el-button size="large" @click="$emit('start-timer')">
+            <el-button size="large" @click="startTimer">
               <el-icon><VideoPlay /></el-icon>
               <span>开始番茄</span>
             </el-button>
@@ -198,20 +138,21 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowRight, MagicStick, Plus, VideoPlay } from '@element-plus/icons-vue'
+import { ArrowRight, Plus, VideoPlay } from '@element-plus/icons-vue'
 import TaskCard from '@/components/tasks/TaskCard.vue'
 import { useTaskStore } from '@/stores/task'
 import { useTimerStore } from '@/stores/timer'
 import { useAIStore } from '@/stores/ai'
-import type { Task, ScheduleEvent } from '@/types'
+import type { Task } from '@/types'
 
+const router = useRouter()
 const taskStore = useTaskStore()
 const timerStore = useTimerStore()
 const aiStore = useAIStore()
 
 defineEmits<{
-  'add-task': []
   'edit-task': [task: Task]
   'complete-task': [id: string]
   'delete-task': [id: string]
@@ -222,9 +163,6 @@ const todayPomodoros = ref(0)
 const focusTime = ref(0)
 const completedTasks = ref(0)
 
-const scheduleStartTime = ref('09:00')
-const scheduleEndTime = ref('18:00')
-const generatedSchedule = ref<ScheduleEvent[] | null>(null)
 const priorityTasks = ref<Task[]>([])
 
 const pendingTasks = computed(() =>
@@ -246,25 +184,13 @@ function formatDuration(seconds: number): string {
   return `${mins}m`
 }
 
-function formatScheduleTime(dateStr: string): string {
-  const date = new Date(dateStr)
-  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
-}
-
-async function generateSchedule() {
-  if (!scheduleStartTime.value || !scheduleEndTime.value) {
-    ElMessage.warning('请选择时间范围')
-    return
-  }
-
+async function startTimer() {
   try {
-    const result = await aiStore.generateSchedule(scheduleStartTime.value, scheduleEndTime.value)
-    if (result) {
-      generatedSchedule.value = result
-      ElMessage.success('日程已生成')
-    }
-  } catch (error) {
-    ElMessage.error('生成日程失败')
+    await timerStore.createSession(null, 'work')
+    ElMessage.success('开始番茄计时')
+    router.push('/timer')
+  } catch {
+    ElMessage.error('启动计时器失败')
   }
 }
 
@@ -526,71 +452,6 @@ onMounted(async () => {
 
 .quick-actions .el-button .el-icon {
   font-size: 16px;
-}
-
-.ai-section .schedule-form {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.time-inputs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.time-separator {
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.schedule-result {
-  margin-top: 12px;
-}
-
-.schedule-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  background: var(--bg-primary);
-  border-radius: var(--radius-sm);
-  margin-bottom: 4px;
-  transition: all var(--transition-fast);
-}
-
-.schedule-item:hover {
-  background: var(--bg-secondary);
-}
-
-.schedule-time {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
-  min-width: 100px;
-  font-family: var(--font-mono);
-}
-
-.schedule-task {
-  flex: 1;
-  font-weight: 500;
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
-.ai-placeholder {
-  text-align: center;
-  padding: 28px 20px;
-  border-radius: var(--radius-md);
-}
-
-.ai-placeholder p {
-  color: var(--text-muted);
-  margin-bottom: 14px;
-  font-size: 13px;
 }
 
 .priority-card .priority-list {

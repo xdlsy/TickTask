@@ -60,6 +60,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { Plus } from '@element-plus/icons-vue'
 import QuadrantView from '@/components/tasks/QuadrantView.vue'
 import ListView from '@/components/tasks/ListView.vue'
@@ -67,6 +68,8 @@ import TaskForm from '@/components/tasks/TaskForm.vue'
 import { useTaskStore } from '@/stores/task'
 import type { Task } from '@/types'
 
+const router = useRouter()
+const route = useRoute()
 const taskStore = useTaskStore()
 
 const viewMode = ref<'quadrant' | 'list'>('quadrant')
@@ -78,6 +81,11 @@ const listViewRef = ref()
 onMounted(async () => {
   await taskStore.fetchTasks()
   await taskStore.fetchTasksByQuadrant()
+
+  if (route.query.add === 'true') {
+    onAddTask()
+    router.replace({ query: {} })
+  }
 })
 
 function onAddTask() {

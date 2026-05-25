@@ -12,6 +12,12 @@ export interface Task {
   status: TaskStatus
   estimated_time: number
   deadline: string | null
+  start_date: string | null
+  due_date: string | null
+  is_recurring: boolean
+  recurrence_pattern: string
+  preferred_start_time: string
+  preferred_end_time: string
   tags: string[]
   order: number
   created_at: string

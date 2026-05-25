@@ -38,7 +38,7 @@ func main() {
 
 	// 插入初始数据
 	if err := database.SeedInitialData(db); err != nil {
-		logger.Logger.Warn("seed initial data: %v", err)
+		logger.Logger.Warn("seed initial data", "err", err)
 	}
 
 	// 初始化 Repository
@@ -71,7 +71,7 @@ func main() {
 
 	// 启动服务器
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
-	logger.Logger.Info("server listening on %s", addr)
+	logger.Logger.Info("server listening", "addr", addr)
 	if err := router.Run(addr); err != nil {
 		log.Fatal(err)
 	}
