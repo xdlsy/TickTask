@@ -98,12 +98,15 @@ func SetupRouter(
 		{
 			scheduleHandler := handler.NewScheduleHandler(scheduleService)
 			schedules.GET("", scheduleHandler.GetSchedules)
+				schedules.POST("/revise", scheduleHandler.ReviseWithAI)
+				schedules.POST("/revise/apply", scheduleHandler.ApplyRevision)
 			schedules.GET("/:id", scheduleHandler.GetSchedule)
 			schedules.POST("", scheduleHandler.CreateSchedule)
 			schedules.PUT("/:id", scheduleHandler.UpdateSchedule)
 			schedules.DELETE("/:id", scheduleHandler.DeleteSchedule)
 			schedules.PUT("/:id/move", scheduleHandler.MoveSchedule)
 			schedules.POST("/generate", scheduleHandler.GenerateWithAI)
+			schedules.DELETE("", scheduleHandler.DeleteAll)
 		}
 	}
 

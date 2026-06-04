@@ -1,6 +1,8 @@
 package service
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"ticktask/internal/model"
 	"ticktask/internal/repository"
@@ -103,6 +105,12 @@ func (m *mockScheduleRepo) Move(id string, startTime, endTime time.Time) error {
 	return repository.ErrNotFound
 }
 
+func (m *mockScheduleRepo) DeleteAll() (int64, error) {
+	count := int64(len(m.schedules))
+	m.schedules = make(map[string]*model.Schedule)
+	return count, nil
+}
+
 // mockTaskRepo implements repository.TaskRepository for service testing
 type mockTaskRepoForSchedule struct {
 	tasks map[string]*model.Task
@@ -179,7 +187,7 @@ func (m *mockTaskRepoForSchedule) GetAllByQuadrant() (map[model.Quadrant][]model
 func createTestScheduleService() *ScheduleService {
 	scheduleRepo := newMockScheduleRepo()
 	taskRepo := newMockTaskRepoForSchedule()
-	return NewScheduleService(scheduleRepo, taskRepo, nil)
+	return NewScheduleService(scheduleRepo, taskRepo, nil, nil, nil)
 }
 
 // Test GetSchedules - 获取日程列表
@@ -538,7 +546,7 @@ func TestScheduleService_GenerateScheduleWithAI(t *testing.T) {
 		Status:    model.StatusTodo,
 	})
 
-	svc := NewScheduleService(scheduleRepo, taskRepo, nil)
+	svc := NewScheduleService(scheduleRepo, taskRepo, nil, nil, nil)
 
 	events, err := svc.GenerateScheduleWithAI("09:00", "18:00")
 	if err != nil {
@@ -585,7 +593,7 @@ func TestScheduleService_GenerateScheduleWithAI_PreferredTimeSlots(t *testing.T)
 		EstimatedTime: 30,
 	})
 
-	svc := NewScheduleService(scheduleRepo, taskRepo, nil)
+	svc := NewScheduleService(scheduleRepo, taskRepo, nil, nil, nil)
 
 	events, err := svc.GenerateScheduleWithAI("09:00", "18:00")
 	if err != nil {
@@ -648,7 +656,7 @@ func TestScheduleService_GenerateScheduleWithAI_NoPreferences(t *testing.T) {
 		EstimatedTime: 30,
 	})
 
-	svc := NewScheduleService(scheduleRepo, taskRepo, nil)
+	svc := NewScheduleService(scheduleRepo, taskRepo, nil, nil, nil)
 
 	events, err := svc.GenerateScheduleWithAI("09:00", "18:00")
 	if err != nil {
@@ -666,5 +674,257 @@ func TestScheduleService_GenerateScheduleWithAI_NoPreferences(t *testing.T) {
 		if !start2.After(start1) {
 			t.Error("tasks without preferences should be scheduled sequentially")
 		}
+	}
+}
+// ===== computeDiff Tests =====
+
+func makeICSEvent(summary string, startHour, startMin, endHour, endMin int) ICSEvent {
+	loc := time.UTC
+	return ICSEvent{
+		Summary: summary,
+		Start:   time.Date(2026, 6, 9, startHour, startMin, 0, 0, loc),
+		End:     time.Date(2026, 6, 9, endHour, endMin, 0, 0, loc),
+	}
+}
+
+func TestComputeDiff_Moved(t *testing.T) {
+	original := []ICSEvent{
+		makeICSEvent("代码评审", 10, 0, 11, 0),
+	}
+	revised := []ICSEvent{
+		makeICSEvent("代码评审", 14, 0, 15, 0),
+	}
+
+	changes, summary := computeDiff(original, revised)
+
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d", len(changes))
+	}
+	if changes[0].Type != "moved" {
+		t.Errorf("expected type 'moved', got '%s'", changes[0].Type)
+	}
+	if changes[0].Title != "代码评审" {
+		t.Errorf("expected title '代码评审', got '%s'", changes[0].Title)
+	}
+	if summary == "" {
+		t.Error("expected non-empty summary")
+	}
+	t.Logf("summary: %s", summary)
+}
+
+func TestComputeDiff_Added(t *testing.T) {
+	original := []ICSEvent{
+		makeICSEvent("任务A", 9, 0, 10, 0),
+	}
+	revised := []ICSEvent{
+		makeICSEvent("任务A", 9, 0, 10, 0),
+		makeICSEvent("任务B", 10, 0, 11, 0),
+	}
+
+	changes, summary := computeDiff(original, revised)
+
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d", len(changes))
+	}
+	if changes[0].Type != "added" {
+		t.Errorf("expected type 'added', got '%s'", changes[0].Type)
+	}
+	if changes[0].Title != "任务B" {
+		t.Errorf("expected title '任务B', got '%s'", changes[0].Title)
+	}
+	t.Logf("summary: %s", summary)
+}
+
+func TestComputeDiff_Removed(t *testing.T) {
+	original := []ICSEvent{
+		makeICSEvent("任务A", 9, 0, 10, 0),
+		makeICSEvent("任务B", 10, 0, 11, 0),
+	}
+	revised := []ICSEvent{
+		makeICSEvent("任务A", 9, 0, 10, 0),
+	}
+
+	changes, summary := computeDiff(original, revised)
+
+	if len(changes) != 1 {
+		t.Fatalf("expected 1 change, got %d", len(changes))
+	}
+	if changes[0].Type != "removed" {
+		t.Errorf("expected type 'removed', got '%s'", changes[0].Type)
+	}
+	if changes[0].Title != "任务B" {
+		t.Errorf("expected title '任务B', got '%s'", changes[0].Title)
+	}
+	t.Logf("summary: %s", summary)
+}
+
+func TestComputeDiff_Mixed(t *testing.T) {
+	original := []ICSEvent{
+		makeICSEvent("任务A", 9, 0, 10, 0),
+		makeICSEvent("任务B", 10, 0, 11, 0),
+		makeICSEvent("任务C", 11, 0, 12, 0),
+	}
+	revised := []ICSEvent{
+		makeICSEvent("任务A", 14, 0, 15, 0),
+		makeICSEvent("任务C", 11, 0, 12, 0),
+		makeICSEvent("任务D", 15, 0, 16, 0),
+	}
+
+	changes, summary := computeDiff(original, revised)
+
+	if len(changes) != 3 {
+		t.Fatalf("expected 3 changes, got %d", len(changes))
+	}
+
+	moved, added, removed := 0, 0, 0
+	for _, ch := range changes {
+		switch ch.Type {
+		case "moved":
+			moved++
+			if ch.Title != "任务A" {
+				t.Errorf("expected moved title '任务A', got '%s'", ch.Title)
+			}
+		case "added":
+			added++
+			if ch.Title != "任务D" {
+				t.Errorf("expected added title '任务D', got '%s'", ch.Title)
+			}
+		case "removed":
+			removed++
+			if ch.Title != "任务B" {
+				t.Errorf("expected removed title '任务B', got '%s'", ch.Title)
+			}
+		}
+	}
+
+	if moved != 1 || added != 1 || removed != 1 {
+		t.Errorf("expected 1m/1a/1r, got %dm/%da/%dr", moved, added, removed)
+	}
+	t.Logf("summary: %s", summary)
+}
+
+func TestComputeDiff_NoChanges(t *testing.T) {
+	original := []ICSEvent{
+		makeICSEvent("任务A", 9, 0, 10, 0),
+		makeICSEvent("任务B", 10, 0, 11, 0),
+	}
+	revised := []ICSEvent{
+		makeICSEvent("任务A", 9, 0, 10, 0),
+		makeICSEvent("任务B", 10, 0, 11, 0),
+	}
+
+	changes, summary := computeDiff(original, revised)
+
+	if len(changes) != 0 {
+		t.Errorf("expected 0 changes, got %d", len(changes))
+	}
+	if summary != "当前日程已是最优安排，无需调整" {
+		t.Errorf("expected empty-state message, got '%s'", summary)
+	}
+}
+
+func TestComputeDiff_AllAdded(t *testing.T) {
+	original := []ICSEvent{}
+	revised := []ICSEvent{
+		makeICSEvent("任务A", 9, 0, 10, 0),
+		makeICSEvent("任务B", 10, 0, 11, 0),
+	}
+
+	changes, _ := computeDiff(original, revised)
+
+	if len(changes) != 2 {
+		t.Fatalf("expected 2 changes, got %d", len(changes))
+	}
+	for _, ch := range changes {
+		if ch.Type != "added" {
+			t.Errorf("expected all 'added', got '%s' for '%s'", ch.Type, ch.Title)
+		}
+	}
+}
+
+func TestComputeDiff_DifferentDays(t *testing.T) {
+	loc := time.UTC
+	original := []ICSEvent{
+		{Summary: "每日站会", Start: time.Date(2026, 6, 9, 9, 0, 0, 0, loc), End: time.Date(2026, 6, 9, 9, 30, 0, 0, loc)},
+	}
+	revised := []ICSEvent{
+		{Summary: "每日站会", Start: time.Date(2026, 6, 10, 9, 0, 0, 0, loc), End: time.Date(2026, 6, 10, 9, 30, 0, 0, loc)},
+	}
+
+	changes, _ := computeDiff(original, revised)
+
+	if len(changes) != 2 {
+		t.Fatalf("expected 2 changes (removed from day 9 + added on day 10), got %d", len(changes))
+	}
+}
+
+func TestWriteScheduleICS_RoundTrip(t *testing.T) {
+	events := []ScheduleEvent{
+		{
+			ID:    "evt-1",
+			Title: "代码评审",
+			Start: "2026-06-09T10:00:00Z",
+			End:   "2026-06-09T11:00:00Z",
+			Type:  "deep_work",
+		},
+		{
+			ID:    "evt-2",
+			Title: "团队同步",
+			Start: "2026-06-09T14:00:00Z",
+			End:   "2026-06-09T14:30:00Z",
+			Type:  "meeting",
+		},
+	}
+
+	var sb strings.Builder
+	sb.WriteString("BEGIN:VCALENDAR\n")
+	sb.WriteString("VERSION:2.0\n")
+	sb.WriteString("PRODID:-//TickTask//EN\n")
+	sb.WriteString("CALSCALE:GREGORIAN\n")
+	sb.WriteString("METHOD:PUBLISH\n")
+	for _, ev := range events {
+		startTime, _ := time.Parse(time.RFC3339, ev.Start)
+		endTime, _ := time.Parse(time.RFC3339, ev.End)
+		icsStart := startTime.Format("20060102T150405")
+		icsEnd := endTime.Format("20060102T150405")
+
+		sb.WriteString("BEGIN:VEVENT\n")
+		sb.WriteString(fmt.Sprintf("DTSTART:%s\n", icsStart))
+		sb.WriteString(fmt.Sprintf("DTEND:%s\n", icsEnd))
+		sb.WriteString(fmt.Sprintf("SUMMARY:%s\n", escapeICS(ev.Title)))
+		sb.WriteString(fmt.Sprintf("DESCRIPTION:%s | %s\n", escapeICS(ev.Title), ev.Type))
+		sb.WriteString("END:VEVENT\n")
+	}
+	sb.WriteString("END:VCALENDAR\n")
+
+	icsContent := sb.String()
+
+	parsed, err := ParseICS(icsContent, time.UTC)
+	if err != nil {
+		t.Fatalf("failed to parse generated ICS: %v", err)
+	}
+
+	if len(parsed) != 2 {
+		t.Fatalf("expected 2 events, got %d", len(parsed))
+	}
+	if parsed[0].Summary != "代码评审" {
+		t.Errorf("expected summary '代码评审', got '%s'", parsed[0].Summary)
+	}
+	if parsed[1].Summary != "团队同步" {
+		t.Errorf("expected summary '团队同步', got '%s'", parsed[1].Summary)
+	}
+	if parsed[0].Start.Hour() != 10 || parsed[0].Start.Minute() != 0 {
+		t.Errorf("expected start 10:00, got %02d:%02d", parsed[0].Start.Hour(), parsed[0].Start.Minute())
+	}
+}
+
+func TestEscapeICS_SpecialChars(t *testing.T) {
+	input := "任务: 代码评审; Q1, 重要"
+	escaped := escapeICS(input)
+	if !strings.Contains(escaped, "\\;") {
+		t.Error("semicolons should be escaped")
+	}
+	if !strings.Contains(escaped, "\\,") {
+		t.Error("commas should be escaped")
 	}
 }

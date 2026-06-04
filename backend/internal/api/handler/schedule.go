@@ -178,11 +178,65 @@ func (h *ScheduleHandler) GenerateWithAI(c *gin.Context) {
 		req.EndTime = "18:00"
 	}
 
-	events, err := h.scheduleService.GenerateScheduleWithAI(req.StartTime, req.EndTime)
+	events, reasoning, err := h.scheduleService.GenerateSchedule(req.StartTime, req.EndTime)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"events": events})
+	c.JSON(http.StatusOK, gin.H{"events": events, "reasoning": reasoning})
+}
+
+// ReviseWithAI AI 修订日程 — returns a preview of changes without applying.
+func (h *ScheduleHandler) ReviseWithAI(c *gin.Context) {
+	var req struct {
+		Prompt string `json:"prompt"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Prompt == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "prompt is required"})
+		return
+	}
+
+	response, err := h.scheduleService.ReviseSchedule(req.Prompt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"applied": response.Applied,
+		"summary": response.Summary,
+		"changes": response.Changes,
+		"events":  response.Events,
+	})
+}
+
+// ApplyRevision 确认应用修订 — persists the revised schedule to the database.
+func (h *ScheduleHandler) ApplyRevision(c *gin.Context) {
+	events, err := h.scheduleService.ApplyRevision()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"applied": true,
+		"events":  events,
+	})
+}
+
+// DeleteAll 清空所有日程
+func (h *ScheduleHandler) DeleteAll(c *gin.Context) {
+	deleted, err := h.scheduleService.DeleteAllSchedules()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": deleted})
 }
