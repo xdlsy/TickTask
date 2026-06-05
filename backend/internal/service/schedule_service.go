@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"ticktask/internal/model"
 	"ticktask/internal/repository"
@@ -488,7 +489,7 @@ func (s *ScheduleService) GenerateSchedule(startTime, endTime string) ([]Schedul
 	}
 	broadcast(fmt.Sprintf("✓ 配置文件已刷新: %d 个任务\n", len(candidates)), false)
 
-	var allEvents []ScheduleEvent
+	allEvents := make([]ScheduleEvent, 0)
 	seenEventKeys := map[string]bool{}
 
 	// ======== Phase 1: AI 生成 ICS ========
@@ -754,7 +755,7 @@ func (s *ScheduleService) ApplyRevision() ([]ScheduleEvent, error) {
 		"deleted", deleted)
 
 	// Persist revised events (reuse same pattern as GenerateSchedule Phase 3)
-	var allEvents []ScheduleEvent
+	allEvents := make([]ScheduleEvent, 0)
 	seenEventKeys := map[string]bool{}
 
 	for _, ev := range parsedEvents {
@@ -1309,6 +1310,41 @@ func buildWeekSchedulePrompt(monday, sunday time.Time) string {
 
 // --- Task filtering ---
 
+// matchesRecurrenceInRange checks if a recurring task has any occurrence within the date range.
+func matchesRecurrenceInRange(task model.Task, start, end time.Time) bool {
+	current := start
+	for !current.After(end) {
+		if matchesRecurrence(task, current) {
+			return true
+		}
+		current = current.AddDate(0, 0, 1)
+	}
+	return false
+}
+
+// matchesRecurrence checks if a recurring task applies on a specific date.
+func matchesRecurrence(task model.Task, date time.Time) bool {
+	if !task.IsRecurring || task.RecurrencePattern == "" {
+		return false
+	}
+	switch task.RecurrencePattern {
+	case "daily":
+		return true
+	case "weekly":
+		weekday := int(date.Weekday())
+		if weekday == 0 {
+			weekday = 7 // Sunday -> 7
+		}
+		return task.RecurrenceDay == 0 || task.RecurrenceDay == weekday
+	case "monthly":
+		dom := date.Day()
+		return task.RecurrenceDay == 0 || task.RecurrenceDay == dom
+	default:
+		return true // unknown pattern, assume matches
+	}
+}
+
+// filterTasksForWeek filters tasks to only those relevant for the given week.
 func filterTasksForWeek(allTasks []model.Task, monday, sunday time.Time) []model.Task {
 	twoWeeksAgo := monday.AddDate(0, 0, -14)
 	twoWeeksAhead := sunday.AddDate(0, 0, 14)
@@ -1335,6 +1371,33 @@ func filterTasksForWeek(allTasks []model.Task, monday, sunday time.Time) []model
 		candidates = append(candidates, t)
 	}
 	return candidates
+}
+
+// sortTasksForScheduling sorts tasks by scheduling priority:
+// Q1 (important+urgent) first, then Q2, Q3, Q4.
+// Within the same quadrant: sooner deadline first, then longer estimated time first.
+func sortTasksForScheduling(tasks []model.Task) {
+	sort.SliceStable(tasks, func(i, j int) bool {
+		a, b := tasks[i], tasks[j]
+		// Sort by quadrant first
+		if a.Quadrant != b.Quadrant {
+			return a.Quadrant < b.Quadrant
+		}
+		// Within same quadrant: deadline priority (sooner first, nil deadlines last)
+		if a.Deadline != nil && b.Deadline != nil {
+			if !a.Deadline.Equal(*b.Deadline) {
+				return a.Deadline.Before(*b.Deadline)
+			}
+		}
+		if a.Deadline != nil && b.Deadline == nil {
+			return true
+		}
+		if a.Deadline == nil && b.Deadline != nil {
+			return false
+		}
+		// Longer estimated time first (big rocks first)
+		return a.EstimatedTime > b.EstimatedTime
+	})
 }
 
 // filterTasksForDate filters tasks to only those relevant for a specific date.

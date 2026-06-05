@@ -85,6 +85,13 @@
 
     <div v-if="aiReasoning" class="ai-reasoning-bar">
       <div class="reasoning-header">
+        <svg class="reasoning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
+          <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-1.135-5.675a.55.55 0 0 1 .652-.625L14 9l1.05-4.725a.55.55 0 0 1 1.045.152L14.063 15.5A2 2 0 0 1 12 17H4a1 1 0 0 1 0-2h5.937Z"/>
+          <path d="M20 3v4"/>
+          <path d="M22 5h-4"/>
+          <path d="M4 17v4"/>
+          <path d="M6 19H2"/>
+        </svg>
         <span>排程总结</span>
       </div>
       <p class="reasoning-text">{{ aiReasoning }}</p>
@@ -674,5 +681,56 @@ async function loadSchedules() {
 .change-time {
   color: var(--text-secondary);
   flex: 1;
+}
+
+/* ── AI 排程总结 ── */
+.ai-reasoning-bar {
+  margin-top: 28px;
+  padding: 22px 26px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  border-left: 3px solid var(--accent-sage);
+  animation: reasoningSlideIn 0.4s ease-out;
+}
+
+@keyframes reasoningSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reasoning-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.reasoning-icon {
+  color: var(--accent-sage);
+  flex-shrink: 0;
+}
+
+.reasoning-header span {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent-sage);
+  letter-spacing: -0.2px;
+}
+
+.reasoning-text {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-secondary);
+  margin: 0;
+  white-space: pre-wrap;
 }
 </style>
