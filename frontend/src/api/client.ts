@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Task, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights } from '@/types'
+import type { Task, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse } from '@/types'
 
 const client = axios.create({
   baseURL: '/api',
@@ -74,5 +74,8 @@ export const api = {
   updateSchedule: (id: string, data: UpdateScheduleDTO) => client.put(`/schedules/${id}`, data),
   deleteSchedule: (id: string) => client.delete(`/schedules/${id}`),
   moveSchedule: (id: string, data: MoveScheduleDTO) => client.put(`/schedules/${id}/move`, data),
-  generateScheduleFromTasks: (startTime?: string, endTime?: string) => client.post<{ events: ScheduleEvent[] }>('/schedules/generate', { start_time: startTime, end_time: endTime })
+  generateScheduleFromTasks: (startTime?: string, endTime?: string) => client.post<{ events: ScheduleEvent[] }>('/schedules/generate', { start_time: startTime, end_time: endTime }, { timeout: 360000 }), // AI 整周生成可能需要 3-5 分钟
+  deleteAllSchedules: () => client.delete<{ deleted: number }>('/schedules'),
+  reviseSchedule: (prompt: string) => client.post<ReviseResponse>('/schedules/revise', { prompt }, { timeout: 360000 }),
+  applyRevision: () => client.post<{ applied: boolean; events: ScheduleEvent[] }>('/schedules/revise/apply')
 }

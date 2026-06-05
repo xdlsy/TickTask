@@ -16,6 +16,7 @@ export interface Task {
   due_date: string | null
   is_recurring: boolean
   recurrence_pattern: string
+  recurrence_day: number
   preferred_start_time: string
   preferred_end_time: string
   tags: string[]
@@ -53,6 +54,7 @@ export interface PomodoroSettings {
   enable_sound: boolean
   buffer_ratio: number
   task_time_preferences: string
+  scheduling_strategy: string
 }
 
 export interface QuadrantInfo {
@@ -75,6 +77,8 @@ export type WSMessageType =
   | 'timer_complete'
   | 'session_state'
   | 'task_updated'
+  | 'terminal_output'
+  | 'terminal_status'
   | 'error'
 
 export interface TimerTickMessage {
@@ -96,7 +100,20 @@ export interface TimerCompleteMessage {
   session_id: string
 }
 
-export type WSMessage = TimerTickMessage | SessionStateMessage | TimerCompleteMessage
+export interface TerminalOutputMessage {
+  type: 'terminal_output'
+  chunk: string
+  is_stderr?: boolean
+}
+
+export interface TerminalStatusMessage {
+  type: 'terminal_status'
+  status: string
+  message?: string
+  detail?: string
+}
+
+export type WSMessage = TimerTickMessage | SessionStateMessage | TimerCompleteMessage | TerminalOutputMessage | TerminalStatusMessage
 
 // AI 相关类型
 export interface ClassificationResult {
@@ -132,6 +149,7 @@ export interface AISettings {
   api_key: string
   base_url: string
   model: string
+  cli_tool: string
 }
 
 // 任务时间统计
@@ -206,6 +224,23 @@ export interface AdjustedItem {
 export interface RescheduleResult {
   adjusted_schedule: AdjustedItem[]
   summary: string
+}
+
+// 修订日程
+export interface RevisionChange {
+  type: 'moved' | 'added' | 'removed'
+  title: string
+  original_start?: string
+  original_end?: string
+  new_start?: string
+  new_end?: string
+}
+
+export interface ReviseResponse {
+  applied: boolean
+  summary: string
+  changes: RevisionChange[]
+  events: ScheduleEvent[]
 }
 
 // AI 每日洞察
