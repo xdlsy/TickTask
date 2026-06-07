@@ -1,0 +1,50 @@
+{
+  "date": "2026-05-31",
+  "tasks": [
+    {
+      "title": "撰写项目提案",
+      "description": "完成 Q2 项目提案的第一版草稿",
+      "estimated_minutes": 120,
+      "priority": "high",
+      "type": "deep_work",
+      "fixed_time": null,
+      "deadline": "2026-05-31T18:00:00"
+    },
+    {
+      "title": "团队周会",
+      "description": "同步本周进度，讨论阻塞项",
+      "estimated_minutes": 30,
+      "priority": "high",
+      "type": "meeting",
+      "fixed_time": "10:00",
+      "deadline": null
+    },
+    {
+      "title": "回复邮件",
+      "description": "处理积压的工作邮件",
+      "estimated_minutes": 30,
+      "priority": "medium",
+      "type": "shallow_work",
+      "fixed_time": null,
+      "deadline": null
+    },
+    {
+      "title": "代码审查",
+      "description": "Review 团队提交的 3 个 PR",
+      "estimated_minutes": 45,
+      "priority": "medium",
+      "type": "deep_work",
+      "fixed_time": null,
+      "deadline": null
+    },
+    {
+      "title": "取快递",
+      "description": "去收发室取包裹",
+      "estimated_minutes": 15,
+      "priority": "low",
+      "type": "errand",
+      "fixed_time": null,
+      "deadline": null
+    }
+  ]
+}
