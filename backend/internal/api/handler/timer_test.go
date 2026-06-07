@@ -195,10 +195,11 @@ func TestTimerHandler_CreateSession_WithTask(t *testing.T) {
 
 	// Create a task first
 	taskService := service.NewTaskService(
-		newMockTaskRepository(),
-		newMockAnalyticsRepository(),
-		newMockSettingRepository(),
-	)
+			newMockTaskRepository(),
+			newMockAnalyticsRepository(),
+			newMockSettingRepository(),
+			newMockSessionRepository(),
+		)
 	task, _ := taskService.CreateTask(service.CreateTaskRequest{
 		Title:    "Test Task",
 		Quadrant: model.Quadrant1,

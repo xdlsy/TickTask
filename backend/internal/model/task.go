@@ -34,6 +34,7 @@ type Task struct {
 	DueDate            *time.Time `json:"due_date"`     // 任务截止日期 (date only)
 	IsRecurring        bool       `gorm:"not null;default:false" json:"is_recurring"`
 	RecurrencePattern  string     `gorm:"size:20" json:"recurrence_pattern"`          // daily, weekly, monthly
+	RecurrenceDay       int        `gorm:"default:0" json:"recurrence_day"`             // day of week (1=Mon..7=Sun) or day of month (1-31)
 	PreferredStartTime string     `gorm:"size:5" json:"preferred_start_time"`  // HH:MM
 	PreferredEndTime   string     `gorm:"size:5" json:"preferred_end_time"`    // HH:MM
 	Tags               string     `gorm:"size:500" json:"tags"`

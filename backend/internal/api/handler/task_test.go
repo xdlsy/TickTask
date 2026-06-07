@@ -21,10 +21,11 @@ func setupTestRouter() *gin.Engine {
 func TestTaskHandler_GetTasks(t *testing.T) {
 	// Create mock services
 	taskService := service.NewTaskService(
-		newMockTaskRepository(),
-		newMockAnalyticsRepository(),
-		newMockSettingRepository(),
-	)
+			newMockTaskRepository(),
+			newMockAnalyticsRepository(),
+			newMockSettingRepository(),
+			newMockSessionRepository(),
+		)
 
 	handler := NewTaskHandler(taskService)
 	router := setupTestRouter()
@@ -43,10 +44,11 @@ func TestTaskHandler_GetTasks(t *testing.T) {
 
 func TestTaskHandler_CreateTask(t *testing.T) {
 	taskService := service.NewTaskService(
-		newMockTaskRepository(),
-		newMockAnalyticsRepository(),
-		newMockSettingRepository(),
-	)
+			newMockTaskRepository(),
+			newMockAnalyticsRepository(),
+			newMockSettingRepository(),
+			newMockSessionRepository(),
+		)
 
 	handler := NewTaskHandler(taskService)
 	router := setupTestRouter()
@@ -73,10 +75,11 @@ func TestTaskHandler_CreateTask(t *testing.T) {
 
 func TestTaskHandler_CreateTask_MissingTitle(t *testing.T) {
 	taskService := service.NewTaskService(
-		newMockTaskRepository(),
-		newMockAnalyticsRepository(),
-		newMockSettingRepository(),
-	)
+			newMockTaskRepository(),
+			newMockAnalyticsRepository(),
+			newMockSettingRepository(),
+			newMockSessionRepository(),
+		)
 
 	handler := NewTaskHandler(taskService)
 	router := setupTestRouter()
@@ -103,10 +106,11 @@ func TestTaskHandler_CreateTask_MissingTitle(t *testing.T) {
 
 func TestTaskHandler_CreateTask_InvalidQuadrant(t *testing.T) {
 	taskService := service.NewTaskService(
-		newMockTaskRepository(),
-		newMockAnalyticsRepository(),
-		newMockSettingRepository(),
-	)
+			newMockTaskRepository(),
+			newMockAnalyticsRepository(),
+			newMockSettingRepository(),
+			newMockSessionRepository(),
+		)
 
 	handler := NewTaskHandler(taskService)
 	router := setupTestRouter()
@@ -132,10 +136,11 @@ func TestTaskHandler_CreateTask_InvalidQuadrant(t *testing.T) {
 
 func TestTaskHandler_GetTasksByQuadrant(t *testing.T) {
 	taskService := service.NewTaskService(
-		newMockTaskRepository(),
-		newMockAnalyticsRepository(),
-		newMockSettingRepository(),
-	)
+			newMockTaskRepository(),
+			newMockAnalyticsRepository(),
+			newMockSettingRepository(),
+			newMockSessionRepository(),
+		)
 
 	handler := NewTaskHandler(taskService)
 	router := setupTestRouter()
@@ -164,10 +169,11 @@ func TestTaskHandler_GetTasksByQuadrant(t *testing.T) {
 
 func TestTaskHandler_MoveTask(t *testing.T) {
 	taskService := service.NewTaskService(
-		newMockTaskRepository(),
-		newMockAnalyticsRepository(),
-		newMockSettingRepository(),
-	)
+			newMockTaskRepository(),
+			newMockAnalyticsRepository(),
+			newMockSettingRepository(),
+			newMockSessionRepository(),
+		)
 
 	handler := NewTaskHandler(taskService)
 	router := setupTestRouter()
@@ -198,10 +204,11 @@ func TestTaskHandler_MoveTask(t *testing.T) {
 
 func TestTaskHandler_DeleteTask(t *testing.T) {
 	taskService := service.NewTaskService(
-		newMockTaskRepository(),
-		newMockAnalyticsRepository(),
-		newMockSettingRepository(),
-	)
+			newMockTaskRepository(),
+			newMockAnalyticsRepository(),
+			newMockSettingRepository(),
+			newMockSessionRepository(),
+		)
 
 	handler := NewTaskHandler(taskService)
 	router := setupTestRouter()
@@ -225,10 +232,11 @@ func TestTaskHandler_DeleteTask(t *testing.T) {
 
 func TestTaskHandler_GetTask(t *testing.T) {
 	taskService := service.NewTaskService(
-		newMockTaskRepository(),
-		newMockAnalyticsRepository(),
-		newMockSettingRepository(),
-	)
+			newMockTaskRepository(),
+			newMockAnalyticsRepository(),
+			newMockSettingRepository(),
+			newMockSessionRepository(),
+		)
 
 	handler := NewTaskHandler(taskService)
 	router := setupTestRouter()
@@ -252,10 +260,11 @@ func TestTaskHandler_GetTask(t *testing.T) {
 
 func TestTaskHandler_GetTask_NotFound(t *testing.T) {
 	taskService := service.NewTaskService(
-		newMockTaskRepository(),
-		newMockAnalyticsRepository(),
-		newMockSettingRepository(),
-	)
+			newMockTaskRepository(),
+			newMockAnalyticsRepository(),
+			newMockSettingRepository(),
+			newMockSessionRepository(),
+		)
 
 	handler := NewTaskHandler(taskService)
 	router := setupTestRouter()
@@ -273,10 +282,11 @@ func TestTaskHandler_GetTask_NotFound(t *testing.T) {
 
 func TestTaskHandler_CreateTask_WithNewFields(t *testing.T) {
 	taskService := service.NewTaskService(
-		newMockTaskRepository(),
-		newMockAnalyticsRepository(),
-		newMockSettingRepository(),
-	)
+			newMockTaskRepository(),
+			newMockAnalyticsRepository(),
+			newMockSettingRepository(),
+			newMockSessionRepository(),
+		)
 
 	handler := NewTaskHandler(taskService)
 	router := setupTestRouter()

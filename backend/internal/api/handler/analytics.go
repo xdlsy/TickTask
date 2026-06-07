@@ -97,3 +97,37 @@ func (h *AnalyticsHandler) GetDistribution(c *gin.Context) {
 
 	c.JSON(http.StatusOK, distribution)
 }
+
+// GetPomodoroByTask 获取按任务聚合的番茄钟统计（排行榜）
+func (h *AnalyticsHandler) GetPomodoroByTask(c *gin.Context) {
+	period := c.DefaultQuery("period", "week")
+	if period != "week" && period != "month" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid period, use 'week' or 'month'"})
+		return
+	}
+
+	result, err := h.analyticsService.GetPomodoroByTask(period)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}
+
+// GetPomodoroTrends 获取番茄钟计划 vs 实际趋势对比
+func (h *AnalyticsHandler) GetPomodoroTrends(c *gin.Context) {
+	period := c.DefaultQuery("period", "week")
+	if period != "week" && period != "month" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid period, use 'week' or 'month'"})
+		return
+	}
+
+	result, err := h.analyticsService.GetPomodoroTrends(period)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, result)
+}

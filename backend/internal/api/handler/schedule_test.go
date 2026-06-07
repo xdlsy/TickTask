@@ -110,12 +110,18 @@ func (m *mockScheduleRepositoryForService) Move(id string, startTime, endTime ti
 	return repository.ErrNotFound
 }
 
+func (m *mockScheduleRepositoryForService) DeleteAll() (int64, error) {
+	count := int64(len(m.schedules))
+	m.schedules = make(map[string]*model.Schedule)
+	return count, nil
+}
+
 // createScheduleService creates a ScheduleService with mock repositories
 func createScheduleService() *service.ScheduleService {
 	scheduleRepo := newMockScheduleRepositoryForService()
 	taskRepo := newMockTaskRepository()
 	aiService := &service.AIService{} // Empty AI service for basic tests
-	return service.NewScheduleService(scheduleRepo, taskRepo, aiService)
+	return service.NewScheduleService(scheduleRepo, taskRepo, aiService, nil, nil)
 }
 
 // Test GetSchedules - 获取日程列表
@@ -504,7 +510,7 @@ func TestScheduleHandler_CreateSchedule_WithTaskID(t *testing.T) {
 	// Use shared repositories so the task can be found
 	taskRepo := newMockTaskRepository()
 	scheduleRepo := newMockScheduleRepositoryForService()
-	scheduleService := service.NewScheduleService(scheduleRepo, taskRepo, nil)
+	scheduleService := service.NewScheduleService(scheduleRepo, taskRepo, nil, nil, nil)
 
 	// Create a task in the same repository
 	task := &model.Task{

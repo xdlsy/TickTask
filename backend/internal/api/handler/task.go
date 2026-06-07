@@ -55,7 +55,7 @@ type UpdateTaskInput struct {
 
 // GetTasks 获取任务列表
 func (h *TaskHandler) GetTasks(c *gin.Context) {
-	tasks, err := h.taskService.GetAllTasks()
+	tasks, err := h.taskService.GetAllTaskResponses()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -65,7 +65,7 @@ func (h *TaskHandler) GetTasks(c *gin.Context) {
 
 // GetTasksByQuadrant 获取按象限分组的任务
 func (h *TaskHandler) GetTasksByQuadrant(c *gin.Context) {
-	tasks, err := h.taskService.GetTasksByQuadrant()
+	tasks, err := h.taskService.GetTasksByQuadrantResponse()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -76,7 +76,7 @@ func (h *TaskHandler) GetTasksByQuadrant(c *gin.Context) {
 // GetTask 获取单个任务
 func (h *TaskHandler) GetTask(c *gin.Context) {
 	id := c.Param("id")
-	task, err := h.taskService.GetTask(id)
+	task, err := h.taskService.GetTaskResponse(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
 		return

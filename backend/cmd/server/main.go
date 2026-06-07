@@ -52,9 +52,9 @@ func main() {
 	wsHub := websocket.NewHub()
 
 	// 初始化 Service
-	taskService := service.NewTaskService(taskRepo, analyticsRepo, settingRepo)
+	taskService := service.NewTaskService(taskRepo, analyticsRepo, settingRepo, sessionRepo)
 	timerService := service.NewTimerService(sessionRepo, taskRepo, analyticsRepo, settingRepo, wsHub)
-	analyticsService := service.NewAnalyticsService(analyticsRepo, taskRepo, sessionRepo)
+	analyticsService := service.NewAnalyticsService(analyticsRepo, taskRepo, sessionRepo, settingRepo)
 
 	// 初始化 AI Service
 	aiSettings, err := settingRepo.GetAISettings()
@@ -64,7 +64,7 @@ func main() {
 	aiService := service.NewAIService(aiSettings, taskRepo, scheduleRepo, sessionRepo)
 
 	// 初始化 Schedule Service
-	scheduleService := service.NewScheduleService(scheduleRepo, taskRepo, aiService)
+	scheduleService := service.NewScheduleService(scheduleRepo, taskRepo, aiService, settingRepo, wsHub)
 
 	// 设置路由
 	router := api.SetupRouter(cfg, taskService, timerService, aiService, analyticsService, scheduleService, wsHub, settingRepo)

@@ -74,6 +74,26 @@ func (m *MockSessionRepository) GetByDate(date time.Time) ([]model.PomodoroSessi
 	return result, nil
 }
 
+func (m *MockSessionRepository) CountByTaskID(taskID string, sessionType model.SessionType, status model.SessionStatus) (int, error) {
+	count := 0
+	for _, s := range m.sessions {
+		if s.TaskID != nil && *s.TaskID == taskID && s.Type == sessionType && s.Status == status {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (m *MockSessionRepository) GetCompletedWorkByDateRange(start, end time.Time) ([]model.PomodoroSession, error) {
+	var result []model.PomodoroSession
+	for _, s := range m.sessions {
+		if s.Type == model.SessionWork && s.Status == model.SessionCompleted && !s.StartTime.Before(start) && s.StartTime.Before(end) {
+			result = append(result, *s)
+		}
+	}
+	return result, nil
+}
+
 // Tests
 
 func TestTimerService_StartSession(t *testing.T) {

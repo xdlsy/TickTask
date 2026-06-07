@@ -185,7 +185,7 @@ func TestTaskService_CreateTask(t *testing.T) {
 	analyticsRepo := NewMockAnalyticsRepository()
 	settingRepo := NewMockSettingRepository()
 
-	service := NewTaskService(taskRepo, analyticsRepo, settingRepo)
+	service := NewTaskService(taskRepo, analyticsRepo, settingRepo, NewMockSessionRepository())
 
 	req := CreateTaskRequest{
 		Title:       "Test Task",
@@ -218,7 +218,7 @@ func TestTaskService_UpdateTask(t *testing.T) {
 	analyticsRepo := NewMockAnalyticsRepository()
 	settingRepo := NewMockSettingRepository()
 
-	service := NewTaskService(taskRepo, analyticsRepo, settingRepo)
+	service := NewTaskService(taskRepo, analyticsRepo, settingRepo, NewMockSessionRepository())
 
 	// Create a task first
 	task, _ := service.CreateTask(CreateTaskRequest{
@@ -247,7 +247,7 @@ func TestTaskService_DeleteTask(t *testing.T) {
 	analyticsRepo := NewMockAnalyticsRepository()
 	settingRepo := NewMockSettingRepository()
 
-	service := NewTaskService(taskRepo, analyticsRepo, settingRepo)
+	service := NewTaskService(taskRepo, analyticsRepo, settingRepo, NewMockSessionRepository())
 
 	task, _ := service.CreateTask(CreateTaskRequest{
 		Title:    "Task to Delete",
@@ -271,7 +271,7 @@ func TestTaskService_MoveTask(t *testing.T) {
 	analyticsRepo := NewMockAnalyticsRepository()
 	settingRepo := NewMockSettingRepository()
 
-	service := NewTaskService(taskRepo, analyticsRepo, settingRepo)
+	service := NewTaskService(taskRepo, analyticsRepo, settingRepo, NewMockSessionRepository())
 
 	task, _ := service.CreateTask(CreateTaskRequest{
 		Title:    "Move Test",
@@ -328,7 +328,7 @@ func TestTaskService_GetTasksByQuadrant(t *testing.T) {
 	analyticsRepo := NewMockAnalyticsRepository()
 	settingRepo := NewMockSettingRepository()
 
-	service := NewTaskService(taskRepo, analyticsRepo, settingRepo)
+	service := NewTaskService(taskRepo, analyticsRepo, settingRepo, NewMockSessionRepository())
 
 	// Create tasks in different quadrants
 	service.CreateTask(CreateTaskRequest{Title: "Q1 Task", Quadrant: model.Quadrant1})
@@ -358,7 +358,7 @@ func TestTaskService_MarkCompleted(t *testing.T) {
 	analyticsRepo := NewMockAnalyticsRepository()
 	settingRepo := NewMockSettingRepository()
 
-	service := NewTaskService(taskRepo, analyticsRepo, settingRepo)
+	service := NewTaskService(taskRepo, analyticsRepo, settingRepo, NewMockSessionRepository())
 
 	task, _ := service.CreateTask(CreateTaskRequest{
 		Title:    "Complete Me",
@@ -386,5 +386,177 @@ func TestTaskService_MarkCompleted(t *testing.T) {
 
 	if analyticsRepo.completedTasks != 1 {
 		t.Errorf("expected completedTasks to be 1, got %d", analyticsRepo.completedTasks)
+	}
+}
+
+// --- Pomodoro Enrichment Tests ---
+
+func TestComputePomodoroStatus(t *testing.T) {
+	tests := []struct {
+		name      string
+		planned   int
+		completed int
+		expected  string
+	}{
+		{"no estimate", 0, 0, "not_started"},
+		{"planned but not started", 4, 0, "not_started"},
+		{"in progress", 4, 2, "in_progress"},
+		{"exactly completed", 4, 4, "completed"},
+		{"exceeded", 4, 6, "exceeded"},
+		{"no estimate with sessions", 0, 3, "not_started"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := computePomodoroStatus(tt.planned, tt.completed)
+			if result != tt.expected {
+				t.Errorf("computePomodoroStatus(%d, %d) = %q, want %q", tt.planned, tt.completed, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestTaskService_GetTaskResponse(t *testing.T) {
+	taskRepo := NewMockTaskRepository()
+	sessionRepo := NewMockSessionRepository()
+	analyticsRepo := NewMockAnalyticsRepository()
+	settingRepo := NewMockSettingRepository()
+
+	svc := NewTaskService(taskRepo, analyticsRepo, settingRepo, sessionRepo)
+
+	// Create task with estimate
+	task, _ := svc.CreateTask(CreateTaskRequest{
+		Title:         "Test Task",
+		Quadrant:      model.Quadrant1,
+		EstimatedTime: 100, // 100 min / 25 min = 4 planned
+	})
+
+	// Seed completed sessions
+	taskID := task.ID
+	sessionRepo.sessions["s1"] = &model.PomodoroSession{
+		ID:        "s1",
+		TaskID:    &taskID,
+		Type:      model.SessionWork,
+		Status:    model.SessionCompleted,
+		StartTime: time.Now(),
+	}
+	sessionRepo.sessions["s2"] = &model.PomodoroSession{
+		ID:        "s2",
+		TaskID:    &taskID,
+		Type:      model.SessionWork,
+		Status:    model.SessionCompleted,
+		StartTime: time.Now(),
+	}
+
+	resp, err := svc.GetTaskResponse(task.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.PlannedPomodoros != 4 {
+		t.Errorf("expected PlannedPomodoros 4, got %d", resp.PlannedPomodoros)
+	}
+	if resp.CompletedPomodoros != 2 {
+		t.Errorf("expected CompletedPomodoros 2, got %d", resp.CompletedPomodoros)
+	}
+	if resp.PomodoroStatus != "in_progress" {
+		t.Errorf("expected PomodoroStatus in_progress, got %s", resp.PomodoroStatus)
+	}
+}
+
+func TestTaskService_GetTaskResponse_NoEstimate(t *testing.T) {
+	taskRepo := NewMockTaskRepository()
+	sessionRepo := NewMockSessionRepository()
+	analyticsRepo := NewMockAnalyticsRepository()
+	settingRepo := NewMockSettingRepository()
+
+	svc := NewTaskService(taskRepo, analyticsRepo, settingRepo, sessionRepo)
+
+	task, _ := svc.CreateTask(CreateTaskRequest{
+		Title:    "No Estimate Task",
+		Quadrant: model.Quadrant2,
+	})
+
+	resp, err := svc.GetTaskResponse(task.ID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.PlannedPomodoros != 0 {
+		t.Errorf("expected PlannedPomodoros 0, got %d", resp.PlannedPomodoros)
+	}
+	if resp.PomodoroStatus != "not_started" {
+		t.Errorf("expected PomodoroStatus not_started, got %s", resp.PomodoroStatus)
+	}
+}
+
+func TestTaskService_GetAllTaskResponses(t *testing.T) {
+	taskRepo := NewMockTaskRepository()
+	sessionRepo := NewMockSessionRepository()
+	analyticsRepo := NewMockAnalyticsRepository()
+	settingRepo := NewMockSettingRepository()
+
+	svc := NewTaskService(taskRepo, analyticsRepo, settingRepo, sessionRepo)
+
+	svc.CreateTask(CreateTaskRequest{Title: "Task 1", Quadrant: model.Quadrant1, EstimatedTime: 50})
+	svc.CreateTask(CreateTaskRequest{Title: "Task 2", Quadrant: model.Quadrant2})
+
+	responses, err := svc.GetAllTaskResponses()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(responses) != 2 {
+		t.Fatalf("expected 2 responses, got %d", len(responses))
+	}
+
+	found := false
+	for _, r := range responses {
+		if r.Title == "Task 1" {
+			found = true
+			if r.PlannedPomodoros != 2 {
+				t.Errorf("expected PlannedPomodoros 2, got %d", r.PlannedPomodoros)
+			}
+		}
+	}
+	if !found {
+		t.Error("Task 1 not found in responses")
+	}
+}
+
+func TestTaskService_GetTasksByQuadrantResponse(t *testing.T) {
+	taskRepo := NewMockTaskRepository()
+	sessionRepo := NewMockSessionRepository()
+	analyticsRepo := NewMockAnalyticsRepository()
+	settingRepo := NewMockSettingRepository()
+
+	svc := NewTaskService(taskRepo, analyticsRepo, settingRepo, sessionRepo)
+
+	svc.CreateTask(CreateTaskRequest{Title: "Q1 Task", Quadrant: model.Quadrant1, EstimatedTime: 25})
+	svc.CreateTask(CreateTaskRequest{Title: "Q2 Task", Quadrant: model.Quadrant2, EstimatedTime: 60})
+
+	responses, err := svc.GetTasksByQuadrantResponse()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(responses) != 4 {
+		t.Errorf("expected 4 quadrant keys, got %d", len(responses))
+	}
+
+	q1Tasks, ok := responses["1"]
+	if !ok {
+		t.Fatal("expected quadrant 1 key")
+	}
+	if len(q1Tasks) != 1 {
+		t.Errorf("expected 1 task in Q1, got %d", len(q1Tasks))
+	}
+	if q1Tasks[0].PlannedPomodoros != 1 {
+		t.Errorf("expected PlannedPomodoros 1, got %d", q1Tasks[0].PlannedPomodoros)
+	}
+
+	q2Tasks := responses["2"]
+	if q2Tasks[0].PlannedPomodoros != 3 {
+		t.Errorf("expected PlannedPomodoros 3, got %d", q2Tasks[0].PlannedPomodoros)
 	}
 }

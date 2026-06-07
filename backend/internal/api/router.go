@@ -91,6 +91,8 @@ func SetupRouter(
 			analytics.GET("/summary", analyticsHandler.GetSummary)
 			analytics.GET("/trend", analyticsHandler.GetTrend)
 			analytics.GET("/distribution", analyticsHandler.GetDistribution)
+				analytics.GET("/pomodoro-by-task", analyticsHandler.GetPomodoroByTask)
+				analytics.GET("/pomodoro-trends", analyticsHandler.GetPomodoroTrends)
 		}
 
 		// 日程

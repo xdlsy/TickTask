@@ -122,6 +122,38 @@ func (h *Hub) BroadcastTaskUpdated(task any) {
 	})
 }
 
+// TerminalOutputMessage 终端输出流式推送
+type TerminalOutputMessage struct {
+	Type     string `json:"type"` // "terminal_output"
+	Chunk    string `json:"chunk"`
+	IsStderr bool   `json:"is_stderr"`
+}
+
+func (h *Hub) BroadcastTerminalOutput(chunk string, isStderr bool) {
+	h.Broadcast(TerminalOutputMessage{
+		Type:     "terminal_output",
+		Chunk:    chunk,
+		IsStderr: isStderr,
+	})
+}
+
+// TerminalStatusMessage 终端状态变更推送
+type TerminalStatusMessage struct {
+	Type    string `json:"type"` // "terminal_status"
+	Status  string `json:"status"`
+	Message string `json:"message"`
+	Detail  string `json:"detail"`
+}
+
+func (h *Hub) BroadcastTerminalStatus(status, message, detail string) {
+	h.Broadcast(TerminalStatusMessage{
+		Type:    "terminal_status",
+		Status:  status,
+		Message: message,
+		Detail:  detail,
+	})
+}
+
 // WebSocketHandler 处理 WebSocket 连接
 func (h *Hub) WebSocketHandler(c *gin.Context) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)

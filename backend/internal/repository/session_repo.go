@@ -14,6 +14,8 @@ type SessionRepository interface {
 	Update(session *model.PomodoroSession) error
 	GetByDate(date time.Time) ([]model.PomodoroSession, error)
 	GetRecent(limit int) ([]model.PomodoroSession, error)
+	CountByTaskID(taskID string, sessionType model.SessionType, status model.SessionStatus) (int, error)
+	GetCompletedWorkByDateRange(start, end time.Time) ([]model.PomodoroSession, error)
 }
 
 type sessionRepository struct {
@@ -67,5 +69,22 @@ func (r *sessionRepository) GetByDate(date time.Time) ([]model.PomodoroSession, 
 func (r *sessionRepository) GetRecent(limit int) ([]model.PomodoroSession, error) {
 	var sessions []model.PomodoroSession
 	err := r.db.Order("start_time DESC").Limit(limit).Find(&sessions).Error
+	return sessions, err
+}
+
+func (r *sessionRepository) CountByTaskID(taskID string, sessionType model.SessionType, status model.SessionStatus) (int, error) {
+	var count int64
+	err := r.db.Model(&model.PomodoroSession{}).
+		Where("task_id = ? AND type = ? AND status = ?", taskID, sessionType, status).
+		Count(&count).Error
+	return int(count), err
+}
+
+func (r *sessionRepository) GetCompletedWorkByDateRange(start, end time.Time) ([]model.PomodoroSession, error) {
+	var sessions []model.PomodoroSession
+	err := r.db.Where("type = ? AND status = ? AND start_time >= ? AND start_time < ?",
+		model.SessionWork, model.SessionCompleted, start, end).
+		Order("start_time ASC").
+		Find(&sessions).Error
 	return sessions, err
 }

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"fmt"
+	"math"
 	"ticktask/internal/model"
 	"ticktask/internal/repository"
 	"time"
@@ -12,17 +14,20 @@ type TaskService struct {
 	taskRepo    repository.TaskRepository
 	analytics   repository.AnalyticsRepository
 	settingRepo repository.SettingRepository
+	sessionRepo repository.SessionRepository
 }
 
 func NewTaskService(
 	taskRepo repository.TaskRepository,
 	analytics repository.AnalyticsRepository,
 	settingRepo repository.SettingRepository,
+	sessionRepo repository.SessionRepository,
 ) *TaskService {
 	return &TaskService{
 		taskRepo:    taskRepo,
 		analytics:   analytics,
 		settingRepo: settingRepo,
+		sessionRepo: sessionRepo,
 	}
 }
 
@@ -233,4 +238,151 @@ func encodeTags(tags []string) string {
 func decodeTags(s string) []string {
 	// 简化处理，实际应使用 json.Unmarshal
 	return []string{}
+}
+
+// TaskResponse is the enriched API response DTO with computed pomodoro fields.
+type TaskResponse struct {
+	ID                 string     `json:"id"`
+	Title              string     `json:"title"`
+	Description        string     `json:"description"`
+	Quadrant           int        `json:"quadrant"`
+	IsImportant        bool       `json:"is_important"`
+	IsUrgent           bool       `json:"is_urgent"`
+	Status             string     `json:"status"`
+	EstimatedTime      int        `json:"estimated_time"`
+	Deadline           *time.Time `json:"deadline"`
+	StartDate          *time.Time `json:"start_date"`
+	DueDate            *time.Time `json:"due_date"`
+	IsRecurring        bool       `json:"is_recurring"`
+	RecurrencePattern  string     `json:"recurrence_pattern"`
+	RecurrenceDay      int        `json:"recurrence_day"`
+	PreferredStartTime string     `json:"preferred_start_time"`
+	PreferredEndTime   string     `json:"preferred_end_time"`
+	Tags               string     `json:"tags"`
+	Order              int        `json:"order"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	CompletedAt        *time.Time `json:"completed_at"`
+	// Computed pomodoro fields
+	PlannedPomodoros   int    `json:"planned_pomodoros"`
+	CompletedPomodoros int    `json:"completed_pomodoros"`
+	PomodoroStatus     string `json:"pomodoro_status"`
+}
+
+// GetTaskResponse returns a single task enriched with pomodoro info.
+func (s *TaskService) GetTaskResponse(id string) (*TaskResponse, error) {
+	task, err := s.taskRepo.GetByID(id)
+	if err != nil {
+		return nil, err
+	}
+	workDuration, err := s.getWorkDurationMinutes()
+	if err != nil {
+		workDuration = 25 // fallback default
+	}
+	return s.enrichTask(task, workDuration), nil
+}
+
+// GetAllTaskResponses returns all tasks enriched with pomodoro info.
+func (s *TaskService) GetAllTaskResponses() ([]TaskResponse, error) {
+	tasks, err := s.taskRepo.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	workDuration, err := s.getWorkDurationMinutes()
+	if err != nil {
+		workDuration = 25
+	}
+	result := make([]TaskResponse, len(tasks))
+	for i, t := range tasks {
+		result[i] = *s.enrichTask(&t, workDuration)
+	}
+	return result, nil
+}
+
+// GetTasksByQuadrantResponse returns tasks grouped by quadrant, enriched with pomodoro info.
+func (s *TaskService) GetTasksByQuadrantResponse() (map[string][]TaskResponse, error) {
+	quadrantMap, err := s.taskRepo.GetAllByQuadrant()
+	if err != nil {
+		return nil, err
+	}
+	workDuration, err := s.getWorkDurationMinutes()
+	if err != nil {
+		workDuration = 25
+	}
+	result := make(map[string][]TaskResponse)
+	for q, tasks := range quadrantMap {
+		key := fmt.Sprintf("%d", int(q))
+		enriched := make([]TaskResponse, len(tasks))
+		for i, t := range tasks {
+			enriched[i] = *s.enrichTask(&t, workDuration)
+		}
+		result[key] = enriched
+	}
+	return result, nil
+}
+
+func (s *TaskService) getWorkDurationMinutes() (int, error) {
+	settings, err := s.settingRepo.GetPomodoroSettings()
+	if err != nil {
+		return 0, err
+	}
+	return settings.WorkDuration / 60, nil // seconds to minutes
+}
+
+func (s *TaskService) enrichTask(task *model.Task, workDurationMinutes int) *TaskResponse {
+	resp := TaskResponse{
+		ID:                 task.ID,
+		Title:              task.Title,
+		Description:        task.Description,
+		Quadrant:           int(task.Quadrant),
+		IsImportant:        task.IsImportant,
+		IsUrgent:           task.IsUrgent,
+		Status:             string(task.Status),
+		EstimatedTime:      task.EstimatedTime,
+		Deadline:           task.Deadline,
+		StartDate:          task.StartDate,
+		DueDate:            task.DueDate,
+		IsRecurring:        task.IsRecurring,
+		RecurrencePattern:  task.RecurrencePattern,
+		RecurrenceDay:      task.RecurrenceDay,
+		PreferredStartTime: task.PreferredStartTime,
+		PreferredEndTime:   task.PreferredEndTime,
+		Tags:               task.Tags,
+		Order:              task.Order,
+		CreatedAt:          task.CreatedAt,
+		UpdatedAt:          task.UpdatedAt,
+		CompletedAt:        task.CompletedAt,
+	}
+
+	// Compute planned pomodoros
+	if task.EstimatedTime > 0 && workDurationMinutes > 0 {
+		resp.PlannedPomodoros = int(math.Ceil(float64(task.EstimatedTime) / float64(workDurationMinutes)))
+	}
+
+	// Count completed work sessions
+	completed, err := s.sessionRepo.CountByTaskID(task.ID, model.SessionWork, model.SessionCompleted)
+	if err == nil {
+		resp.CompletedPomodoros = completed
+	}
+
+	// Determine pomodoro status
+	resp.PomodoroStatus = computePomodoroStatus(resp.PlannedPomodoros, resp.CompletedPomodoros)
+
+	return &resp
+}
+
+func computePomodoroStatus(planned, completed int) string {
+	if planned == 0 {
+		return "not_started"
+	}
+	if completed == 0 {
+		return "not_started"
+	}
+	if completed < planned {
+		return "in_progress"
+	}
+	if completed == planned {
+		return "completed"
+	}
+	return "exceeded"
 }

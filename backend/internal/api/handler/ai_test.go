@@ -15,7 +15,7 @@ func setupAITestServices() (*service.AIService, *service.TaskService, *mockSetti
 	analyticsRepo := newMockAnalyticsRepository()
 	settingRepo := newMockSettingRepository()
 
-	taskService := service.NewTaskService(taskRepo, analyticsRepo, settingRepo)
+	taskService := service.NewTaskService(taskRepo, analyticsRepo, settingRepo, newMockSessionRepository())
 
 	// Get AI settings from the repository
 	aiSettings, _ := settingRepo.GetAISettings()
@@ -131,7 +131,7 @@ func TestAIHandler_ClassifyTask_MissingTaskID(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -163,7 +163,7 @@ func TestAIHandler_ClassifyTask_TaskNotFound(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -221,7 +221,7 @@ func TestAIHandler_ClassifyTasks_MissingTaskIDs(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -278,7 +278,7 @@ func TestAIHandler_GenerateSchedule_MissingTime(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -353,7 +353,7 @@ func TestAIHandler_ClassifyTaskByText_MissingTitle(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -387,7 +387,7 @@ func TestAIHandler_ClassifyTaskByText_InvalidJSON(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -444,7 +444,7 @@ func TestAIHandler_RescheduleAfterInterrupt_MissingTaskID(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -479,7 +479,7 @@ func TestAIHandler_RescheduleAfterInterrupt_MissingPlannedMinutes(t *testing.T) 
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -514,7 +514,7 @@ func TestAIHandler_RescheduleAfterInterrupt_MissingWorkEndTime(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -551,7 +551,7 @@ func TestAIHandler_RescheduleAfterInterrupt_InvalidJSON(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -598,7 +598,7 @@ func TestAIHandler_GetDailyInsights_DefaultParams(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -627,7 +627,7 @@ func TestAIHandler_GetDailyInsights_WithParams(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
@@ -676,7 +676,7 @@ func TestAIHandler_GenerateSchedule_InvalidJSON(t *testing.T) {
 	aiSettings, _ := settingRepo.GetAISettings()
 	taskRepo := newMockTaskRepository()
 	aiService := service.NewAIService(aiSettings, taskRepo, nil, nil)
-	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo)
+	taskService := service.NewTaskService(taskRepo, newMockAnalyticsRepository(), settingRepo, newMockSessionRepository())
 
 	handler := NewAIHandler(aiService, taskService)
 	router := setupTestRouter()
