@@ -585,6 +585,9 @@ func (s *WorkLogService) UpdateQuickEntry(date string, itemID string, in UpdateQ
 	if _, err := time.Parse("2006-01-02", date); err != nil {
 		return fmt.Errorf("invalid date: %w", err)
 	}
+	// 注意：仅当本次同时提供 start_time 和 end_time 时才校验顺序。
+	// 若用户只改一项，无法在服务层判断最终顺序（另一项依赖库里现值）。
+	// handler 层可在读取现值后做更严格的校验。
 	if in.StartTime != nil && in.EndTime != nil && *in.StartTime >= *in.EndTime {
 		return errors.New("end_time must be after start_time")
 	}

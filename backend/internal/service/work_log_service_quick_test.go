@@ -4,7 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/google/uuid"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"ticktask/internal/model"
@@ -17,7 +16,9 @@ func newQuickTestDB(t *testing.T) (*gorm.DB, repository.WorkLogRepository) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	db.AutoMigrate(&model.WorkLog{}, &model.WorkItem{})
+	if err := db.AutoMigrate(&model.WorkLog{}, &model.WorkItem{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
 	return db, repository.NewWorkLogRepository(db)
 }
 
@@ -68,8 +69,19 @@ func TestAddQuickEntry_AppendsToExistingWorkLog(t *testing.T) {
 	if len(log.Items) != 2 {
 		t.Fatalf("expected 2 items, got %d", len(log.Items))
 	}
-	if log.Items[1].Seq != 2 {
-		t.Fatalf("expected seq=2, got %d", log.Items[1].Seq)
+	// 不依赖 Preload 顺序：按 activity 名找第二条
+	var second *model.WorkItem
+	for i := range log.Items {
+		if log.Items[i].Activity != nil && *log.Items[i].Activity == "b" {
+			second = &log.Items[i]
+			break
+		}
+	}
+	if second == nil {
+		t.Fatalf("item with activity='b' not found in %+v", log.Items)
+	}
+	if second.Seq != 2 {
+		t.Fatalf("expected seq=2, got %d", second.Seq)
 	}
 }
 
@@ -80,6 +92,16 @@ func TestAddQuickEntry_RejectsEndBeforeStart(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for end < start")
+	}
+}
+
+func TestAddQuickEntry_RejectsEqualStartEnd(t *testing.T) {
+	svc := newQuickService(t)
+	_, err := svc.AddQuickEntry("2026-08-02", CreateQuickEntryInput{
+		Activity: "x", StartTime: "09:00", EndTime: "09:00", Quadrant: 1,
+	})
+	if err == nil {
+		t.Fatal("expected error for equal start/end")
 	}
 }
 
@@ -130,6 +152,3 @@ func TestDeleteQuickEntry_HappyPath(t *testing.T) {
 
 // 局部 helper：避免污染包级别
 func strPtrService(s string) *string { return &s }
-
-// 防止 uuid 未使用
-var _ = uuid.New
