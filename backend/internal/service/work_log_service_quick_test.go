@@ -265,3 +265,84 @@ func TestAddQuickEntry_NoOptionalFields_PersistsWithEmptyStrings(t *testing.T) {
 		t.Fatalf("optional fields should be empty, got %+v", item)
 	}
 }
+
+func TestUpdateQuickEntry_ActivityChangeSyncsTitle(t *testing.T) {
+	svc := newQuickService(t)
+	item, _ := svc.AddQuickEntry("2026-08-03", CreateQuickEntryInput{
+		Activity: "old", StartTime: "09:00", EndTime: "10:00", Quadrant: 1,
+	})
+
+	newActivity := "new activity"
+	err := svc.UpdateQuickEntry("2026-08-03", item.ID, UpdateQuickEntryInput{
+		Activity: &newActivity,
+	})
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	log, _ := svc.repo.GetWorkLogByDate("2026-08-03")
+	for _, it := range log.Items {
+		if it.ID == item.ID {
+			if it.Title != "new activity" {
+				t.Fatalf("expected title synced, got %q", it.Title)
+			}
+			if it.Activity == nil || *it.Activity != "new activity" {
+				t.Fatalf("expected activity updated, got %v", it.Activity)
+			}
+		}
+	}
+}
+
+func TestUpdateQuickEntry_OptionalFieldsUpdate(t *testing.T) {
+	svc := newQuickService(t)
+	item, _ := svc.AddQuickEntry("2026-08-03", CreateQuickEntryInput{
+		Activity: "x", StartTime: "09:00", EndTime: "10:00", Quadrant: 1,
+	})
+
+	newContent := "新内容"
+	newResult := "新结果"
+	err := svc.UpdateQuickEntry("2026-08-03", item.ID, UpdateQuickEntryInput{
+		Content: &newContent,
+		Result:  &newResult,
+	})
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	log, _ := svc.repo.GetWorkLogByDate("2026-08-03")
+	for _, it := range log.Items {
+		if it.ID == item.ID {
+			if it.Content != "新内容" {
+				t.Fatalf("expected content updated, got %q", it.Content)
+			}
+			if it.Result != "新结果" {
+				t.Fatalf("expected result updated, got %q", it.Result)
+			}
+		}
+	}
+}
+
+func TestUpdateQuickEntry_ClearOptionalFieldWithEmptyString(t *testing.T) {
+	svc := newQuickService(t)
+	item, _ := svc.AddQuickEntry("2026-08-03", CreateQuickEntryInput{
+		Activity: "x", StartTime: "09:00", EndTime: "10:00", Quadrant: 1,
+		Content: "原内容",
+	})
+
+	emptyStr := ""
+	err := svc.UpdateQuickEntry("2026-08-03", item.ID, UpdateQuickEntryInput{
+		Content: &emptyStr,
+	})
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	log, _ := svc.repo.GetWorkLogByDate("2026-08-03")
+	for _, it := range log.Items {
+		if it.ID == item.ID {
+			if it.Content != "" {
+				t.Fatalf("expected content cleared, got %q", it.Content)
+			}
+		}
+	}
+}

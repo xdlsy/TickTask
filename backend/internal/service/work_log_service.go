@@ -103,10 +103,14 @@ type CreateQuickEntryInput struct {
 
 // UpdateQuickEntryInput 快捷录入编辑输入（指针 = 部分更新）
 type UpdateQuickEntryInput struct {
-	Activity  *string `json:"activity,omitempty"`
-	StartTime *string `json:"start_time,omitempty"`
-	EndTime   *string `json:"end_time,omitempty"`
-	Quadrant  *int    `json:"quadrant,omitempty"`
+	Activity      *string `json:"activity,omitempty"`
+	StartTime     *string `json:"start_time,omitempty"`
+	EndTime       *string `json:"end_time,omitempty"`
+	Quadrant      *int    `json:"quadrant,omitempty"`
+	Content       *string `json:"content,omitempty"`
+	ProblemSolved *string `json:"problem_solved,omitempty"`
+	Result        *string `json:"result,omitempty"`
+	Impact        *string `json:"impact,omitempty"`
 }
 
 // ReportSummary 报告汇总结构（4 字段，所有报告 type 共用）
@@ -629,6 +633,7 @@ func (s *WorkLogService) UpdateQuickEntry(date string, itemID string, in UpdateQ
 	updates := map[string]any{}
 	if in.Activity != nil {
 		updates["activity"] = *in.Activity
+		updates["title"] = *in.Activity // 同步：title 跟随 activity
 	}
 	if in.StartTime != nil {
 		updates["start_time"] = *in.StartTime
@@ -638,6 +643,18 @@ func (s *WorkLogService) UpdateQuickEntry(date string, itemID string, in UpdateQ
 	}
 	if in.Quadrant != nil {
 		updates["quadrant"] = *in.Quadrant
+	}
+	if in.Content != nil {
+		updates["content"] = *in.Content
+	}
+	if in.ProblemSolved != nil {
+		updates["problem_solved"] = *in.ProblemSolved
+	}
+	if in.Result != nil {
+		updates["result"] = *in.Result
+	}
+	if in.Impact != nil {
+		updates["impact"] = *in.Impact
 	}
 	if len(updates) == 0 {
 		return nil
