@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"ticktask/internal/model"
 	"ticktask/internal/repository"
 )
@@ -137,7 +139,7 @@ func NewWorkLogService(
 		taskRepo:    taskRepo,
 		sessionRepo: sessionRepo,
 		aiClient:    aiClient,
-		idGenerator: func() string { return fmt.Sprintf("id-%d", time.Now().UnixNano()) },
+		idGenerator: func() string { return uuid.New().String() },
 	}
 }
 
