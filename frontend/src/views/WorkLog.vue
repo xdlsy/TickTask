@@ -127,7 +127,7 @@ async function onStructure(text: string) {
   try {
     const out: StructuredWorkLog | null = await store.structureBrainDump(text)
     if (out) {
-      draftItems.value = out.items.map(it => ({ ...it }))
+      draftItems.value = out.items.map(it => ({ ...it, title: it.title ?? '' }))
       draftSummary.value = out.summary
     }
   } finally {

@@ -335,6 +335,10 @@ export interface CreateQuickEntryInput {
   start_time: string
   end_time: string
   quadrant: Quadrant
+  content?: string
+  problem_solved?: string
+  result?: string
+  impact?: string
 }
 
 // 快捷录入编辑输入（部分更新）
@@ -343,6 +347,15 @@ export interface UpdateQuickEntryInput {
   start_time?: string
   end_time?: string
   quadrant?: Quadrant
+  content?: string
+  problem_solved?: string
+  result?: string
+  impact?: string
+}
+
+// summary 单独更新输入
+export interface UpdateSummaryInput {
+  summary: string
 }
 
 export interface WorkLog {
@@ -384,7 +397,7 @@ export interface TodayContext {
 
 export interface StructuredWorkLog {
   items: Array<{
-    title: string
+    title?: string // 废弃，待旧组件删除后移除
     content: string
     problem_solved: string
     result: string
