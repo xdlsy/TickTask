@@ -209,6 +209,9 @@ func (s *WorkLogService) StructureBrainDump(input BrainDumpInput) (*StructuredWo
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrAIStructureFailed, err)
 	}
+	if out == nil {
+		return nil, fmt.Errorf("%w: nil output", ErrAIStructureFailed)
+	}
 	for i := range out.Items {
 		if out.Items[i].Title == "" {
 			return nil, fmt.Errorf("%w: item[%d] missing title", ErrAIStructureFailed, i)
@@ -257,7 +260,11 @@ func (s *WorkLogService) UpdateWorkLog(input SaveWorkLogInput) (*model.WorkLog, 
 	if err := s.repo.UpsertWorkLog(log); err != nil {
 		return nil, err
 	}
-	return s.repo.GetWorkLogByDate(input.Date)
+	updated, err := s.repo.GetWorkLogByDate(input.Date)
+	if err != nil {
+		return nil, fmt.Errorf("re-read after upsert: %w", err)
+	}
+	return updated, nil
 }
 
 // GetWorkLog 按日期读
