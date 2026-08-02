@@ -212,3 +212,56 @@ func TestUpdateSummary_InvalidDateReturnsBadRequest(t *testing.T) {
 		t.Fatalf("expected invalid date error, got %v", err)
 	}
 }
+
+func TestAddQuickEntry_WithOptionalFields_SyncsTitle(t *testing.T) {
+	svc := newQuickService(t)
+	in := CreateQuickEntryInput{
+		Activity:      "登录开发",
+		StartTime:     "09:00",
+		EndTime:       "10:00",
+		Quadrant:      2,
+		Content:       "完成 OAuth 联调",
+		ProblemSolved: "回调失败",
+		Result:        "成功率提升",
+		Impact:        "释放测试资源",
+	}
+	item, err := svc.AddQuickEntry("2026-08-03", in)
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if item.Title != "登录开发" {
+		t.Fatalf("expected title='登录开发', got %q", item.Title)
+	}
+	if item.Content != "完成 OAuth 联调" {
+		t.Fatalf("expected content set, got %q", item.Content)
+	}
+	if item.ProblemSolved != "回调失败" {
+		t.Fatalf("expected problem_solved set, got %q", item.ProblemSolved)
+	}
+	if item.Result != "成功率提升" {
+		t.Fatalf("expected result set, got %q", item.Result)
+	}
+	if item.Impact != "释放测试资源" {
+		t.Fatalf("expected impact set, got %q", item.Impact)
+	}
+}
+
+func TestAddQuickEntry_NoOptionalFields_PersistsWithEmptyStrings(t *testing.T) {
+	svc := newQuickService(t)
+	in := CreateQuickEntryInput{
+		Activity:  "x",
+		StartTime: "09:00",
+		EndTime:   "10:00",
+		Quadrant:  1,
+	}
+	item, err := svc.AddQuickEntry("2026-08-03", in)
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if item.Title != "x" {
+		t.Fatalf("expected title synced from activity, got %q", item.Title)
+	}
+	if item.Content != "" || item.ProblemSolved != "" || item.Result != "" || item.Impact != "" {
+		t.Fatalf("optional fields should be empty, got %+v", item)
+	}
+}

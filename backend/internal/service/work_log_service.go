@@ -91,10 +91,14 @@ type GenerateReportInput struct {
 
 // CreateQuickEntryInput 快捷录入新增输入
 type CreateQuickEntryInput struct {
-	Activity  string `json:"activity"`
-	StartTime string `json:"start_time"`
-	EndTime   string `json:"end_time"`
-	Quadrant  int    `json:"quadrant"`
+	Activity      string `json:"activity"`
+	StartTime     string `json:"start_time"`
+	EndTime       string `json:"end_time"`
+	Quadrant      int    `json:"quadrant"`
+	Content       string `json:"content"`        // 可选
+	ProblemSolved string `json:"problem_solved"` // 可选
+	Result        string `json:"result"`         // 可选
+	Impact        string `json:"impact"`         // 可选
 }
 
 // UpdateQuickEntryInput 快捷录入编辑输入（指针 = 部分更新）
@@ -571,14 +575,19 @@ func (s *WorkLogService) AddQuickEntry(date string, in CreateQuickEntryInput) (*
 	}
 
 	item := model.WorkItem{
-		ID:        s.idGenerator(),
-		WorkLogID: log.ID,
-		Seq:       maxSeq + 1,
-		Activity:  &in.Activity,
-		StartTime: &in.StartTime,
-		EndTime:   &in.EndTime,
-		Quadrant:  &in.Quadrant,
-		Source:    "manual",
+		ID:            s.idGenerator(),
+		WorkLogID:     log.ID,
+		Seq:           maxSeq + 1,
+		Title:         in.Activity, // 同步：title = activity
+		Content:       in.Content,
+		ProblemSolved: in.ProblemSolved,
+		Result:        in.Result,
+		Impact:        in.Impact,
+		Activity:      &in.Activity,
+		StartTime:     &in.StartTime,
+		EndTime:       &in.EndTime,
+		Quadrant:      &in.Quadrant,
+		Source:        "manual",
 	}
 	if err := s.repo.AppendItem(log.ID, item); err != nil {
 		return nil, err
