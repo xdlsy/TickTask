@@ -98,6 +98,18 @@ func (r *handlerTestRepo) ListWorkReports(t model.WorkReportType) ([]*model.Work
 	return out, nil
 }
 
+func (r *handlerTestRepo) AppendItem(workLogID string, item model.WorkItem) error {
+	return errors.New("AppendItem not supported in this mock")
+}
+
+func (r *handlerTestRepo) UpdateItem(workLogID string, itemID string, updates map[string]any) error {
+	return errors.New("UpdateItem not supported in this mock")
+}
+
+func (r *handlerTestRepo) DeleteItem(workLogID string, itemID string) error {
+	return errors.New("DeleteItem not supported in this mock")
+}
+
 // ── Mock AI client for handler tests ──
 
 type handlerMockAIClient struct {

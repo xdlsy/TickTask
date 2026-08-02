@@ -98,6 +98,18 @@ func (m *mockWorkLogRepo) ListWorkReports(t model.WorkReportType) ([]*model.Work
 	return out, nil
 }
 
+func (m *mockWorkLogRepo) AppendItem(workLogID string, item model.WorkItem) error {
+	return errors.New("AppendItem not supported in this mock")
+}
+
+func (m *mockWorkLogRepo) UpdateItem(workLogID string, itemID string, updates map[string]any) error {
+	return errors.New("UpdateItem not supported in this mock")
+}
+
+func (m *mockWorkLogRepo) DeleteItem(workLogID string, itemID string) error {
+	return errors.New("DeleteItem not supported in this mock")
+}
+
 // ── Mock AI client ──
 
 type mockAIClient struct {
