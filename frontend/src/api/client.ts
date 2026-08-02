@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkItem, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput, CreateQuickEntryInput, UpdateQuickEntryInput } from '@/types'
+import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkItem, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput, CreateQuickEntryInput, UpdateQuickEntryInput, UpdateSummaryInput } from '@/types'
 
 const client = axios.create({
   baseURL: '/api',
@@ -103,5 +103,8 @@ export const api = {
   updateWorkItem: (date: string, itemId: string, data: UpdateQuickEntryInput) =>
     client.patch<{ ok: boolean }>(`/work-logs/${date}/items/${itemId}`, data),
   deleteWorkItem: (date: string, itemId: string) =>
-    client.delete<{ ok: boolean }>(`/work-logs/${date}/items/${itemId}`)
+    client.delete<{ ok: boolean }>(`/work-logs/${date}/items/${itemId}`),
+
+  updateWorkLogSummary: (date: string, summary: string) =>
+    client.patch<{ ok: boolean }>(`/work-logs/${date}/summary`, { summary } as UpdateSummaryInput)
 }
