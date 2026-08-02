@@ -176,3 +176,25 @@
 - **根因**: 本机（Windows VM `Administrator@P_V30315-GSAtW8`）的 `git config --global` 未设置 `user.name` / `user.email`，仓库本身也没 local config。CLAUDE.md 安全规则禁止 `git config --global` 写入。
 - **教训**: 用 inline 一次性 override：`git -c user.name="lsy" -c user.email="lsy@local" commit -m "..."`。这不修改任何 config 文件，符合安全规则。最近的 commit 都是 `lsy <lsy@local>`，沿用此身份即可。
 - **适用范围**: 本机所有 git commit 操作（直到用户手动配置 global identity）。
+
+---
+
+### [LRN-20260803-018] jsdom 29 在 Node 18 上 ESM 加载失败——切到 happy-dom
+
+- **分类**: best_practice
+- **现象**: `npx vitest run` 全部测试报错 `Error: require() of ES Module ...@exodus/bytes/encoding-lite.js from ...html-encoding-sniffer.js not supported. Serialized Error: { code: 'ERR_REQUIRE_ESM' }`。
+- **根因**: jsdom v29 依赖 `html-encoding-sniffer` v6，后者依赖纯 ESM 包 `@exodus/bytes/encoding-lite`。Node 18 的 CommonJS `require()` 加载 ESM 模块不被支持。这是 jsdom 29 + Node 18 的组合 bug，不是项目代码问题。
+- **教训**: 切到 `happy-dom`：`npm install --save-dev happy-dom`，再把 `vitest.config.ts` 的 `environment: 'jsdom'` 改成 `environment: 'happy-dom'`。happy-dom 更轻、与 `@vue/test-utils` 兼容好。
+- **副作用**: happy-dom 不会把 inline style 的颜色归一化成 `rgb(...)`，所以 schedule 视图的旧测试（断言 `rgb(107, 139, 111)`）会失败——这些测试本就是 jsdom-specific 的实现细节断言。修复时让测试接受 hex 格式或断言更稳定的不变量。
+- **参考**: commit `479d65a` — 切到 happy-dom。
+- **适用范围**: 本机 + Node 18 的所有 vitest 运行。
+
+---
+
+### [LRN-20260803-019] Vue 组件测试用 happy-dom 时 el-table 行选择器要用 `.el-table__row`
+
+- **分类**: best_practice
+- **现象**: Element Plus `el-table` 不会把自定义 `data-test` 等 attr 透传到 row DOM；测试用 `wrapper.findAll('[data-test="row"]')` 找不到行。
+- **根因**: el-table 渲染时把用户传的 props/attrs 用于组件内部状态，不直接绑到 `<tr>` DOM。但 el-table 默认给行加 `.el-table__row` class，这个 class 是稳定的。
+- **教训**: 测 Element Plus 表格行用 `wrapper.findAll('.el-table__row')`，不要用自定义 `data-test` attr。
+- **适用范围**: 所有用 Element Plus el-table 的 Vue 组件测试。
