@@ -282,6 +282,16 @@ func (m *mockTaskRepo) GetByStatus(status model.TaskStatus) ([]model.Task, error
 }
 func (m *mockTaskRepo) GetByQuadrant(quadrant model.Quadrant) ([]model.Task, error) { return nil, nil }
 func (m *mockTaskRepo) GetAllByQuadrant() (map[model.Quadrant][]model.Task, error) { return nil, nil }
+func (m *mockTaskRepo) GetCompletedTasksInRange(start, end time.Time) ([]*model.Task, error) {
+	var result []*model.Task
+	for _, t := range m.tasks {
+		if t.Status == model.StatusCompleted && t.CompletedAt != nil &&
+			!t.CompletedAt.Before(start) && t.CompletedAt.Before(end) {
+			result = append(result, t)
+		}
+	}
+	return result, nil
+}
 
 func TestAIService_RescheduleAfterInterrupt_NotConfigured(t *testing.T) {
 	taskRepo := newMockTaskRepo()

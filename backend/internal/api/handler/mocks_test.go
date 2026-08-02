@@ -78,6 +78,17 @@ func (m *mockTaskRepository) GetAllByQuadrant() (map[model.Quadrant][]model.Task
 	return result, nil
 }
 
+func (m *mockTaskRepository) GetCompletedTasksInRange(start, end time.Time) ([]*model.Task, error) {
+	var result []*model.Task
+	for _, task := range m.tasks {
+		if task.Status == model.StatusCompleted && task.CompletedAt != nil &&
+			!task.CompletedAt.Before(start) && task.CompletedAt.Before(end) {
+			result = append(result, task)
+		}
+	}
+	return result, nil
+}
+
 // mockSessionRepository implements repository.SessionRepository for testing
 type mockSessionRepository struct {
 	sessions map[string]*model.PomodoroSession
