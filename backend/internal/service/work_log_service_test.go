@@ -101,8 +101,13 @@ func (m *mockWorkLogRepo) ListWorkReports(t model.WorkReportType) ([]*model.Work
 // ── Mock AI client ──
 
 type mockAIClient struct {
-	structuredOut *StructuredWorkLog
-	structuredErr error
+	structuredOut      *StructuredWorkLog
+	structuredErr      error
+	weeklyInput        []model.WorkItem
+	monthlyInput       []*model.WorkReport
+	monthlyOrphanInput []model.WorkItem
+	halfYearInput      []*model.WorkReport
+	yearlyInput        []*model.WorkReport
 }
 
 func (m *mockAIClient) StructureBrainDump(input BrainDumpInput) (*StructuredWorkLog, error) {
@@ -112,16 +117,21 @@ func (m *mockAIClient) StructureBrainDump(input BrainDumpInput) (*StructuredWork
 	return m.structuredOut, nil
 }
 func (m *mockAIClient) GenerateWeeklyReport(items []model.WorkItem, start, end string) (*ReportSummary, error) {
-	return nil, errors.New("not impl")
+	m.weeklyInput = items
+	return &ReportSummary{CoreWork: "cw"}, nil
 }
 func (m *mockAIClient) GenerateMonthlyReport(w []*model.WorkReport, o []model.WorkItem, start, end string) (*ReportSummary, error) {
-	return nil, errors.New("not impl")
+	m.monthlyInput = w
+	m.monthlyOrphanInput = o
+	return &ReportSummary{CoreWork: "cw"}, nil
 }
 func (m *mockAIClient) GenerateHalfYearReport(mo []*model.WorkReport, start, end string) (*ReportSummary, error) {
-	return nil, errors.New("not impl")
+	m.halfYearInput = mo
+	return &ReportSummary{CoreWork: "cw"}, nil
 }
 func (m *mockAIClient) GenerateYearlyReport(mo []*model.WorkReport, start, end string) (*ReportSummary, error) {
-	return nil, errors.New("not impl")
+	m.yearlyInput = mo
+	return &ReportSummary{CoreWork: "cw"}, nil
 }
 
 // ── Mock Task / Session repos (interface-embedded to avoid full impl) ──
@@ -299,13 +309,148 @@ func TestStructureBrainDump_FillsPendingForMissingDims(t *testing.T) {
 	}
 }
 
-// ── Tests: GenerateReport stub ──
+// ── Tests: GenerateReport ──
 
-func TestGenerateReport_StubReturnsError(t *testing.T) {
+func TestGenerateReport_Weekly_GathersItems(t *testing.T) {
+	svc, repo, ai := newServiceForTest()
+	repo.logs["2026-08-03"] = &model.WorkLog{
+		ID: "wl-1", Date: "2026-08-03",
+		Items: []model.WorkItem{{ID: "wi-1", WorkLogID: "wl-1", Title: "T1"}},
+	}
+	report, err := svc.GenerateReport(GenerateReportInput{
+		Type: model.ReportWeekly, PeriodKey: "2026-W32", Force: true,
+	})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if len(ai.weeklyInput) != 1 || ai.weeklyInput[0].Title != "T1" {
+		t.Errorf("weekly should gather 1 item, got: %+v", ai.weeklyInput)
+	}
+	if report.PeriodKey != "2026-W32" {
+		t.Errorf("period_key = %s", report.PeriodKey)
+	}
+}
+
+func TestGenerateReport_AlreadyExists_NoForce(t *testing.T) {
+	svc, repo, _ := newServiceForTest()
+	repo.reports["weekly:2026-W32"] = &model.WorkReport{
+		ID: "wr-1", Type: model.ReportWeekly, PeriodKey: "2026-W32",
+		StartDate: "2026-08-03", EndDate: "2026-08-09",
+	}
+	_, err := svc.GenerateReport(GenerateReportInput{
+		Type: model.ReportWeekly, PeriodKey: "2026-W32",
+	})
+	if !errors.Is(err, ErrReportAlreadyExists) {
+		t.Errorf("err = %v, want ErrReportAlreadyExists", err)
+	}
+}
+
+// INVARIANT: monthly 只读 weekly 报告 + 月内孤儿 items，绝不读所有原始 items
+func TestGenerateReport_Monthly_ReadsWeekliesAndOrphans(t *testing.T) {
+	svc, repo, ai := newServiceForTest()
+	// 周报：8/3~8/9（覆盖月初前段）
+	repo.reports["weekly:2026-W32"] = &model.WorkReport{
+		ID: "wr-1", Type: model.ReportWeekly, PeriodKey: "2026-W32",
+		StartDate: "2026-08-03", EndDate: "2026-08-09",
+	}
+	// 孤儿：8/12 不在周报覆盖内（8/10~8/16 才是 W33）
+	// 实际 W33 = 8/10~8/16，所以 8/12 在 W33 内；改用 8/2（属 W31）作孤儿
+	repo.logs["2026-08-02"] = &model.WorkLog{
+		ID: "wl-1", Date: "2026-08-02",
+		Items: []model.WorkItem{{ID: "wi-1", WorkLogID: "wl-1", Title: "Orphan"}},
+	}
+	// 周报覆盖内的 log（8/4 属 W32），它的 items 不应被作为孤儿传入
+	repo.logs["2026-08-04"] = &model.WorkLog{
+		ID: "wl-2", Date: "2026-08-04",
+		Items: []model.WorkItem{{ID: "wi-2", WorkLogID: "wl-2", Title: "Covered"}},
+	}
+	_, err := svc.GenerateReport(GenerateReportInput{
+		Type: model.ReportMonthly, PeriodKey: "2026-08", Force: true,
+	})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if len(ai.monthlyInput) != 1 {
+		t.Errorf("monthly should read 1 weekly report, got %d", len(ai.monthlyInput))
+	}
+	if len(ai.monthlyOrphanInput) != 1 || ai.monthlyOrphanInput[0].Title != "Orphan" {
+		t.Errorf("monthly orphan input = %+v, want only 'Orphan'", ai.monthlyOrphanInput)
+	}
+}
+
+// INVARIANT: halfyear 只读 monthly 报告，绝不读原始 items
+func TestGenerateReport_HalfYear_ReadsOnlyMonthlies(t *testing.T) {
+	svc, repo, ai := newServiceForTest()
+	repo.reports["monthly:2026-07"] = &model.WorkReport{
+		ID: "mr-1", Type: model.ReportMonthly, PeriodKey: "2026-07",
+		StartDate: "2026-07-01", EndDate: "2026-07-31",
+	}
+	// 原始 items 存在但不应被读取
+	repo.logs["2026-07-15"] = &model.WorkLog{
+		ID: "wl-1", Date: "2026-07-15",
+		Items: []model.WorkItem{{ID: "wi-1", WorkLogID: "wl-1", Title: "Should be ignored"}},
+	}
+	_, err := svc.GenerateReport(GenerateReportInput{
+		Type: model.ReportHalfYear, PeriodKey: "2026-H2", Force: true,
+	})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if len(ai.halfYearInput) != 1 {
+		t.Errorf("halfyear should read 1 monthly, got %d", len(ai.halfYearInput))
+	}
+	if len(ai.monthlyOrphanInput) != 0 {
+		t.Errorf("halfyear must not touch orphan items, got %d", len(ai.monthlyOrphanInput))
+	}
+}
+
+// INVARIANT: yearly 只读 monthly 报告，绝不读原始 items 或 weekly 报告
+func TestGenerateReport_Yearly_ReadsOnlyMonthlies(t *testing.T) {
+	svc, repo, ai := newServiceForTest()
+	repo.reports["monthly:2026-01"] = &model.WorkReport{
+		ID: "mr-1", Type: model.ReportMonthly, PeriodKey: "2026-01",
+		StartDate: "2026-01-01", EndDate: "2026-01-31",
+	}
+	repo.reports["weekly:2026-W01"] = &model.WorkReport{
+		ID: "wr-1", Type: model.ReportWeekly, PeriodKey: "2026-W01",
+		StartDate: "2025-12-29", EndDate: "2026-01-04",
+	}
+	_, err := svc.GenerateReport(GenerateReportInput{
+		Type: model.ReportYearly, PeriodKey: "2026", Force: true,
+	})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if len(ai.yearlyInput) != 1 {
+		t.Errorf("yearly should read 1 monthly, got %d", len(ai.yearlyInput))
+	}
+}
+
+func TestGenerateReport_Force_OverwritesExisting(t *testing.T) {
+	svc, repo, _ := newServiceForTest()
+	repo.reports["weekly:2026-W32"] = &model.WorkReport{
+		ID: "wr-old", Type: model.ReportWeekly, PeriodKey: "2026-W32",
+		StartDate: "2026-08-03", EndDate: "2026-08-09",
+	}
+	_, err := svc.GenerateReport(GenerateReportInput{
+		Type: model.ReportWeekly, PeriodKey: "2026-W32", Force: true,
+	})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	updated := repo.reports["weekly:2026-W32"]
+	if updated.ID != "wr-old" {
+		t.Errorf("should preserve existing ID, got %s", updated.ID)
+	}
+}
+
+func TestGenerateReport_BadPeriodKey(t *testing.T) {
 	svc, _, _ := newServiceForTest()
-	_, err := svc.GenerateReport(GenerateReportInput{Type: model.ReportWeekly, PeriodKey: "2026-W31"})
+	_, err := svc.GenerateReport(GenerateReportInput{
+		Type: model.ReportWeekly, PeriodKey: "garbage", Force: true,
+	})
 	if err == nil {
-		t.Errorf("expected stub error")
+		t.Errorf("expected error for bad period key")
 	}
 }
 
