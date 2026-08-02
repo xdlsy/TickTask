@@ -122,6 +122,10 @@ func SetupRouter(
 			workLogs.POST("", wlHandler.CreateWorkLog)
 			workLogs.GET("/:date", wlHandler.GetWorkLog)
 			workLogs.PUT("/:date", wlHandler.UpdateWorkLog)
+			// 快捷录入（今日全景）
+			workLogs.POST("/:date/items", wlHandler.AddQuickEntry)
+			workLogs.PATCH("/:date/items/:itemId", wlHandler.UpdateQuickEntry)
+			workLogs.DELETE("/:date/items/:itemId", wlHandler.DeleteQuickEntry)
 		}
 
 		// 工作日志报告
