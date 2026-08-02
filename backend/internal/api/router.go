@@ -22,6 +22,7 @@ func SetupRouter(
 	aiService *service.AIService,
 	analyticsService *service.AnalyticsService,
 	scheduleService *service.ScheduleService,
+	workLogService *service.WorkLogService,
 	wsHub *websocket.Hub,
 	settingRepo repository.SettingRepository,
 ) *gin.Engine {
@@ -109,6 +110,27 @@ func SetupRouter(
 			schedules.PUT("/:id/move", scheduleHandler.MoveSchedule)
 			schedules.POST("/generate", scheduleHandler.GenerateWithAI)
 			schedules.DELETE("", scheduleHandler.DeleteAll)
+		}
+
+		// 工作日志
+		workLogs := api.Group("/work-logs")
+		{
+			wlHandler := handler.NewWorkLogHandler(workLogService)
+			workLogs.GET("/today/context", wlHandler.GetTodayContext)
+			workLogs.POST("/structure", wlHandler.Structure)
+			workLogs.GET("", wlHandler.ListWorkLogs)
+			workLogs.POST("", wlHandler.CreateWorkLog)
+			workLogs.GET("/:date", wlHandler.GetWorkLog)
+			workLogs.PUT("/:date", wlHandler.UpdateWorkLog)
+		}
+
+		// 工作日志报告
+		workReports := api.Group("/work-reports")
+		{
+			wrHandler := handler.NewWorkLogHandler(workLogService)
+			workReports.POST("/generate", wrHandler.GenerateReport)
+			workReports.GET("", wrHandler.ListReports)
+			workReports.GET("/:type/:periodKey", wrHandler.GetReport)
 		}
 	}
 
