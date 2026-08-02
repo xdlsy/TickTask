@@ -310,3 +310,28 @@ func TestUpsertWorkLog_PreservesManualItems(t *testing.T) {
 		t.Fatalf("ai items wrong: expected 2, got %d", aiCount)
 	}
 }
+
+func TestUpdateWorkLogSummary_UpdatesExistingLog(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewWorkLogRepository(db)
+	repo.CreateWorkLog(&model.WorkLog{ID: "wl-1", Date: "2026-08-01", Summary: "old"})
+
+	err := repo.UpdateWorkLogSummary("2026-08-01", "new summary")
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	log, _ := repo.GetWorkLogByDate("2026-08-01")
+	if log.Summary != "new summary" {
+		t.Fatalf("expected 'new summary', got %q", log.Summary)
+	}
+}
+
+func TestUpdateWorkLogSummary_ReturnsNotFoundForMissingLog(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewWorkLogRepository(db)
+	err := repo.UpdateWorkLogSummary("2026-99-99", "x")
+	if err != ErrNotFound {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}

@@ -15,7 +15,8 @@ type WorkLogRepository interface {
 	CreateWorkLog(log *model.WorkLog) error
 	GetWorkLogByDate(date string) (*model.WorkLog, error)
 	GetWorkLogsInRange(from, to string) ([]*model.WorkLog, error)
-	UpsertWorkLog(log *model.WorkLog) error // PUT 语义：存在则更新 items 全量替换，否则创建
+	UpsertWorkLog(log *model.WorkLog) error                // PUT 语义：存在则更新 items 全量替换，否则创建
+	UpdateWorkLogSummary(date string, summary string) error // PATCH 语义：仅更新 summary 字段
 
 	// WorkItem
 	ReplaceItems(workLogID string, items []model.WorkItem) error
@@ -188,4 +189,15 @@ func (r *workLogRepository) DeleteItem(workLogID string, itemID string) error {
 	}
 	return r.db.Where("id = ? AND work_log_id = ?", itemID, workLogID).
 		Delete(&model.WorkItem{}).Error
+}
+
+func (r *workLogRepository) UpdateWorkLogSummary(date string, summary string) error {
+	result := r.db.Model(&model.WorkLog{}).Where("date = ?", date).Update("summary", summary)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
