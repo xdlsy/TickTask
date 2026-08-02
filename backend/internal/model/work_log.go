@@ -17,16 +17,25 @@ type WorkLog struct {
 
 func (WorkLog) TableName() string { return "work_logs" }
 
-// WorkItem 日报里的一条核心工作，四维独立字段
+// WorkItem 日报里的一条工作。两类来源：
+//   - source='manual'：快捷录入（activity/start_time/end_time/quadrant 必填，叙事字段为空）
+//   - source='ai'：AI 拆条（4 维叙事字段必填，新字段为 nil）
 type WorkItem struct {
-	ID            string `gorm:"primaryKey;size:36" json:"id"`
-	WorkLogID     string `gorm:"index;size:36;not null" json:"work_log_id"`
-	Seq           int    `gorm:"not null" json:"seq"` // 顺序，从 1 开始
-	Title         string `gorm:"size:200" json:"title"`
-	Content       string `gorm:"size:1000" json:"content"`       // 做了什么
-	ProblemSolved string `gorm:"size:1000" json:"problem_solved"` // 解决了什么问题
-	Result        string `gorm:"size:1000" json:"result"`         // 已产生的结果，缺则"（待补充）"
-	Impact        string `gorm:"size:1000" json:"impact"`         // 对后续的影响
+	ID            string  `gorm:"primaryKey;size:36" json:"id"`
+	WorkLogID     string  `gorm:"index;size:36;not null" json:"work_log_id"`
+	Seq           int     `gorm:"not null" json:"seq"`
+	Title         string  `gorm:"size:200" json:"title"`
+	Content       string  `gorm:"size:1000" json:"content"`
+	ProblemSolved string  `gorm:"size:1000" json:"problem_solved"`
+	Result        string  `gorm:"size:1000" json:"result"`
+	Impact        string  `gorm:"size:1000" json:"impact"`
+
+	// 快捷录入字段（manual 必填，ai 为 nil）
+	Activity  *string `gorm:"column:activity;size:200" json:"activity,omitempty"`
+	StartTime *string `gorm:"column:start_time;size:5" json:"start_time,omitempty"` // "HH:MM"
+	EndTime   *string `gorm:"column:end_time;size:5" json:"end_time,omitempty"`     // "HH:MM"
+	Quadrant  *int    `gorm:"column:quadrant" json:"quadrant,omitempty"`            // 1-4
+	Source    string  `gorm:"column:source;size:10;default:'ai'" json:"source"`
 }
 
 func (WorkItem) TableName() string { return "work_items" }
