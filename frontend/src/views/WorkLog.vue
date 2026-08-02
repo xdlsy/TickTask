@@ -19,6 +19,24 @@
       <div class="detail-area">
         <!-- 日报视图 -->
         <template v-if="!store.selected || store.selected.kind === 'log'">
+          <QuickEntryForm
+            v-if="!editingItemId"
+            :date="currentDate"
+            mode="add"
+            @added="onQuickAdded"
+          />
+          <QuickEntryForm
+            v-else
+            :key="editingItemId"
+            :date="currentDate"
+            mode="edit"
+            :item-id="editingItemId"
+            :initial="editingInitial"
+            @saved="onEditSaved"
+            @cancel="onEditCancel"
+          />
+          <TodayPanorama :date="currentDate" @edit="onPanoramaEdit" />
+
           <TodayContextCard :context="store.todayContext" />
 
           <BrainDumpInput
@@ -59,6 +77,8 @@ import BrainDumpInput from '@/components/work-log/BrainDumpInput.vue'
 import WorkItemList from '@/components/work-log/WorkItemList.vue'
 import ReportActions from '@/components/work-log/ReportActions.vue'
 import ReportDetail from '@/components/work-log/ReportDetail.vue'
+import QuickEntryForm from '@/components/work-log/QuickEntryForm.vue'
+import TodayPanorama from '@/components/work-log/TodayPanorama.vue'
 import { ElMessageBox } from 'element-plus'
 import type { StructuredWorkLog, SaveWorkLogInput, WorkReportType } from '@/types'
 
@@ -77,10 +97,23 @@ const saving = ref(false)
 const draftItems = ref<DraftItem[]>([])
 const draftSummary = ref('')
 const currentDate = ref(new Date().toISOString().slice(0, 10))
+const editingItemId = ref<string | null>(null)
 
 const isUpdate = computed(() =>
   store.logs.some(l => l.date === currentDate.value),
 )
+
+const editingInitial = computed(() => {
+  if (!editingItemId.value || !store.currentLog) return {}
+  const it = store.currentLog.items.find(i => i.id === editingItemId.value)
+  if (!it) return {}
+  return {
+    activity: it.activity ?? '',
+    start_time: it.start_time ?? '09:00',
+    end_time: it.end_time ?? '10:00',
+    quadrant: it.quadrant ?? 2,
+  }
+})
 
 async function loadInitial() {
   await Promise.all([
@@ -120,6 +153,22 @@ async function onSave() {
 function goToday() {
   currentDate.value = new Date().toISOString().slice(0, 10)
   store.selectNode({ kind: 'log', date: currentDate.value })
+}
+
+function onPanoramaEdit(itemId: string) {
+  editingItemId.value = itemId
+}
+
+function onEditCancel() {
+  editingItemId.value = null
+}
+
+function onEditSaved() {
+  editingItemId.value = null
+}
+
+function onQuickAdded() {
+  // store 已经 fetchLog 过，panorama 通过 computed 自动刷新
 }
 
 function computePeriodKey(type: WorkReportType): string {
