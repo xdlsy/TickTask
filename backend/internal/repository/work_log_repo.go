@@ -5,6 +5,7 @@ import (
 	"errors"
 	"ticktask/internal/model"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -81,7 +82,7 @@ func (r *workLogRepository) UpsertWorkLog(log *model.WorkLog) error {
 			return err
 		}
 		for i := range log.Items {
-			log.Items[i].ID = "" // 让 GORM 自动生成新 ID
+			log.Items[i].ID = uuid.New().String() // 生成新 UUID（GORM 不为 string PK 自动生成）
 			log.Items[i].WorkLogID = log.ID
 		}
 		if len(log.Items) > 0 {
