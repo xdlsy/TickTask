@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"time"
+
 	"ticktask/internal/model"
 
 	"gorm.io/gorm"
@@ -15,6 +17,7 @@ type TaskRepository interface {
 	Update(task *model.Task) error
 	Delete(id string) error
 	GetAllByQuadrant() (map[model.Quadrant][]model.Task, error)
+	GetCompletedTasksInRange(start, end time.Time) ([]*model.Task, error)
 }
 
 type taskRepository struct {
@@ -91,4 +94,16 @@ func (r *taskRepository) GetAllByQuadrant() (map[model.Quadrant][]model.Task, er
 	}
 
 	return result, nil
+}
+
+func (r *taskRepository) GetCompletedTasksInRange(start, end time.Time) ([]*model.Task, error) {
+	var tasks []*model.Task
+	err := r.db.Where("status = ? AND completed_at BETWEEN ? AND ?",
+		model.StatusCompleted, start, end).
+		Order("completed_at DESC").
+		Find(&tasks).Error
+	if err != nil {
+		return nil, err
+	}
+	return tasks, nil
 }
