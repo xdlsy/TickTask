@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput } from '@/types'
+import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkItem, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput, CreateQuickEntryInput, UpdateQuickEntryInput } from '@/types'
 
 const client = axios.create({
   baseURL: '/api',
@@ -95,5 +95,13 @@ export const api = {
   listWorkReports: (type: WorkReportType) =>
     client.get<{ reports: WorkReport[] }>('/work-reports', { params: { type } }),
   getWorkReport: (type: WorkReportType, periodKey: string) =>
-    client.get<WorkReport>(`/work-reports/${type}/${periodKey}`)
+    client.get<WorkReport>(`/work-reports/${type}/${periodKey}`),
+
+  // 快捷录入（今日全景）
+  appendWorkItem: (date: string, data: CreateQuickEntryInput) =>
+    client.post<WorkItem>(`/work-logs/${date}/items`, data),
+  updateWorkItem: (date: string, itemId: string, data: UpdateQuickEntryInput) =>
+    client.patch<{ ok: boolean }>(`/work-logs/${date}/items/${itemId}`, data),
+  deleteWorkItem: (date: string, itemId: string) =>
+    client.delete<{ ok: boolean }>(`/work-logs/${date}/items/${itemId}`)
 }

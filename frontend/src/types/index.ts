@@ -321,6 +321,28 @@ export interface WorkItem {
   problem_solved: string
   result: string
   impact: string
+  // 快捷录入字段（manual 必填，ai 为 null）
+  activity?: string | null
+  start_time?: string | null
+  end_time?: string | null
+  quadrant?: Quadrant | null
+  source?: 'manual' | 'ai'
+}
+
+// 快捷录入新建输入
+export interface CreateQuickEntryInput {
+  activity: string
+  start_time: string
+  end_time: string
+  quadrant: Quadrant
+}
+
+// 快捷录入编辑输入（部分更新）
+export interface UpdateQuickEntryInput {
+  activity?: string
+  start_time?: string
+  end_time?: string
+  quadrant?: Quadrant
 }
 
 export interface WorkLog {
