@@ -311,3 +311,85 @@ export interface PomodoroTrendDay {
 export interface PomodoroTrendsResult {
   days: PomodoroTrendDay[]
 }
+
+// ── 工作日志 ──
+
+export interface WorkItem {
+  id: string
+  work_log_id: string
+  seq: number
+  title: string
+  content: string
+  problem_solved: string
+  result: string
+  impact: string
+}
+
+export interface WorkLog {
+  id: string
+  date: string
+  summary: string
+  raw_brain_dump: string
+  created_at: string
+  updated_at: string
+  items: WorkItem[]
+}
+
+export type WorkReportType = 'weekly' | 'monthly' | 'halfyear' | 'yearly'
+
+export interface WorkReport {
+  id: string
+  type: WorkReportType
+  period_key: string
+  start_date: string
+  end_date: string
+  summary_json: string
+  missing_days: string
+  created_at: string
+  updated_at: string
+}
+
+export interface TodayContext {
+  date: string
+  completed_tasks: Array<{ id: string; title: string }>
+  pomodoro_sessions: Array<{
+    id: string
+    task_id: string
+    task_title: string
+    started_at: string
+    minutes: number
+  }>
+  pomodoro_summary: { count: number; total_minutes: number }
+}
+
+export interface StructuredWorkLog {
+  items: Array<{
+    title: string
+    content: string
+    problem_solved: string
+    result: string
+    impact: string
+  }>
+  summary: string
+}
+
+export interface SaveWorkLogInput {
+  date: string
+  summary: string
+  raw_brain_dump: string
+  items: Array<{
+    seq: number
+    title: string
+    content: string
+    problem_solved: string
+    result: string
+    impact: string
+  }>
+}
+
+export interface ReportSummary {
+  core_work: string
+  main_progress: string
+  open_issues: string
+  next_focus: string
+}
