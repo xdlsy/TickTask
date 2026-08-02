@@ -1,0 +1,39 @@
+# WDS Project Outline - TickTask
+# Generated: 2026-05-24
+
+project:
+  name: TickTask
+  type: brownfield
+  product_complexity: complex
+  description: "个人任务管理工具，支持四象限视图、日历排程、计时器、数据分析"
+
+tech_stack:
+  frontend: "Vue 3 + Vite + Element Plus + Pinia"
+  backend: "Go"
+  database: "SQLite"
+
+design:
+  component_library: element-plus
+  skip_design_system: true
+
+configuration:
+  root_folder: docs
+  brief_level: complete
+  strategic_analysis: skip
+
+existing_materials:
+  has_materials: false
+
+project_context:
+  stakes: personal_hobby
+  documentation_style: minimal
+
+working_relationship:
+  involvement: balanced
+  role: product_owner
+  recommendation_style: recommend_with_rationale
+  communication_language: zh-CN
+
+phases:
+  brownfield:
+    - phase_8: product_evolution

@@ -1,0 +1,14 @@
+{
+  "date": "2026-05-25",
+  "tasks": [
+    {
+      "title": "Focus Block",
+      "description": "",
+      "estimated_minutes": 30,
+      "priority": "high",
+      "type": "shallow_work",
+      "fixed_time": null,
+      "deadline": null
+    }
+  ]
+}

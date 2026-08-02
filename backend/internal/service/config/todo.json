@@ -1,0 +1,23 @@
+{
+  "date": "2026-05-25",
+  "tasks": [
+    {
+      "title": "任务1",
+      "description": "",
+      "estimated_minutes": 30,
+      "priority": "high",
+      "type": "shallow_work",
+      "fixed_time": null,
+      "deadline": null
+    },
+    {
+      "title": "任务2",
+      "description": "",
+      "estimated_minutes": 30,
+      "priority": "high",
+      "type": "shallow_work",
+      "fixed_time": null,
+      "deadline": null
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(lsof -ti:*)",
+      "Bash(grep *)",
+      "Bash(sed *)",
+      "Bash(go *)",
+      "Bash(curl *)",
+      "Bash(python3 *)",
+      "Bash(chmod *)",
+      "Bash(cat *)",
+      "Bash(echo *)",
+      "Bash(find *)",
+      "Bash(ls *)",
+      "Bash(ps *)",
+      "Bash(rm *)",
+      "Bash(mkdir *)",
+      "Bash(tail *)",
+      "Bash(head *)",
+      "Bash(sleep *)",
+      "Bash(until *)",
+      "Bash(npx *)",
+      "Bash(npm *)",
+      "Bash(cd *)",
+      "Bash(make *)",
+      "Bash(sqlite3 *)",
+      "Skill(*)",
+      "Read(*)",
+      "Edit(*)",
+      "Write(*)",
+      "Bash(lsof -ti:8080 -ti:5173)",
+      "Bash(xxd internal/service/schedule_service.go)",
+      "Bash(sed -i '' 's/^\\\\t\\\\t\\\\t/\\\\t\\\\t/' schedule_service.go)",
+      "Bash(find ~/.claude -name \"*.jsonl\" -newer /Users/lsy/CodeHub/TickTask/backend/internal/service/schedule_service.go 2>/dev/null | head -5)",
+      "Read(//Users/lsy/.claude/**)",
+      "Bash(ls /Users/lsy/.claude/skills/bmad-create-epics-and-stories/templates/ 2>/dev/null)",
+      "Read(//Users/lsy/skills/bmad-create-epics-and-stories/templates/**)",
+      "Bash(xxd /Users/lsy/CodeHub/TickTask/config/schedule.ics)",
+      "Read(//Users/lsy/skills/bmad-quick-dev/**)",
+      "Bash(code -r . _bmad/implementation_artifacts/spec-fix-schedule-revision-null-events.md)",
+      "Bash(ls -la /Users/lsy/.claude/skills/bmad-prd/ 2>&1)",
+      "Read(//Users/lsy/skills/bmad-prd/**)",
+      "Bash(ls /Users/lsy/.claude/skills/bmad-create-architecture/)",
+      "Read(//Users/lsy/skills/bmad-create-architecture/**)",
+      "Read(//usr/local/**)",
+      "Read(//opt/homebrew/bin/**)",
+      "Bash(brew list *)",
+      "Bash(head -20 /Users/lsy/.claude/skills/bmad-story-automator/scripts/story-automator)",
+      "Read(//Users/lsy/skills/bmad-story-automator/scripts/**)",
+      "Bash(/Users/lsy/miniconda3/bin/python3.13 -c \"import tomllib; print\\('tomllib OK'\\)\")",
+      "Bash(PATH=/Users/lsy/.local/bin:__TRACKED_VAR__ python3 --version)",
+      "Bash(echo 'export PATH=\"/Users/lsy/.local/bin:$PATH\"' >> /Users/lsy/.zshrc && echo \"done\")",
+      "Bash(echo 'export PATH=\"/Users/lsy/.local/bin:$PATH\"' >> /Users/lsy/.zshenv 2>&1; echo \"EXIT:$?\")",
+      "Bash(/Users/lsy/.local/bin/python3 --version)",
+      "Bash(echo 'export PATH=\"/Users/lsy/.local/bin:$PATH\"' >> /Users/lsy/.zprofile 2>&1; echo \"EXIT:$?\")",
+      "Bash(PATH=/Users/lsy/.local/bin:__TRACKED_VAR__ bash /Users/lsy/.claude/skills/bmad-story-automator/scripts/story-automator ensure-stop-hook --settings /Users/lsy/CodeHub/TickTask/.claude/settings.json --command '/Users/lsy/.claude/skills/bmad-story-automator/scripts/story-automator stop-hook' --timeout 10)",
+      "Bash(/Users/lsy/.claude/skills/bmad-story-automator/scripts/story-automator ensure-stop-hook *)",
+      "Bash(PYTHONPATH=\"/Users/lsy/.claude/skills/bmad-story-automator/src\" /Users/lsy/miniconda3/bin/python3.13 -m story_automator ensure-stop-hook --settings \"/Users/lsy/CodeHub/TickTask/.claude/settings.json\" --command \"/Users/lsy/.claude/skills/bmad-story-automator/scripts/story-automator stop-hook\" --timeout 10)",
+      "Bash(pip3 install *)",
+      "Bash(/Users/lsy/miniconda3/bin/python3.13 --version)",
+      "Bash(mkdir -p /Users/lsy/CodeHub/TickTask/.claude/rules)",
+      "Bash(mkdir -p /Users/lsy/.claude/skills/aidoc-adapt-opencode)",
+      "Edit(~/.claude/skills/aidoc-adapt-opencode/**)"
+    ],
+    "additionalDirectories": [
+      "/Users/lsy",
+      "/Users/lsy/CodeHub/TickTask/.claude",
+      "/Users/lsy/.claude/skills"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "env PROJECT_ROOT=/Users/lsy/skills/bmad-story-automator /Users/lsy/skills/bmad-story-automator/scripts/story-automator stop-hook",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/scripts/aidoc-learning/activator.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
