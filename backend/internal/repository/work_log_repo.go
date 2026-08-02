@@ -98,6 +98,7 @@ func (r *workLogRepository) ReplaceItems(workLogID string, items []model.WorkIte
 			return err
 		}
 		for i := range items {
+			items[i].ID = uuid.New().String() // 生成新 UUID（GORM 不为 string PK 自动生成）
 			items[i].WorkLogID = workLogID
 		}
 		if len(items) > 0 {
