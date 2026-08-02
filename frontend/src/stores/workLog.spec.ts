@@ -12,6 +12,9 @@ vi.mock('@/api/client', () => ({
     generateWorkReport: vi.fn(),
     listWorkReports: vi.fn(),
     getWorkReport: vi.fn(),
+    appendWorkItem: vi.fn(),
+    updateWorkItem: vi.fn(),
+    deleteWorkItem: vi.fn(),
   },
 }))
 
@@ -42,6 +45,9 @@ beforeEach(() => {
   mockApi.createWorkLog.mockResolvedValue({})
   mockApi.updateWorkLog.mockResolvedValue({})
   mockApi.getWorkLog.mockResolvedValue({ data: { id: 'wl-1', date: '2026-08-02', items: [] } })
+  mockApi.appendWorkItem.mockResolvedValue({ data: {} })
+  mockApi.updateWorkItem.mockResolvedValue({ data: { ok: true } })
+  mockApi.deleteWorkItem.mockResolvedValue({ data: { ok: true } })
 })
 
 describe('WorkLog Store', () => {
@@ -169,5 +175,71 @@ describe('WorkLog Store', () => {
     store.selectNode({ kind: 'report', type: 'weekly', periodKey: '2026-W31' })
     expect(store.selected).toEqual({ kind: 'report', type: 'weekly', periodKey: '2026-W31' })
     expect(mockApi.getWorkReport).toHaveBeenCalledWith('weekly', '2026-W31')
+  })
+})
+
+describe('WorkLog Store - quick entry', () => {
+  beforeEach(() => {
+    // already covered by top-level beforeEach, but be explicit
+    mockApi.getWorkLog.mockResolvedValue({ data: { id: 'wl-1', date: '2026-08-02', items: [] } })
+  })
+
+  it('todayManualItems filters source=manual and sorts by start_time', () => {
+    setActivePinia(createPinia())
+    const store = useWorkLogStore()
+    store.currentLog = {
+      id: 'wl-1', date: '2026-08-02', summary: '', raw_brain_dump: '',
+      created_at: '', updated_at: '',
+      items: [
+        { id: '1', work_log_id: 'wl-1', seq: 1, title: '', content: '', problem_solved: '', result: '', impact: '', source: 'ai', activity: null, start_time: null, end_time: null, quadrant: null },
+        { id: '2', work_log_id: 'wl-1', seq: 2, title: '', content: '', problem_solved: '', result: '', impact: '', source: 'manual', activity: 'b', start_time: '10:00', end_time: '11:00', quadrant: 2 },
+        { id: '3', work_log_id: 'wl-1', seq: 3, title: '', content: '', problem_solved: '', result: '', impact: '', source: 'manual', activity: 'a', start_time: '09:00', end_time: '10:00', quadrant: 1 },
+      ],
+    } as any
+    const got = store.todayManualItems
+    expect(got).toHaveLength(2)
+    expect(got[0].id).toBe('3')  // 09:00 排前
+    expect(got[1].id).toBe('2')
+  })
+
+  it('addQuickEntry calls api and refetches currentLog', async () => {
+    setActivePinia(createPinia())
+    mockApi.appendWorkItem.mockResolvedValueOnce({ data: {} })
+    mockApi.getWorkLog.mockResolvedValueOnce({ data: { id: 'wl-1', date: '2026-08-02', items: [] } })
+    const store = useWorkLogStore()
+    await store.addQuickEntry('2026-08-02', {
+      activity: '晨会', start_time: '09:00', end_time: '10:00', quadrant: 1,
+    })
+    expect(mockApi.appendWorkItem).toHaveBeenCalledWith('2026-08-02', {
+      activity: '晨会', start_time: '09:00', end_time: '10:00', quadrant: 1,
+    })
+    expect(mockApi.getWorkLog).toHaveBeenCalledWith('2026-08-02')
+  })
+
+  it('updateQuickEntry calls api and refetches', async () => {
+    setActivePinia(createPinia())
+    mockApi.updateWorkItem.mockResolvedValueOnce({ data: { ok: true } })
+    mockApi.getWorkLog.mockResolvedValueOnce({ data: { id: 'wl-1', date: '2026-08-02', items: [] } })
+    const store = useWorkLogStore()
+    await store.updateQuickEntry('2026-08-02', 'item-1', { activity: 'new' })
+    expect(mockApi.updateWorkItem).toHaveBeenCalledWith('2026-08-02', 'item-1', { activity: 'new' })
+  })
+
+  it('deleteQuickEntry calls api and refetches', async () => {
+    setActivePinia(createPinia())
+    mockApi.deleteWorkItem.mockResolvedValueOnce({ data: { ok: true } })
+    mockApi.getWorkLog.mockResolvedValueOnce({ data: { id: 'wl-1', date: '2026-08-02', items: [] } })
+    const store = useWorkLogStore()
+    await store.deleteQuickEntry('2026-08-02', 'item-1')
+    expect(mockApi.deleteWorkItem).toHaveBeenCalledWith('2026-08-02', 'item-1')
+  })
+
+  it('addQuickEntry does not call getTodayContext on success', async () => {
+    setActivePinia(createPinia())
+    mockApi.appendWorkItem.mockResolvedValueOnce({ data: {} })
+    mockApi.getWorkLog.mockResolvedValueOnce({ data: { id: 'wl-1', date: '2026-08-02', items: [] } })
+    const store = useWorkLogStore()
+    await store.addQuickEntry('2026-08-02', { activity: 'x', start_time: '09:00', end_time: '10:00', quadrant: 1 })
+    expect(mockApi.getTodayContext).not.toHaveBeenCalled()
   })
 })

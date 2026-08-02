@@ -1,10 +1,11 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { api } from '@/api/client'
 import { ElMessage } from 'element-plus'
 import type {
   WorkLog, WorkReport, WorkReportType, TodayContext,
   StructuredWorkLog, SaveWorkLogInput,
+  CreateQuickEntryInput, UpdateQuickEntryInput,
 } from '@/types'
 
 export type SelectedNode =
@@ -21,6 +22,13 @@ export const useWorkLogStore = defineStore('workLog', () => {
   const currentReport = ref<WorkReport | null>(null)
   const selected = ref<SelectedNode | null>(null)
   const loading = ref(false)
+
+  const todayManualItems = computed(() => {
+    const items = currentLog.value?.items ?? []
+    return items
+      .filter(i => i.source === 'manual')
+      .sort((a, b) => (a.start_time ?? '').localeCompare(b.start_time ?? ''))
+  })
 
   async function fetchInitialRange() {
     loading.value = true
@@ -92,6 +100,39 @@ export const useWorkLogStore = defineStore('workLog', () => {
     }
   }
 
+  async function addQuickEntry(date: string, payload: CreateQuickEntryInput): Promise<boolean> {
+    try {
+      await api.appendWorkItem(date, payload)
+      await fetchLog(date) // 只刷新 WorkLog，不调 fetchTodayContext
+      return true
+    } catch (e: any) {
+      ElMessage.error('添加失败：' + (e?.response?.data?.error || e?.message || ''))
+      return false
+    }
+  }
+
+  async function updateQuickEntry(date: string, itemId: string, payload: UpdateQuickEntryInput): Promise<boolean> {
+    try {
+      await api.updateWorkItem(date, itemId, payload)
+      await fetchLog(date)
+      return true
+    } catch (e: any) {
+      ElMessage.error('更新失败：' + (e?.response?.data?.error || e?.message || ''))
+      return false
+    }
+  }
+
+  async function deleteQuickEntry(date: string, itemId: string): Promise<boolean> {
+    try {
+      await api.deleteWorkItem(date, itemId)
+      await fetchLog(date)
+      return true
+    } catch (e: any) {
+      ElMessage.error('删除失败：' + (e?.response?.data?.error || e?.message || ''))
+      return false
+    }
+  }
+
   async function generateReport(type: WorkReportType, periodKey?: string, force = false) {
     try {
       const { data } = await api.generateWorkReport(type, periodKey, force)
@@ -136,7 +177,9 @@ export const useWorkLogStore = defineStore('workLog', () => {
 
   return {
     logs, currentLog, todayContext, reports, currentReport, selected, loading,
+    todayManualItems,
     fetchInitialRange, fetchLog, fetchTodayContext, structureBrainDump,
     saveWorkLog, generateReport, fetchReports, fetchReport, selectNode,
+    addQuickEntry, updateQuickEntry, deleteQuickEntry,
   }
 })
