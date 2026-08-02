@@ -66,9 +66,10 @@ func main() {
 	// 初始化 Schedule Service
 	scheduleService := service.NewScheduleService(scheduleRepo, taskRepo, aiService, settingRepo, wsHub)
 
-	// 初始化 WorkLog Service（M1: AI client 传 nil，M2 接真实实现）
+	// 初始化 WorkLog Service（M2: AI client 接真实实现）
 	workLogRepo := repository.NewWorkLogRepository(db)
-	workLogService := service.NewWorkLogService(workLogRepo, taskRepo, sessionRepo, nil)
+	workLogAIClient := service.NewWorkLogAIClient(aiService)
+	workLogService := service.NewWorkLogService(workLogRepo, taskRepo, sessionRepo, workLogAIClient)
 
 	// 设置路由
 	router := api.SetupRouter(cfg, taskService, timerService, aiService, analyticsService, scheduleService, workLogService, wsHub, settingRepo)
