@@ -89,6 +89,22 @@ type GenerateReportInput struct {
 	Force     bool                  `json:"force"`
 }
 
+// CreateQuickEntryInput 快捷录入新增输入
+type CreateQuickEntryInput struct {
+	Activity  string `json:"activity"`
+	StartTime string `json:"start_time"`
+	EndTime   string `json:"end_time"`
+	Quadrant  int    `json:"quadrant"`
+}
+
+// UpdateQuickEntryInput 快捷录入编辑输入（指针 = 部分更新）
+type UpdateQuickEntryInput struct {
+	Activity  *string `json:"activity,omitempty"`
+	StartTime *string `json:"start_time,omitempty"`
+	EndTime   *string `json:"end_time,omitempty"`
+	Quadrant  *int    `json:"quadrant,omitempty"`
+}
+
 // ReportSummary 报告汇总结构（4 字段，所有报告 type 共用）
 type ReportSummary struct {
 	CoreWork     string `json:"core_work"`
@@ -504,6 +520,7 @@ func (s *WorkLogService) buildWorkLogFromInput(input SaveWorkLogInput) *model.Wo
 			ProblemSolved: it.ProblemSolved,
 			Result:        it.Result,
 			Impact:        it.Impact,
+			Source:        "ai",
 		})
 	}
 	return &model.WorkLog{
@@ -513,6 +530,107 @@ func (s *WorkLogService) buildWorkLogFromInput(input SaveWorkLogInput) *model.Wo
 		RawBrainDump: input.RawBrainDump,
 		Items:        items,
 	}
+}
+
+// AddQuickEntry 快捷录入：自动建 WorkLog（如不存在）+ 追加 manual item
+func (s *WorkLogService) AddQuickEntry(date string, in CreateQuickEntryInput) (*model.WorkItem, error) {
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		return nil, fmt.Errorf("invalid date: %w", err)
+	}
+	if in.StartTime >= in.EndTime {
+		return nil, errors.New("end_time must be after start_time")
+	}
+
+	log, err := s.repo.GetWorkLogByDate(date)
+	if err != nil && !errors.Is(err, repository.ErrNotFound) {
+		return nil, err
+	}
+	if log == nil {
+		log = &model.WorkLog{
+			ID:           s.idGenerator(),
+			Date:         date,
+			Summary:      "",
+			RawBrainDump: "",
+		}
+		if err := s.repo.CreateWorkLog(log); err != nil {
+			return nil, err
+		}
+	}
+
+	maxSeq := 0
+	for _, it := range log.Items {
+		if it.Seq > maxSeq {
+			maxSeq = it.Seq
+		}
+	}
+
+	item := model.WorkItem{
+		ID:        s.idGenerator(),
+		WorkLogID: log.ID,
+		Seq:       maxSeq + 1,
+		Activity:  &in.Activity,
+		StartTime: &in.StartTime,
+		EndTime:   &in.EndTime,
+		Quadrant:  &in.Quadrant,
+		Source:    "manual",
+	}
+	if err := s.repo.AppendItem(log.ID, item); err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+// UpdateQuickEntry 编辑快捷录入条目
+func (s *WorkLogService) UpdateQuickEntry(date string, itemID string, in UpdateQuickEntryInput) error {
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		return fmt.Errorf("invalid date: %w", err)
+	}
+	if in.StartTime != nil && in.EndTime != nil && *in.StartTime >= *in.EndTime {
+		return errors.New("end_time must be after start_time")
+	}
+
+	log, err := s.repo.GetWorkLogByDate(date)
+	if err != nil {
+		// WorkLog 不存在时，item 必然也不存在：归一化为 ErrItemNotFound，便于调用方分支处理
+		if errors.Is(err, repository.ErrNotFound) {
+			return repository.ErrItemNotFound
+		}
+		return err
+	}
+
+	updates := map[string]any{}
+	if in.Activity != nil {
+		updates["activity"] = *in.Activity
+	}
+	if in.StartTime != nil {
+		updates["start_time"] = *in.StartTime
+	}
+	if in.EndTime != nil {
+		updates["end_time"] = *in.EndTime
+	}
+	if in.Quadrant != nil {
+		updates["quadrant"] = *in.Quadrant
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	return s.repo.UpdateItem(log.ID, itemID, updates)
+}
+
+// DeleteQuickEntry 删除快捷录入条目
+func (s *WorkLogService) DeleteQuickEntry(date string, itemID string) error {
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		return fmt.Errorf("invalid date: %w", err)
+	}
+	log, err := s.repo.GetWorkLogByDate(date)
+	if err != nil {
+		// WorkLog 不存在时，item 必然也不存在：归一化为 ErrItemNotFound，便于调用方分支处理
+		if errors.Is(err, repository.ErrNotFound) {
+			return repository.ErrItemNotFound
+		}
+		return err
+	}
+	return s.repo.DeleteItem(log.ID, itemID)
 }
 
 // 确保 ReportSummary / TodayContext 能 JSON 序列化（避免 unused 警告）
