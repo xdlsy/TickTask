@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult } from '@/types'
+import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput } from '@/types'
 
 const client = axios.create({
   baseURL: '/api',
@@ -79,5 +79,21 @@ export const api = {
   generateScheduleFromTasks: (startTime?: string, endTime?: string) => client.post<{ events: ScheduleEvent[] }>('/schedules/generate', { start_time: startTime, end_time: endTime }, { timeout: 360000 }), // AI 整周生成可能需要 3-5 分钟
   deleteAllSchedules: () => client.delete<{ deleted: number }>('/schedules'),
   reviseSchedule: (prompt: string) => client.post<ReviseResponse>('/schedules/revise', { prompt }, { timeout: 360000 }),
-  applyRevision: () => client.post<{ applied: boolean; events: ScheduleEvent[] }>('/schedules/revise/apply')
+  applyRevision: () => client.post<{ applied: boolean; events: ScheduleEvent[] }>('/schedules/revise/apply'),
+
+  // 工作日志
+  getTodayContext: (date?: string) => client.get<TodayContext>('/work-logs/today/context', { params: { date } }),
+  structureBrainDump: (brain_dump: string, context: TodayContext) =>
+    client.post<StructuredWorkLog>('/work-logs/structure', { brain_dump, context }, { timeout: 120000 }),
+  listWorkLogs: (from: string, to: string) =>
+    client.get<{ logs: WorkLog[] }>('/work-logs', { params: { from, to } }),
+  getWorkLog: (date: string) => client.get<WorkLog>(`/work-logs/${date}`),
+  createWorkLog: (data: SaveWorkLogInput) => client.post<WorkLog>('/work-logs', data),
+  updateWorkLog: (date: string, data: SaveWorkLogInput) => client.put<WorkLog>(`/work-logs/${date}`, data),
+  generateWorkReport: (type: WorkReportType, period_key?: string, force = false) =>
+    client.post<WorkReport>('/work-reports/generate', { type, period_key, force }, { timeout: 180000 }),
+  listWorkReports: (type: WorkReportType) =>
+    client.get<{ reports: WorkReport[] }>('/work-reports', { params: { type } }),
+  getWorkReport: (type: WorkReportType, periodKey: string) =>
+    client.get<WorkReport>(`/work-reports/${type}/${periodKey}`)
 }
