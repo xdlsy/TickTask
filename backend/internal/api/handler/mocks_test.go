@@ -346,3 +346,167 @@ func (m *mockScheduleRepository) Move(id string, startTime, endTime time.Time) e
 	}
 	return repository.ErrNotFound
 }
+
+// mockWorkLogRepository implements repository.WorkLogRepository for testing
+type mockWorkLogRepository struct {
+	logs    map[string]*model.WorkLog
+	items   map[string]*model.WorkItem // itemID -> item
+	reports map[string]*model.WorkReport
+}
+
+func newMockWorkLogRepository() *mockWorkLogRepository {
+	return &mockWorkLogRepository{
+		logs:    make(map[string]*model.WorkLog),
+		items:   make(map[string]*model.WorkItem),
+		reports: make(map[string]*model.WorkReport),
+	}
+}
+
+func (m *mockWorkLogRepository) CreateWorkLog(log *model.WorkLog) error {
+	m.logs[log.Date] = log
+	for i := range log.Items {
+		m.items[log.Items[i].ID] = &log.Items[i]
+	}
+	return nil
+}
+
+func (m *mockWorkLogRepository) GetWorkLogByDate(date string) (*model.WorkLog, error) {
+	if log, ok := m.logs[date]; ok {
+		return log, nil
+	}
+	return nil, repository.ErrNotFound
+}
+
+func (m *mockWorkLogRepository) GetWorkLogsInRange(from, to string) ([]*model.WorkLog, error) {
+	var result []*model.WorkLog
+	for _, log := range m.logs {
+		if log.Date >= from && log.Date <= to {
+			result = append(result, log)
+		}
+	}
+	return result, nil
+}
+
+func (m *mockWorkLogRepository) UpsertWorkLog(log *model.WorkLog) error {
+	existing, ok := m.logs[log.Date]
+	if !ok {
+		m.logs[log.Date] = log
+		for i := range log.Items {
+			m.items[log.Items[i].ID] = &log.Items[i]
+		}
+		return nil
+	}
+	log.ID = existing.ID
+	// 关键不变式：只删 ai items
+	newItems := []model.WorkItem{}
+	for _, it := range existing.Items {
+		if it.Source == "manual" {
+			newItems = append(newItems, it)
+		} else {
+			delete(m.items, it.ID)
+		}
+	}
+	newItems = append(newItems, log.Items...)
+	log.Items = newItems
+	m.logs[log.Date] = log
+	for i := range log.Items {
+		m.items[log.Items[i].ID] = &log.Items[i]
+	}
+	return nil
+}
+
+func (m *mockWorkLogRepository) ReplaceItems(workLogID string, items []model.WorkItem) error {
+	return nil // 测试不依赖
+}
+
+func (m *mockWorkLogRepository) AppendItem(workLogID string, item model.WorkItem) error {
+	// 校验 WorkLog 存在
+	var found *model.WorkLog
+	for _, log := range m.logs {
+		if log.ID == workLogID {
+			found = log
+			break
+		}
+	}
+	if found == nil {
+		return repository.ErrNotFound
+	}
+	item.WorkLogID = workLogID
+	found.Items = append(found.Items, item)
+	m.items[item.ID] = &item
+	return nil
+}
+
+func (m *mockWorkLogRepository) UpdateItem(workLogID string, itemID string, updates map[string]any) error {
+	item, ok := m.items[itemID]
+	if !ok || item.WorkLogID != workLogID {
+		return repository.ErrItemNotFound
+	}
+	if item.Source != "manual" {
+		return repository.ErrItemNotEditable
+	}
+	if v, ok := updates["activity"]; ok {
+		s := v.(string)
+		item.Activity = &s
+	}
+	if v, ok := updates["start_time"]; ok {
+		s := v.(string)
+		item.StartTime = &s
+	}
+	if v, ok := updates["end_time"]; ok {
+		s := v.(string)
+		item.EndTime = &s
+	}
+	if v, ok := updates["quadrant"]; ok {
+		i := v.(int)
+		item.Quadrant = &i
+	}
+	return nil
+}
+
+func (m *mockWorkLogRepository) DeleteItem(workLogID string, itemID string) error {
+	item, ok := m.items[itemID]
+	if !ok || item.WorkLogID != workLogID {
+		return repository.ErrItemNotFound
+	}
+	if item.Source != "manual" {
+		return repository.ErrItemNotEditable
+	}
+	delete(m.items, itemID)
+	for _, log := range m.logs {
+		if log.ID == workLogID {
+			for i, it := range log.Items {
+				if it.ID == itemID {
+					log.Items = append(log.Items[:i], log.Items[i+1:]...)
+					break
+				}
+			}
+			break
+		}
+	}
+	return nil
+}
+
+func (m *mockWorkLogRepository) CreateWorkReport(report *model.WorkReport) error {
+	m.reports[string(report.Type)+":"+report.PeriodKey] = report
+	return nil
+}
+func (m *mockWorkLogRepository) UpdateWorkReport(report *model.WorkReport) error {
+	m.reports[string(report.Type)+":"+report.PeriodKey] = report
+	return nil
+}
+func (m *mockWorkLogRepository) GetWorkReportByTypeAndPeriod(t model.WorkReportType, periodKey string) (*model.WorkReport, error) {
+	if r, ok := m.reports[string(t)+":"+periodKey]; ok {
+		return r, nil
+	}
+	return nil, repository.ErrNotFound
+}
+func (m *mockWorkLogRepository) ListWorkReports(t model.WorkReportType) ([]*model.WorkReport, error) {
+	var result []*model.WorkReport
+	for _, r := range m.reports {
+		if r.Type == t {
+			result = append(result, r)
+		}
+	}
+	return result, nil
+}

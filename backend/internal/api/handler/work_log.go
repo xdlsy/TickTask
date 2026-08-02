@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"ticktask/internal/model"
+	"ticktask/internal/repository"
 	"ticktask/internal/service"
 )
 
@@ -198,4 +199,91 @@ func (h *WorkLogHandler) ListReports(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"reports": reports})
+}
+
+// ── 快捷录入端点 ──
+
+type createQuickEntryInput struct {
+	Activity  string `json:"activity" binding:"required"`
+	StartTime string `json:"start_time" binding:"required"`
+	EndTime   string `json:"end_time" binding:"required"`
+	Quadrant  int    `json:"quadrant" binding:"required,min=1,max=4"`
+}
+
+type updateQuickEntryInput struct {
+	Activity  *string `json:"activity,omitempty"`
+	StartTime *string `json:"start_time,omitempty"`
+	EndTime   *string `json:"end_time,omitempty"`
+	Quadrant  *int    `json:"quadrant,omitempty" binding:"omitempty,min=1,max=4"`
+}
+
+// AddQuickEntry POST /api/work-logs/:date/items
+func (h *WorkLogHandler) AddQuickEntry(c *gin.Context) {
+	date := c.Param("date")
+	var req createQuickEntryInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	item, err := h.svc.AddQuickEntry(date, service.CreateQuickEntryInput{
+		Activity:  req.Activity,
+		StartTime: req.StartTime,
+		EndTime:   req.EndTime,
+		Quadrant:  req.Quadrant,
+	})
+	if err != nil {
+		status := mapQuickEntryErrorStatus(err)
+		c.JSON(status, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, item)
+}
+
+// UpdateQuickEntry PATCH /api/work-logs/:date/items/:itemId
+func (h *WorkLogHandler) UpdateQuickEntry(c *gin.Context) {
+	date := c.Param("date")
+	itemID := c.Param("itemId")
+	var req updateQuickEntryInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	err := h.svc.UpdateQuickEntry(date, itemID, service.UpdateQuickEntryInput{
+		Activity:  req.Activity,
+		StartTime: req.StartTime,
+		EndTime:   req.EndTime,
+		Quadrant:  req.Quadrant,
+	})
+	if err != nil {
+		c.JSON(mapQuickEntryErrorStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// DeleteQuickEntry DELETE /api/work-logs/:date/items/:itemId
+func (h *WorkLogHandler) DeleteQuickEntry(c *gin.Context) {
+	date := c.Param("date")
+	itemID := c.Param("itemId")
+	if err := h.svc.DeleteQuickEntry(date, itemID); err != nil {
+		c.JSON(mapQuickEntryErrorStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func mapQuickEntryErrorStatus(err error) int {
+	if errors.Is(err, repository.ErrItemNotFound) {
+		return http.StatusNotFound
+	}
+	if errors.Is(err, repository.ErrItemNotEditable) {
+		return http.StatusForbidden
+	}
+	if strings.HasPrefix(err.Error(), "invalid date:") {
+		return http.StatusBadRequest
+	}
+	if err.Error() == "end_time must be after start_time" {
+		return http.StatusBadRequest
+	}
+	return http.StatusInternalServerError
 }

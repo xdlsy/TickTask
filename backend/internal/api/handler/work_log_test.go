@@ -407,3 +407,70 @@ func TestHandler_GetReport_Missing(t *testing.T) {
 		t.Errorf("code = %d, want 404", w.Code)
 	}
 }
+
+// ── Quick entry handler tests ──
+
+func TestAddQuickEntry_HandlerHappyPath(t *testing.T) {
+	repo := newMockWorkLogRepository()
+	svc := service.NewWorkLogService(repo, nil, nil, nil)
+	h := NewWorkLogHandler(svc)
+	r := gin.New()
+	r.POST("/api/work-logs/:date/items", h.AddQuickEntry)
+
+	body, _ := json.Marshal(map[string]any{
+		"activity": "晨会", "start_time": "09:00", "end_time": "10:00", "quadrant": 1,
+	})
+	req := httptest.NewRequest("POST", "/api/work-logs/2026-08-02/items", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp model.WorkItem
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Source != "manual" || resp.Activity == nil || *resp.Activity != "晨会" {
+		t.Fatalf("bad response: %+v", resp)
+	}
+}
+
+func TestAddQuickEntry_HandlerRejectsBadTime(t *testing.T) {
+	repo := newMockWorkLogRepository()
+	svc := service.NewWorkLogService(repo, nil, nil, nil)
+	h := NewWorkLogHandler(svc)
+	r := gin.New()
+	r.POST("/api/work-logs/:date/items", h.AddQuickEntry)
+
+	body, _ := json.Marshal(map[string]any{
+		"activity": "x", "start_time": "11:00", "end_time": "10:00", "quadrant": 1,
+	})
+	req := httptest.NewRequest("POST", "/api/work-logs/2026-08-02/items", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDeleteQuickEntry_HandlerReturns403ForAIItem(t *testing.T) {
+	repo := newMockWorkLogRepository()
+	svc := service.NewWorkLogService(repo, nil, nil, nil)
+	h := NewWorkLogHandler(svc)
+	r := gin.New()
+	r.DELETE("/api/work-logs/:date/items/:itemId", h.DeleteQuickEntry)
+
+	aiItem := model.WorkItem{ID: "ai-1", WorkLogID: "log-1", Source: "ai", Title: "x"}
+	repo.logs["2026-08-02"] = &model.WorkLog{ID: "log-1", Date: "2026-08-02", Items: []model.WorkItem{aiItem}}
+	repo.items["ai-1"] = &aiItem
+
+	req := httptest.NewRequest("DELETE", "/api/work-logs/2026-08-02/items/ai-1", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+}
