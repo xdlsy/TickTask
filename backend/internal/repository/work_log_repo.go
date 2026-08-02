@@ -19,6 +19,9 @@ type WorkLogRepository interface {
 
 	// WorkItem
 	ReplaceItems(workLogID string, items []model.WorkItem) error
+	AppendItem(workLogID string, item model.WorkItem) error
+	UpdateItem(workLogID string, itemID string, updates map[string]any) error
+	DeleteItem(workLogID string, itemID string) error
 
 	// WorkReport
 	CreateWorkReport(report *model.WorkReport) error
@@ -135,4 +138,53 @@ func (r *workLogRepository) ListWorkReports(t model.WorkReportType) ([]*model.Wo
 		return nil, err
 	}
 	return reports, nil
+}
+
+func (r *workLogRepository) AppendItem(workLogID string, item model.WorkItem) error {
+	var log model.WorkLog
+	err := r.db.Where("id = ?", workLogID).First(&log).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if item.ID == "" {
+		item.ID = uuid.New().String()
+	}
+	item.WorkLogID = workLogID
+	return r.db.Create(&item).Error
+}
+
+func (r *workLogRepository) UpdateItem(workLogID string, itemID string, updates map[string]any) error {
+	var existing model.WorkItem
+	err := r.db.Where("work_log_id = ? AND id = ?", workLogID, itemID).First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrItemNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if existing.Source != "manual" {
+		return ErrItemNotEditable
+	}
+	return r.db.Model(&model.WorkItem{}).
+		Where("id = ? AND work_log_id = ?", itemID, workLogID).
+		Updates(updates).Error
+}
+
+func (r *workLogRepository) DeleteItem(workLogID string, itemID string) error {
+	var existing model.WorkItem
+	err := r.db.Where("work_log_id = ? AND id = ?", workLogID, itemID).First(&existing).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrItemNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if existing.Source != "manual" {
+		return ErrItemNotEditable
+	}
+	return r.db.Where("id = ? AND work_log_id = ?", itemID, workLogID).
+		Delete(&model.WorkItem{}).Error
 }
