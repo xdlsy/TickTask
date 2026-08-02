@@ -14,7 +14,6 @@ type WorkLogRepository interface {
 	CreateWorkLog(log *model.WorkLog) error
 	GetWorkLogByDate(date string) (*model.WorkLog, error)
 	GetWorkLogsInRange(from, to string) ([]*model.WorkLog, error)
-	UpdateWorkLog(log *model.WorkLog) error
 	UpsertWorkLog(log *model.WorkLog) error // PUT 语义：存在则更新 items 全量替换，否则创建
 
 	// WorkItem
@@ -26,9 +25,6 @@ type WorkLogRepository interface {
 	GetWorkReportByTypeAndPeriod(t model.WorkReportType, periodKey string) (*model.WorkReport, error)
 	ListWorkReports(t model.WorkReportType) ([]*model.WorkReport, error)
 }
-
-// ErrWorkLogNotFound 复用既有 ErrNotFound
-var ErrWorkLogNotFound = ErrNotFound
 
 type workLogRepository struct {
 	db *gorm.DB
@@ -44,9 +40,9 @@ func (r *workLogRepository) CreateWorkLog(log *model.WorkLog) error {
 
 func (r *workLogRepository) GetWorkLogByDate(date string) (*model.WorkLog, error) {
 	var log model.WorkLog
-	err := r.db.Preload("Items", "seq > 0").Where("date = ?", date).First(&log).Error
+	err := r.db.Preload("Items").Where("date = ?", date).First(&log).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrWorkLogNotFound
+		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
@@ -56,7 +52,7 @@ func (r *workLogRepository) GetWorkLogByDate(date string) (*model.WorkLog, error
 
 func (r *workLogRepository) GetWorkLogsInRange(from, to string) ([]*model.WorkLog, error) {
 	var logs []*model.WorkLog
-	err := r.db.Preload("Items", "seq > 0").
+	err := r.db.Preload("Items").
 		Where("date BETWEEN ? AND ?", from, to).
 		Order("date DESC").
 		Find(&logs).Error
@@ -64,10 +60,6 @@ func (r *workLogRepository) GetWorkLogsInRange(from, to string) ([]*model.WorkLo
 		return nil, err
 	}
 	return logs, nil
-}
-
-func (r *workLogRepository) UpdateWorkLog(log *model.WorkLog) error {
-	return r.db.Save(log).Error
 }
 
 func (r *workLogRepository) UpsertWorkLog(log *model.WorkLog) error {
@@ -126,7 +118,7 @@ func (r *workLogRepository) GetWorkReportByTypeAndPeriod(t model.WorkReportType,
 	var report model.WorkReport
 	err := r.db.Where("type = ? AND period_key = ?", t, periodKey).First(&report).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrWorkLogNotFound
+		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
