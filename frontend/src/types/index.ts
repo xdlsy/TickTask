@@ -397,7 +397,6 @@ export interface TodayContext {
 
 export interface StructuredWorkLog {
   items: Array<{
-    title?: string // 废弃，待旧组件删除后移除
     content: string
     problem_solved: string
     result: string
