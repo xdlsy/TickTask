@@ -54,7 +54,6 @@ export interface PomodoroSettings {
   enable_sound: boolean
   buffer_ratio: number
   task_time_preferences: string
-  scheduling_strategy: string
 }
 
 export interface QuadrantInfo {
@@ -149,7 +148,6 @@ export interface AISettings {
   api_key: string
   base_url: string
   model: string
-  cli_tool: string
 }
 
 // 任务时间统计

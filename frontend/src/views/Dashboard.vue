@@ -153,7 +153,7 @@ const timerStore = useTimerStore()
 const aiStore = useAIStore()
 
 defineEmits<{
-  'edit-task': [task: Task]
+  'edit-task': [task: TaskResponse]
   'complete-task': [id: string]
   'delete-task': [id: string]
   'start-timer': []
