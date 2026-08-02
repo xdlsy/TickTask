@@ -46,7 +46,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { DataBoard, Timer, List, Calendar, TrendCharts, Setting } from '@element-plus/icons-vue'
+import { DataBoard, Timer, List, Calendar, TrendCharts, Setting, Document } from '@element-plus/icons-vue'
 import { useTimerStore } from '@/stores/timer'
 import { useAIStore } from '@/stores/ai'
 import { wsClient } from '@/utils/websocket'
@@ -69,6 +69,7 @@ const navItems = [
   { path: '/tasks', name: 'tasks', label: '任务', icon: List },
   { path: '/schedule', name: 'schedule', label: '日程', icon: Calendar },
   { path: '/analytics', name: 'analytics', label: '分析', icon: TrendCharts },
+  { path: '/work-log', name: 'work-log', label: '工作日志', icon: Document },
   { path: '/settings', name: 'settings', label: '设置', icon: Setting },
 ]
 
