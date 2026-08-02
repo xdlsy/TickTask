@@ -80,8 +80,8 @@ func (r *workLogRepository) UpsertWorkLog(log *model.WorkLog) error {
 		if err := tx.Save(log).Error; err != nil {
 			return err
 		}
-		// items 全量替换
-		if err := tx.Where("work_log_id = ?", log.ID).Delete(&model.WorkItem{}).Error; err != nil {
+		// 关键不变式：只删除 ai items，保留 manual items（快捷录入）
+		if err := tx.Where("work_log_id = ? AND source = ?", log.ID, "ai").Delete(&model.WorkItem{}).Error; err != nil {
 			return err
 		}
 		for i := range log.Items {
@@ -97,7 +97,8 @@ func (r *workLogRepository) UpsertWorkLog(log *model.WorkLog) error {
 
 func (r *workLogRepository) ReplaceItems(workLogID string, items []model.WorkItem) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("work_log_id = ?", workLogID).Delete(&model.WorkItem{}).Error; err != nil {
+		// 保留 manual items（虽然 ReplaceItems 当前只被 AI 流程内部调用，仍守不变式）
+		if err := tx.Where("work_log_id = ? AND source = ?", workLogID, "ai").Delete(&model.WorkItem{}).Error; err != nil {
 			return err
 		}
 		for i := range items {

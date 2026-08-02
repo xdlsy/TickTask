@@ -263,3 +263,50 @@ func TestDeleteItem_AIItemReturnsErrItemNotEditable(t *testing.T) {
 		t.Fatalf("expected ErrItemNotEditable, got %v", err)
 	}
 }
+
+func TestUpsertWorkLog_PreservesManualItems(t *testing.T) {
+	db := newTestDB(t)
+	repo := NewWorkLogRepository(db)
+	// Step 1: 建一个含 manual item 的 WorkLog
+	log1 := &model.WorkLog{
+		ID:    uuid.New().String(),
+		Date:  "2026-08-02",
+		Items: []model.WorkItem{
+			{Activity: strPtr("晨会"), StartTime: strPtr("09:00"), EndTime: strPtr("10:00"), Quadrant: intPtr(1), Source: "manual", Seq: 1},
+		},
+	}
+	if err := repo.CreateWorkLog(log1); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	// Step 2: UpsertWorkLog 来一波 ai items（模拟用户跑了 AI 流程）
+	aiLog := &model.WorkLog{
+		ID:    log1.ID,
+		Date:  "2026-08-02",
+		Items: []model.WorkItem{
+			{Title: "ai-item-1", Source: "ai", Seq: 1},
+			{Title: "ai-item-2", Source: "ai", Seq: 2},
+		},
+	}
+	if err := repo.UpsertWorkLog(aiLog); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+	got, err := repo.GetWorkLogByDate("2026-08-02")
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	// Critical invariant: manual item 必须保留 + ai items 也存在
+	manualCount, aiCount := 0, 0
+	for _, it := range got.Items {
+		if it.Source == "manual" {
+			manualCount++
+		} else {
+			aiCount++
+		}
+	}
+	if manualCount != 1 {
+		t.Fatalf("manual items wiped! expected 1, got %d (items: %+v)", manualCount, got.Items)
+	}
+	if aiCount != 2 {
+		t.Fatalf("ai items wrong: expected 2, got %d", aiCount)
+	}
+}
