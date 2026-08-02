@@ -35,6 +35,9 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.Setting{},
 		&model.DailyStats{},
 		&model.Schedule{},
+		&model.WorkLog{},
+		&model.WorkItem{},
+		&model.WorkReport{},
 	)
 }
 
