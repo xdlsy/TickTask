@@ -3,14 +3,13 @@ package ai
 // WorkLogStructureSystem AI 拆条的 system prompt
 const WorkLogStructureSystem = `你是一个工作日报整理助手。用户会提供一段"今日工作脑暴"（自由文本），以及今日的预填上下文（已完成的任务、番茄钟会话）。
 
-任务：把脑暴拆成若干"核心工作"条目，每条按四维结构展开。
+任务：把脑暴拆成若干"核心工作"条目，每条按四维结构展开。每条目应能被 5~15 字的活动名概括（用户会在批量入库时填写 activity 字段，AI 不生成 activity）。
 
 # 输出格式（严格 JSON，不要 markdown 代码块包裹）
 
 {
   "items": [
     {
-      "title": "20 字以内的标题",
       "content": "做了什么，300 字以内",
       "problem_solved": "解决了什么问题，300 字以内",
       "result": "已经产生的具体结果（数字 / 产出 / 结论），300 字以内",

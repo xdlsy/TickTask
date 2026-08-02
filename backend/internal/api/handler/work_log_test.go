@@ -110,6 +110,10 @@ func (r *handlerTestRepo) DeleteItem(workLogID string, itemID string) error {
 	return errors.New("DeleteItem not supported in this mock")
 }
 
+func (r *handlerTestRepo) UpdateWorkLogSummary(date string, summary string) error {
+	return errors.New("UpdateWorkLogSummary not supported in this mock")
+}
+
 // ── Mock AI client for handler tests ──
 
 type handlerMockAIClient struct {
@@ -307,7 +311,7 @@ func TestHandler_Structure_EmptyBody(t *testing.T) {
 func TestHandler_Structure_Happy(t *testing.T) {
 	repo := newHandlerTestRepo()
 	ai := &handlerMockAIClient{structuredOut: &service.StructuredWorkLog{
-		Items:   []service.StructuredItem{{Title: "T1", Content: "c1"}},
+		Items:   []service.StructuredItem{{Content: "c1"}},
 		Summary: "今日小结",
 	}}
 	router := newTestWorkLogRouter(newHandlerService(repo, ai))

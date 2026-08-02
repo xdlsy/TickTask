@@ -49,9 +49,8 @@ type BrainDumpInput struct {
 	Context   TodayContext `json:"context"`
 }
 
-// StructuredItem AI 拆条输出的单条工作（四维）
+// StructuredItem AI 拆条输出的单条工作（4 维，无 title——activity 由用户在批量表中补齐）
 type StructuredItem struct {
-	Title         string `json:"title"`
 	Content       string `json:"content"`
 	ProblemSolved string `json:"problem_solved"`
 	Result        string `json:"result"`
@@ -239,9 +238,6 @@ func (s *WorkLogService) StructureBrainDump(input BrainDumpInput) (*StructuredWo
 		return nil, fmt.Errorf("%w: nil output", ErrAIStructureFailed)
 	}
 	for i := range out.Items {
-		if out.Items[i].Title == "" {
-			return nil, fmt.Errorf("%w: item[%d] missing title", ErrAIStructureFailed, i)
-		}
 		if out.Items[i].Content == "" {
 			out.Items[i].Content = "（待补充）"
 		}
@@ -523,7 +519,6 @@ func (s *WorkLogService) buildWorkLogFromInput(input SaveWorkLogInput) *model.Wo
 			ID:            s.idGenerator(),
 			WorkLogID:     logID,
 			Seq:           it.Seq,
-			Title:         it.Title,
 			Content:       it.Content,
 			ProblemSolved: it.ProblemSolved,
 			Result:        it.Result,

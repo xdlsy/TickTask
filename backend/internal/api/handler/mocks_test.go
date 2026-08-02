@@ -510,3 +510,13 @@ func (m *mockWorkLogRepository) ListWorkReports(t model.WorkReportType) ([]*mode
 	}
 	return result, nil
 }
+
+func (m *mockWorkLogRepository) UpdateWorkLogSummary(date string, summary string) error {
+	for _, log := range m.logs {
+		if log.Date == date {
+			log.Summary = summary
+			return nil
+		}
+	}
+	return repository.ErrNotFound
+}

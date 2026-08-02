@@ -277,17 +277,6 @@ func TestUpdateWorkLog_FullReplace(t *testing.T) {
 
 // ── Tests: StructureBrainDump ──
 
-func TestStructureBrainDump_NoTitle_Fails(t *testing.T) {
-	svc, _, ai := newServiceForTest()
-	ai.structuredOut = &StructuredWorkLog{
-		Items: []StructuredItem{{Content: "no title"}},
-	}
-	_, err := svc.StructureBrainDump(BrainDumpInput{BrainDump: "x"})
-	if !errors.Is(err, ErrAIStructureFailed) {
-		t.Errorf("err = %v, want ErrAIStructureFailed", err)
-	}
-}
-
 func TestStructureBrainDump_NilOutput_Fails(t *testing.T) {
 	svc, _, ai := newServiceForTest()
 	ai.structuredOut = nil
@@ -309,7 +298,7 @@ func TestStructureBrainDump_AIClientErr_Fails(t *testing.T) {
 func TestStructureBrainDump_FillsPendingForMissingDims(t *testing.T) {
 	svc, _, ai := newServiceForTest()
 	ai.structuredOut = &StructuredWorkLog{
-		Items: []StructuredItem{{Title: "T1", Content: "c1"}},
+		Items: []StructuredItem{{Content: "c1"}},
 	}
 	out, err := svc.StructureBrainDump(BrainDumpInput{BrainDump: "x"})
 	if err != nil {
