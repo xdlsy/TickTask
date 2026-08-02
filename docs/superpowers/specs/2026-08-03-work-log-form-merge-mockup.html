@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>工作日志 · 合并表单排版对比</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg-primary: #FAF9F6;
+      --bg-secondary: #F5F2ED;
+      --bg-card: #FFFEFC;
+      --bg-card-hover: #FDFBF8;
+      --bg-elevated: #FFFFFE;
+      --border-color: rgba(0, 0, 0, 0.06);
+      --border-accent: rgba(0, 0, 0, 0.10);
+      --text-primary: #1C1B1A;
+      --text-secondary: #6E6A65;
+      --text-muted: #9C9893;
+      --accent-primary: #B8452C;
+      --accent-secondary: #C9604A;
+      --accent-tertiary: #D98A75;
+      --accent-sage: #6B8B6F;
+      --accent-gold: #B8954D;
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 48px 24px 80px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .container { max-width: 1080px; margin: 0 auto; }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+      margin: 0 0 8px 0;
+    }
+    .subtitle {
+      color: var(--text-secondary);
+      margin: 0 0 8px 0;
+      font-size: 14px;
+    }
+    .legend {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      margin: 20px 0 48px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .legend-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .dot-required { background: var(--accent-primary); }
+    .dot-optional { background: var(--text-muted); }
+
+    .option-block { margin-bottom: 56px; }
+    .option-header {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+    .option-number {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent-primary);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border: 1px solid var(--accent-primary);
+      border-radius: var(--radius-sm);
+    }
+    .option-number.muted {
+      color: var(--text-muted);
+      border-color: var(--border-accent);
+    }
+    .option-title {
+      font-family: var(--font-display);
+      font-size: 24px;
+      font-weight: 600;
+    }
+    .option-desc {
+      color: var(--text-secondary);
+      font-size: 13px;
+      margin: 4px 0 20px 0;
+      max-width: 760px;
+      line-height: 1.65;
+    }
+
+    /* ========= shared form primitives ========= */
+    .form-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 24px;
+    }
+    .form-title {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 0 18px 0;
+      color: var(--text-primary);
+    }
+
+    .required-row {
+      display: grid;
+      grid-template-columns: 140px 1fr 240px 220px;
+      gap: 14px;
+      align-items: end;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 18px;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    .field-label.req::after {
+      content: ' *';
+      color: var(--accent-primary);
+    }
+    .field-input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-sm);
+      background: var(--bg-elevated);
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--text-primary);
+      height: 30px;
+      outline: none;
+    }
+    .field-input:focus { border-color: var(--accent-primary); }
+
+    .time-pair {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .time-pair .field-input { flex: 1; }
+    .time-dash { color: var(--text-muted); }
+
+    .quadrant-group {
+      display: flex;
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      height: 30px;
+    }
+    .quadrant-btn {
+      flex: 1;
+      background: var(--bg-elevated);
+      border: none;
+      border-right: 1px solid var(--border-accent);
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-family: var(--font-body);
+    }
+    .quadrant-btn:last-child { border-right: none; }
+    .quadrant-btn.active {
+      background: var(--accent-primary);
+      color: white;
+    }
+
+    textarea.field-input {
+      height: auto;
+      min-height: 60px;
+      resize: vertical;
+      padding: 8px 10px;
+      line-height: 1.55;
+      font-family: var(--font-body);
+    }
+
+    .add-btn {
+      background: var(--accent-primary);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 8px 22px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: var(--font-body);
+    }
+    .add-btn:hover { background: var(--accent-secondary); }
+
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 16px;
+    }
+
+    /* ========= A · 双列网格 ========= */
+    .layout-a .optional-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px 18px;
+    }
+
+    /* ========= B · 单栏日记流 ========= */
+    .layout-b .optional-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .layout-b .stack-field-label {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px dashed var(--border-color);
+    }
+
+    /* ========= C · 卡片分组 ========= */
+    .layout-c .optional-wrap {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 18px;
+    }
+    .layout-c .optional-wrap-title {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      font-weight: 500;
+    }
+    .layout-c .optional-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .layout-c .mini-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+    .layout-c .mini-card .field-input {
+      border: none;
+      background: transparent;
+      padding: 4px 0;
+      min-height: 50px;
+    }
+    .layout-c .mini-card .field-input:focus {
+      border: none;
+    }
+
+    .footer-note {
+      margin-top: 32px;
+      padding: 16px 20px;
+      background: var(--bg-card);
+      border-left: 3px solid var(--accent-primary);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>添加工作内容 · 表单排版对比</h1>
+    <p class="subtitle">合并 QuickEntryForm + WorkItemEditor。3 个候选布局，复用项目设计令牌。</p>
+
+    <div class="legend">
+      <span class="legend-tag"><span class="legend-dot dot-required"></span>必填：日期 / 活动 / 时段 / 象限</span>
+      <span class="legend-tag"><span class="legend-dot dot-optional"></span>可选：内容 / 解决了什么问题 / 已产生的结果 / 对后续的影响</span>
+    </div>
+
+    <!-- ============== Layout A ============== -->
+    <div class="option-block layout-a">
+      <div class="option-header">
+        <span class="option-number">A · 推荐</span>
+        <span class="option-title">双列网格</span>
+      </div>
+      <p class="option-desc">
+        必填一行 + 4 个可选字段 2×2 网格。与现有 WorkItemEditor 一致，紧凑、屏幕利用率最高。视觉密度适中，可选字段与必填字段用一条分隔线区分。
+      </p>
+      <div class="form-card">
+        <h3 class="form-title">添加工作内容</h3>
+        <div class="required-row">
+          <div class="field">
+            <span class="field-label req">日期</span>
+            <input class="field-input" value="2026-08-03" />
+          </div>
+          <div class="field">
+            <span class="field-label req">活动</span>
+            <input class="field-input" value="深度开发登录流程" />
+          </div>
+          <div class="field">
+            <span class="field-label req">时段</span>
+            <div class="time-pair">
+              <input class="field-input" value="09:00" />
+              <span class="time-dash">-</span>
+              <input class="field-input" value="10:30" />
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label req">象限</span>
+            <div class="quadrant-group">
+              <button class="quadrant-btn">Q1</button>
+              <button class="quadrant-btn active">Q2</button>
+              <button class="quadrant-btn">Q3</button>
+              <button class="quadrant-btn">Q4</button>
+            </div>
+          </div>
+        </div>
+        <div class="optional-grid">
+          <div class="field">
+            <span class="field-label">内容</span>
+            <textarea class="field-input" placeholder="一句话描述这次工作"></textarea>
+          </div>
+          <div class="field">
+            <span class="field-label">解决了什么问题</span>
+            <textarea class="field-input"></textarea>
+          </div>
+          <div class="field">
+            <span class="field-label">已产生的结果</span>
+            <textarea class="field-input"></textarea>
+          </div>
+          <div class="field">
+            <span class="field-label">对后续的影响</span>
+            <textarea class="field-input"></textarea>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="add-btn">+ 添加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== Layout B ============== -->
+    <div class="option-block layout-b">
+      <div class="option-header">
+        <span class="option-number muted">B</span>
+        <span class="option-title">单栏日记流</span>
+      </div>
+      <p class="option-desc">
+        必填一行 + 4 个可选字段竖直堆叠，每个字段以 Playfair Display 字体的小标题起始，下方虚线分隔。最符合"工作日志/日记"气质，编辑感最强。代价：纵向占用最大。
+      </p>
+      <div class="form-card">
+        <h3 class="form-title">添加工作内容</h3>
+        <div class="required-row">
+          <div class="field">
+            <span class="field-label req">日期</span>
+            <input class="field-input" value="2026-08-03" />
+          </div>
+          <div class="field">
+            <span class="field-label req">活动</span>
+            <input class="field-input" value="深度开发登录流程" />
+          </div>
+          <div class="field">
+            <span class="field-label req">时段</span>
+            <div class="time-pair">
+              <input class="field-input" value="09:00" />
+              <span class="time-dash">-</span>
+              <input class="field-input" value="10:30" />
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label req">象限</span>
+            <div class="quadrant-group">
+              <button class="quadrant-btn">Q1</button>
+              <button class="quadrant-btn active">Q2</button>
+              <button class="quadrant-btn">Q3</button>
+              <button class="quadrant-btn">Q4</button>
+            </div>
+          </div>
+        </div>
+        <div class="optional-stack">
+          <div>
+            <div class="stack-field-label">内容</div>
+            <textarea class="field-input" placeholder="一句话描述这次工作"></textarea>
+          </div>
+          <div>
+            <div class="stack-field-label">解决了什么问题</div>
+            <textarea class="field-input"></textarea>
+          </div>
+          <div>
+            <div class="stack-field-label">已产生的结果</div>
+            <textarea class="field-input"></textarea>
+          </div>
+          <div>
+            <div class="stack-field-label">对后续的影响</div>
+            <textarea class="field-input"></textarea>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="add-btn">+ 添加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== Layout C ============== -->
+    <div class="option-block layout-c">
+      <div class="option-header">
+        <span class="option-number muted">C</span>
+        <span class="option-title">卡片分组</span>
+      </div>
+      <p class="option-desc">
+        必填一行 + 可选字段包在外框中，每个字段独立小卡片（背景色区分）。视觉分区最明显，可选字段在视觉上"退后一步"。代价：卡嵌卡层次较多，与项目"极简"调性略有冲突。
+      </p>
+      <div class="form-card">
+        <h3 class="form-title">添加工作内容</h3>
+        <div class="required-row">
+          <div class="field">
+            <span class="field-label req">日期</span>
+            <input class="field-input" value="2026-08-03" />
+          </div>
+          <div class="field">
+            <span class="field-label req">活动</span>
+            <input class="field-input" value="深度开发登录流程" />
+          </div>
+          <div class="field">
+            <span class="field-label req">时段</span>
+            <div class="time-pair">
+              <input class="field-input" value="09:00" />
+              <span class="time-dash">-</span>
+              <input class="field-input" value="10:30" />
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label req">象限</span>
+            <div class="quadrant-group">
+              <button class="quadrant-btn">Q1</button>
+              <button class="quadrant-btn active">Q2</button>
+              <button class="quadrant-btn">Q3</button>
+              <button class="quadrant-btn">Q4</button>
+            </div>
+          </div>
+        </div>
+        <div class="optional-wrap">
+          <div class="optional-wrap-title">补充详情（可选）</div>
+          <div class="optional-grid">
+            <div class="mini-card">
+              <span class="field-label">内容</span>
+              <textarea class="field-input" placeholder="一句话描述"></textarea>
+            </div>
+            <div class="mini-card">
+              <span class="field-label">解决了什么问题</span>
+              <textarea class="field-input"></textarea>
+            </div>
+            <div class="mini-card">
+              <span class="field-label">已产生的结果</span>
+              <textarea class="field-input"></textarea>
+            </div>
+            <div class="mini-card">
+              <span class="field-label">对后续的影响</span>
+              <textarea class="field-input"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="add-btn">+ 添加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      <strong>说明：</strong>三个方案都使用相同的设计令牌（FAF9F6 背景、FFFEFC 卡片、B8452C 主色、Playfair Display 标题、DM Sans 正文）。
+      必填字段在所有方案中布局一致，区别仅在可选字段的呈现方式。本文件仅供方案对比参考，非实际代码。
+    </div>
+  </div>
+</body>
+</html>

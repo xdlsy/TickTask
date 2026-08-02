@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>工作日志 · 组件架构方案对比</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg-primary: #FAF9F6;
+      --bg-secondary: #F5F2ED;
+      --bg-card: #FFFEFC;
+      --bg-card-hover: #FDFBF8;
+      --bg-elevated: #FFFFFE;
+      --border-color: rgba(0, 0, 0, 0.06);
+      --border-accent: rgba(0, 0, 0, 0.10);
+      --text-primary: #1C1B1A;
+      --text-secondary: #6E6A65;
+      --text-muted: #9C9893;
+      --accent-primary: #B8452C;
+      --accent-secondary: #C9604A;
+      --accent-tertiary: #D98A75;
+      --accent-sage: #6B8B6F;
+      --accent-gold: #B8954D;
+      --font-display: 'Playfair Display', Georgia, serif;
+      --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 48px 24px 80px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+    .container { max-width: 1180px; margin: 0 auto; }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+      margin: 0 0 8px 0;
+    }
+    .subtitle {
+      color: var(--text-secondary);
+      margin: 0 0 32px 0;
+      font-size: 14px;
+    }
+    .intro {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 16px 20px;
+      margin-bottom: 48px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+    .intro strong { color: var(--text-primary); }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 22px;
+      font-weight: 600;
+      margin: 48px 0 8px 0;
+    }
+    .section-desc {
+      color: var(--text-secondary);
+      font-size: 13px;
+      margin: 0 0 20px 0;
+      max-width: 800px;
+      line-height: 1.7;
+    }
+
+    /* ========= form primitives (shared, similar to first mockup) ========= */
+    .form-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 20px;
+    }
+    .form-title {
+      font-family: var(--font-display);
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0 0 14px 0;
+      color: var(--text-primary);
+    }
+
+    .required-row {
+      display: grid;
+      grid-template-columns: 130px 1fr 220px 200px;
+      gap: 12px;
+      align-items: end;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 14px;
+    }
+    .compact .required-row {
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    .field-label.req::after {
+      content: ' *';
+      color: var(--accent-primary);
+    }
+    .field-input {
+      width: 100%;
+      padding: 5px 9px;
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-sm);
+      background: var(--bg-elevated);
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--text-primary);
+      height: 26px;
+      outline: none;
+    }
+    .field-input:focus { border-color: var(--accent-primary); }
+    .field-input.placeholder { color: var(--text-muted); font-style: italic; }
+    .field-input.pre-filled { color: var(--text-primary); }
+
+    .time-pair { display: flex; align-items: center; gap: 6px; }
+    .time-pair .field-input { flex: 1; }
+    .time-dash { color: var(--text-muted); }
+
+    .quadrant-group {
+      display: flex;
+      border: 1px solid var(--border-accent);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      height: 26px;
+    }
+    .quadrant-btn {
+      flex: 1;
+      background: var(--bg-elevated);
+      border: none;
+      border-right: 1px solid var(--border-accent);
+      font-size: 11px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-family: var(--font-body);
+    }
+    .quadrant-btn:last-child { border-right: none; }
+    .quadrant-btn.active {
+      background: var(--accent-primary);
+      color: white;
+    }
+
+    .optional-wrap {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px;
+    }
+    .optional-wrap-title {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      font-weight: 500;
+    }
+    .optional-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .mini-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+    }
+    .mini-text {
+      font-size: 12px;
+      color: var(--text-primary);
+      line-height: 1.5;
+      min-height: 32px;
+    }
+    .mini-text.muted { color: var(--text-muted); font-style: italic; }
+
+    .add-btn {
+      background: var(--accent-primary);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 7px 18px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: var(--font-body);
+    }
+    .add-btn:hover { background: var(--accent-secondary); }
+    .add-btn.secondary {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-accent);
+    }
+    .add-btn.secondary:hover {
+      border-color: var(--accent-primary);
+      color: var(--accent-primary);
+      background: transparent;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    /* ========= page-layout wrapper ========= */
+    .page-mock {
+      background: var(--bg-primary);
+      padding: 8px 0;
+    }
+    .panorama-mock {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px 18px;
+      margin: 14px 0;
+      font-size: 12px;
+    }
+    .panorama-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 600;
+      margin: 0 0 8px 0;
+    }
+    .panorama-row {
+      display: grid;
+      grid-template-columns: 100px 1fr 100px 100px;
+      gap: 10px;
+      padding: 5px 0;
+      color: var(--text-secondary);
+      border-top: 1px dashed var(--border-color);
+    }
+    .panorama-row:first-of-type { border-top: none; }
+    .panorama-edit-link {
+      color: var(--accent-primary);
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    .brain-dump-mock {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      margin: 14px 0;
+      font-size: 12px;
+    }
+    .brain-dump-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .brain-dump-text {
+      color: var(--text-muted);
+      font-style: italic;
+      min-height: 40px;
+    }
+
+    /* ========= variant blocks ========= */
+    .option-block {
+      margin-top: 32px;
+      padding: 24px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+    }
+    .option-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .option-number {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--accent-primary);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border: 1px solid var(--accent-primary);
+      border-radius: var(--radius-sm);
+    }
+    .option-number.muted {
+      color: var(--text-muted);
+      border-color: var(--border-accent);
+    }
+    .option-title {
+      font-family: var(--font-display);
+      font-size: 19px;
+      font-weight: 600;
+    }
+    .option-desc {
+      color: var(--text-secondary);
+      font-size: 12.5px;
+      margin: 4px 0 18px 0;
+      line-height: 1.7;
+    }
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px dashed var(--border-color);
+    }
+    .pros-cons > div { font-size: 12px; }
+    .pros-cons h4 {
+      margin: 0 0 6px 0;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      font-family: var(--font-body);
+    }
+    .pros h4 { color: var(--accent-sage); }
+    .cons h4 { color: var(--accent-primary); }
+    .pros-cons ul {
+      margin: 0;
+      padding-left: 16px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+
+    /* ========= simplified batch row (variant B) ========= */
+    .batch-compact-row {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .batch-compact-header {
+      display: grid;
+      grid-template-columns: 110px 1fr 220px 180px 28px;
+      gap: 10px;
+      align-items: end;
+    }
+    .batch-compact-optional {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--bg-secondary);
+      border-radius: var(--radius-sm);
+    }
+    .batch-compact-optional .field-label {
+      font-size: 9px;
+      margin-bottom: 2px;
+      display: block;
+    }
+    .batch-compact-optional .mini-text {
+      font-size: 11px;
+      min-height: 24px;
+      line-height: 1.4;
+    }
+    .remove-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 4px;
+    }
+    .remove-btn:hover { color: var(--accent-primary); }
+
+    /* ========= table-style batch (variant C) ========= */
+    .batch-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11.5px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .batch-table th, .batch-table td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .batch-table th {
+      background: var(--bg-secondary);
+      font-weight: 500;
+      color: var(--text-muted);
+      font-size: 10px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    .batch-table tr:last-child td { border-bottom: none; }
+    .batch-table .cell-input {
+      border: none;
+      background: transparent;
+      padding: 2px 4px;
+      font-family: var(--font-body);
+      font-size: 11.5px;
+      width: 100%;
+      outline: none;
+      color: var(--text-primary);
+    }
+    .batch-table .cell-input:focus {
+      background: var(--bg-elevated);
+      border: 1px solid var(--accent-primary);
+      border-radius: 2px;
+    }
+    .batch-table .cell-input.pre-filled { color: var(--text-primary); }
+    .batch-table .cell-input.muted { color: var(--text-muted); font-style: italic; }
+    .batch-table .quad-cell {
+      display: flex;
+      gap: 3px;
+    }
+    .batch-table .quad-mini {
+      width: 22px;
+      height: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border-accent);
+      font-size: 10px;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .batch-table .quad-mini.active {
+      background: var(--accent-primary);
+      color: white;
+      border-color: var(--accent-primary);
+    }
+
+    /* ========= edit-mode callout ========= */
+    .edit-callout {
+      margin-top: 16px;
+      padding: 12px 16px;
+      background: var(--bg-secondary);
+      border-left: 3px solid var(--accent-gold);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+    .edit-callout strong { color: var(--text-primary); }
+
+    .footer-note {
+      margin-top: 48px;
+      padding: 16px 20px;
+      background: var(--bg-card);
+      border-left: 3px solid var(--accent-primary);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>组件架构方案 · AI 批量列表的呈现</h1>
+    <p class="subtitle">三个候选方案。主表单（顶部添加）所有方案一致；区别在 AI 拆条后的批量编辑列表。</p>
+
+    <div class="intro">
+      <strong>问题：</strong>用户脑暴输入 → AI 拆出 N 条 → 每条需要用户补齐 <em>日期/时段/活动/象限</em> 才能入库。
+      这 N 条的批量编辑界面怎么设计？下面 3 个候选视觉差距明显，背后对应不同的组件复用策略。
+    </div>
+
+    <!-- ============== 主表单（所有方案共用） ============== -->
+    <h2 class="section-title">主表单 · 所有方案一致</h2>
+    <p class="section-desc">
+      顶部"添加工作内容"表单。布局 C（卡片分组），必填 4 + 可选 4。所有方案的这部分完全相同，区别仅在下方 AI 批量列表。
+    </p>
+    <div class="page-mock">
+      <div class="form-card">
+        <h3 class="form-title">添加工作内容</h3>
+        <div class="required-row">
+          <div class="field">
+            <span class="field-label req">日期</span>
+            <input class="field-input pre-filled" value="2026-08-03" />
+          </div>
+          <div class="field">
+            <span class="field-label req">活动</span>
+            <input class="field-input placeholder" value="" placeholder="做了什么" />
+          </div>
+          <div class="field">
+            <span class="field-label req">时段</span>
+            <div class="time-pair">
+              <input class="field-input" value="09:00" />
+              <span class="time-dash">-</span>
+              <input class="field-input" value="10:00" />
+            </div>
+          </div>
+          <div class="field">
+            <span class="field-label req">象限</span>
+            <div class="quadrant-group">
+              <button class="quadrant-btn">Q1</button>
+              <button class="quadrant-btn active">Q2</button>
+              <button class="quadrant-btn">Q3</button>
+              <button class="quadrant-btn">Q4</button>
+            </div>
+          </div>
+        </div>
+        <div class="optional-wrap">
+          <div class="optional-wrap-title">补充详情（可选）</div>
+          <div class="optional-grid">
+            <div class="mini-card">
+              <span class="field-label">内容</span>
+              <div class="mini-text muted">一句话描述…</div>
+            </div>
+            <div class="mini-card">
+              <span class="field-label">解决了什么问题</span>
+              <div class="mini-text muted">…</div>
+            </div>
+            <div class="mini-card">
+              <span class="field-label">已产生的结果</span>
+              <div class="mini-text muted">…</div>
+            </div>
+            <div class="mini-card">
+              <span class="field-label">对后续的影响</span>
+              <div class="mini-text muted">…</div>
+            </div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="add-btn">+ 添加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== Variant A: 统一组件（每行 = 完整表单） ============== -->
+    <h2 class="section-title">AI 批量列表 · 三个候选</h2>
+
+    <div class="option-block">
+      <div class="option-header">
+        <span class="option-number">方案 1 · 推荐</span>
+        <span class="option-title">每行复用主表单（统一一个组件）</span>
+      </div>
+      <p class="option-desc">
+        AI 拆出的每条都呈现为主表单的复制品：完整布局 C，必填字段空着等用户填，可选字段已由 AI 预填。
+        顶部用一条 "AI 草稿 (2)" 标题分隔。一个 <code>WorkItemForm.vue</code> 用在三个位置：添加 / 批量 / 编辑。
+      </p>
+
+      <div class="page-mock">
+        <div class="form-card" style="border-color: var(--accent-tertiary); background: var(--bg-card-hover);">
+          <h3 class="form-title">AI 草稿 · 待补齐 (2 条)</h3>
+
+          <!-- 草稿条 1 -->
+          <div class="form-card compact" style="margin-bottom: 10px;">
+            <div class="required-row">
+              <div class="field">
+                <span class="field-label req">日期</span>
+                <input class="field-input pre-filled" value="2026-08-03" />
+              </div>
+              <div class="field">
+                <span class="field-label req">活动</span>
+                <input class="field-input placeholder" placeholder="从 AI 内容提炼…" />
+              </div>
+              <div class="field">
+                <span class="field-label req">时段</span>
+                <div class="time-pair">
+                  <input class="field-input" value="09:00" />
+                  <span class="time-dash">-</span>
+                  <input class="field-input" value="10:00" />
+                </div>
+              </div>
+              <div class="field">
+                <span class="field-label req">象限</span>
+                <div class="quadrant-group">
+                  <button class="quadrant-btn">Q1</button>
+                  <button class="quadrant-btn active">Q2</button>
+                  <button class="quadrant-btn">Q3</button>
+                  <button class="quadrant-btn">Q4</button>
+                </div>
+              </div>
+            </div>
+            <div class="optional-wrap">
+              <div class="optional-wrap-title">补充详情（AI 已填）</div>
+              <div class="optional-grid">
+                <div class="mini-card">
+                  <span class="field-label">内容</span>
+                  <div class="mini-text">完成登录鉴权和 OAuth 联调</div>
+                </div>
+                <div class="mini-card">
+                  <span class="field-label">解决了什么问题</span>
+                  <div class="mini-text">第三方回调失败和 token 刷新逻辑漏洞</div>
+                </div>
+                <div class="mini-card">
+                  <span class="field-label">已产生的结果</span>
+                  <div class="mini-text">登录成功率从 78% 提升到 99%</div>
+                </div>
+                <div class="mini-card">
+                  <span class="field-label">对后续的影响</span>
+                  <div class="mini-text">可释放出 2 个测试资源支持支付模块</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 草稿条 2 -->
+          <div class="form-card compact">
+            <div class="required-row">
+              <div class="field">
+                <span class="field-label req">日期</span>
+                <input class="field-input pre-filled" value="2026-08-03" />
+              </div>
+              <div class="field">
+                <span class="field-label req">活动</span>
+                <input class="field-input placeholder" placeholder="从 AI 内容提炼…" />
+              </div>
+              <div class="field">
+                <span class="field-label req">时段</span>
+                <div class="time-pair">
+                  <input class="field-input" value="10:00" />
+                  <span class="time-dash">-</span>
+                  <input class="field-input" value="11:00" />
+                </div>
+              </div>
+              <div class="field">
+                <span class="field-label req">象限</span>
+                <div class="quadrant-group">
+                  <button class="quadrant-btn">Q1</button>
+                  <button class="quadrant-btn">Q2</button>
+                  <button class="quadrant-btn active">Q3</button>
+                  <button class="quadrant-btn">Q4</button>
+                </div>
+              </div>
+            </div>
+            <div class="optional-wrap">
+              <div class="optional-wrap-title">补充详情（AI 已填）</div>
+              <div class="optional-grid">
+                <div class="mini-card">
+                  <span class="field-label">内容</span>
+                  <div class="mini-text">回复客户邮件与团队站会</div>
+                </div>
+                <div class="mini-card">
+                  <span class="field-label">解决了什么问题</span>
+                  <div class="mini-text">客户对发布时间的疑问澄清</div>
+                </div>
+                <div class="mini-card">
+                  <span class="field-label">已产生的结果</span>
+                  <div class="mini-text">客户确认延后到下周三发布</div>
+                </div>
+                <div class="mini-card">
+                  <span class="field-label">对后续的影响</span>
+                  <div class="mini-text">本周可集中火力做支付模块</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="add-btn secondary">放弃草稿</button>
+            <button class="add-btn">批量入库 (2)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优点</h4>
+          <ul>
+            <li>一个组件三处复用，DRY</li>
+            <li>添加和批量编辑视觉一致，用户认知负担低</li>
+            <li>字段改动只需改一处</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>缺点</h4>
+          <ul>
+            <li>N 条草稿时整页很长，每条占用空间大</li>
+            <li>主表单和批量列表视觉"重复"，分不出主次</li>
+            <li>需要重构 3 个调用点</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== Variant B: 紧凑卡片行 ============== -->
+    <div class="option-block">
+      <div class="option-header">
+        <span class="option-number muted">方案 2</span>
+        <span class="option-title">每行紧凑卡片（必填优先 + 可选折叠）</span>
+      </div>
+      <p class="option-desc">
+        批量列表每行紧凑：顶部一条必填字段横向排列（日期/活动/时段/象限/删除），下方一条窄窄的可选区横向 4 列展示 AI 已填内容（只读或点击展开编辑）。
+        视觉上"必填是任务，可选拆是上下文"。可独立组件 <code>BatchItemRow.vue</code>。
+      </p>
+
+      <div class="page-mock">
+        <div class="form-card" style="border-color: var(--accent-tertiary); background: var(--bg-card-hover); padding: 14px 18px;">
+          <h3 class="form-title">AI 草稿 · 待补齐 (2 条)</h3>
+
+          <div class="batch-compact-row">
+            <div class="batch-compact-header">
+              <div class="field">
+                <span class="field-label req">日期</span>
+                <input class="field-input pre-filled" value="2026-08-03" />
+              </div>
+              <div class="field">
+                <span class="field-label req">活动</span>
+                <input class="field-input placeholder" placeholder="提炼活动名…" />
+              </div>
+              <div class="field">
+                <span class="field-label req">时段</span>
+                <div class="time-pair">
+                  <input class="field-input" value="09:00" />
+                  <span class="time-dash">-</span>
+                  <input class="field-input" value="10:00" />
+                </div>
+              </div>
+              <div class="field">
+                <span class="field-label req">象限</span>
+                <div class="quadrant-group">
+                  <button class="quadrant-btn">Q1</button>
+                  <button class="quadrant-btn active">Q2</button>
+                  <button class="quadrant-btn">Q3</button>
+                  <button class="quadrant-btn">Q4</button>
+                </div>
+              </div>
+              <button class="remove-btn" title="删除">×</button>
+            </div>
+            <div class="batch-compact-optional">
+              <div>
+                <span class="field-label">内容</span>
+                <div class="mini-text">完成登录鉴权和 OAuth 联调</div>
+              </div>
+              <div>
+                <span class="field-label">问题</span>
+                <div class="mini-text">回调失败和 token 漏洞</div>
+              </div>
+              <div>
+                <span class="field-label">结果</span>
+                <div class="mini-text">成功率 78% → 99%</div>
+              </div>
+              <div>
+                <span class="field-label">影响</span>
+                <div class="mini-text">释放 2 个测试资源</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="batch-compact-row">
+            <div class="batch-compact-header">
+              <div class="field">
+                <span class="field-label req">日期</span>
+                <input class="field-input pre-filled" value="2026-08-03" />
+              </div>
+              <div class="field">
+                <span class="field-label req">活动</span>
+                <input class="field-input placeholder" placeholder="提炼活动名…" />
+              </div>
+              <div class="field">
+                <span class="field-label req">时段</span>
+                <div class="time-pair">
+                  <input class="field-input" value="10:00" />
+                  <span class="time-dash">-</span>
+                  <input class="field-input" value="11:00" />
+                </div>
+              </div>
+              <div class="field">
+                <span class="field-label req">象限</span>
+                <div class="quadrant-group">
+                  <button class="quadrant-btn">Q1</button>
+                  <button class="quadrant-btn">Q2</button>
+                  <button class="quadrant-btn active">Q3</button>
+                  <button class="quadrant-btn">Q4</button>
+                </div>
+              </div>
+              <button class="remove-btn" title="删除">×</button>
+            </div>
+            <div class="batch-compact-optional">
+              <div>
+                <span class="field-label">内容</span>
+                <div class="mini-text">回复客户邮件与团队站会</div>
+              </div>
+              <div>
+                <span class="field-label">问题</span>
+                <div class="mini-text">客户发布时间疑问</div>
+              </div>
+              <div>
+                <span class="field-label">结果</span>
+                <div class="mini-text">延后到下周三发布</div>
+              </div>
+              <div>
+                <span class="field-label">影响</span>
+                <div class="mini-text">本周集中火力做支付</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="add-btn secondary">放弃草稿</button>
+            <button class="add-btn">批量入库 (2)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优点</h4>
+          <ul>
+            <li>每行紧凑，N 条也能一屏看完</li>
+            <li>必填字段视觉权重高，引导清晰</li>
+            <li>主表单和批量列表视觉上有主次之分</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>缺点</h4>
+          <ul>
+            <li>两个组件（WorkItemForm + BatchItemRow），需各自维护</li>
+            <li>可选字段在批量列表里是只读摘要，要细编辑得展开/弹窗</li>
+            <li>两套字段校验逻辑可能 drift</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== Variant C: 表格式批量 ============== -->
+    <div class="option-block">
+      <div class="option-header">
+        <span class="option-number muted">方案 3</span>
+        <span class="option-title">表格式批量编辑（Excel 风）</span>
+      </div>
+      <p class="option-desc">
+        把 N 条草稿展示成一张表，每行一条；列为 日期 / 时段 / 活动 / 象限 / 内容 / 问题 / 结果 / 影响。
+        必填列高亮、可选列稍淡。可独立组件 <code>BatchTableEditor.vue</code>。Excel 风批量编辑体验最熟。
+      </p>
+
+      <div class="page-mock">
+        <div class="form-card" style="border-color: var(--accent-tertiary); background: var(--bg-card-hover); padding: 14px 18px;">
+          <h3 class="form-title">AI 草稿 · 待补齐 (2 条)</h3>
+
+          <table class="batch-table">
+            <thead>
+              <tr>
+                <th style="width: 90px">日期</th>
+                <th style="width: 130px">时段</th>
+                <th>活动</th>
+                <th style="width: 110px">象限</th>
+                <th>内容</th>
+                <th>解决了什么问题</th>
+                <th>已产生的结果</th>
+                <th>对后续的影响</th>
+                <th style="width: 30px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><input class="cell-input pre-filled" value="2026-08-03" /></td>
+                <td><input class="cell-input" value="09:00-10:00" /></td>
+                <td><input class="cell-input muted" placeholder="提炼…" /></td>
+                <td>
+                  <div class="quad-cell">
+                    <span class="quad-mini">Q1</span>
+                    <span class="quad-mini active">Q2</span>
+                    <span class="quad-mini">Q3</span>
+                    <span class="quad-mini">Q4</span>
+                  </div>
+                </td>
+                <td><input class="cell-input pre-filled" value="完成登录鉴权和 OAuth 联调" /></td>
+                <td><input class="cell-input pre-filled" value="回调失败和 token 漏洞" /></td>
+                <td><input class="cell-input pre-filled" value="成功率 78% → 99%" /></td>
+                <td><input class="cell-input pre-filled" value="释放 2 个测试资源" /></td>
+                <td><button class="remove-btn">×</button></td>
+              </tr>
+              <tr>
+                <td><input class="cell-input pre-filled" value="2026-08-03" /></td>
+                <td><input class="cell-input" value="10:00-11:00" /></td>
+                <td><input class="cell-input muted" placeholder="提炼…" /></td>
+                <td>
+                  <div class="quad-cell">
+                    <span class="quad-mini">Q1</span>
+                    <span class="quad-mini">Q2</span>
+                    <span class="quad-mini active">Q3</span>
+                    <span class="quad-mini">Q4</span>
+                  </div>
+                </td>
+                <td><input class="cell-input pre-filled" value="回复客户邮件与团队站会" /></td>
+                <td><input class="cell-input pre-filled" value="客户发布时间疑问" /></td>
+                <td><input class="cell-input pre-filled" value="延后到下周三发布" /></td>
+                <td><input class="cell-input pre-filled" value="本周集中火力做支付" /></td>
+                <td><button class="remove-btn">×</button></td>
+              </tr>
+              <tr>
+                <td colspan="9" style="text-align: center; padding: 6px; color: var(--text-muted); cursor: pointer;">+ 加一条</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="actions">
+            <button class="add-btn secondary">放弃草稿</button>
+            <button class="add-btn">批量入库 (2)</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优点</h4>
+          <ul>
+            <li>N 条一屏看尽，扫描效率最高</li>
+            <li>列宽可调，长内容用 cell-input 横向滚</li>
+            <li>必填/可选列一目了然</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>缺点</h4>
+          <ul>
+            <li>长文本字段（影响/结果）在窄列里阅读体验差</li>
+            <li>移动端 / 窄屏不友好</li>
+            <li>独立组件，与主表单视觉差距最大</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============== 编辑入口说明 ============== -->
+    <h2 class="section-title">编辑入口 · 三方案一致</h2>
+    <p class="section-desc">
+      TodayPanorama 表里点"编辑"时，三种方案的编辑入口行为相同：把主表单切换为编辑态（替换顶部添加表单），表单内 8 个字段全部回填。
+      保存后立即落库，回到添加态。这部分不需要再分方案。
+    </p>
+    <div class="edit-callout">
+      <strong>交互流程：</strong> 今日全景表 → 点编辑 → 顶部"添加工作内容"表单变成"编辑工作内容"，所有字段回填 → 改完点保存 → 立即落库 → 回到添加态。
+      <br />
+      <strong>实现：</strong> WorkLog.vue 维护 <code>editingItemId</code> 状态（已有），三种方案都复用这个机制，无需新增组件。
+    </div>
+
+    <div class="footer-note">
+      <strong>说明：</strong>所有视觉使用项目设计令牌（FAF9F6 / FFFEFC / B8452C / Playfair Display / DM Sans）。
+      方案 1 视觉与主表单完全一致；方案 2 紧凑但仍卡片化；方案 3 表格式扫描效率最高但长文阅读差。
+      本文件仅供方案对比，非实际代码。
+    </div>
+  </div>
+</body>
+</html>
