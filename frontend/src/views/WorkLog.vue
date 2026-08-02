@@ -4,6 +4,7 @@
       <h1 class="page-title">工作日志</h1>
       <div class="page-actions">
         <button class="action-btn" @click="goToday">今日</button>
+        <ReportActions @generate="onGenerateReport" />
       </div>
     </div>
 
@@ -40,9 +41,9 @@
           </div>
         </template>
 
-        <!-- 报告视图（M5 完善） -->
+        <!-- 报告视图 -->
         <template v-else>
-          <div class="report-placeholder">报告详情视图将在 M5 实现</div>
+          <ReportDetail :report="store.currentReport" />
         </template>
       </div>
     </div>
@@ -56,7 +57,10 @@ import Timeline from '@/components/work-log/Timeline.vue'
 import TodayContextCard from '@/components/work-log/TodayContextCard.vue'
 import BrainDumpInput from '@/components/work-log/BrainDumpInput.vue'
 import WorkItemList from '@/components/work-log/WorkItemList.vue'
-import type { StructuredWorkLog, SaveWorkLogInput } from '@/types'
+import ReportActions from '@/components/work-log/ReportActions.vue'
+import ReportDetail from '@/components/work-log/ReportDetail.vue'
+import { ElMessageBox } from 'element-plus'
+import type { StructuredWorkLog, SaveWorkLogInput, WorkReportType } from '@/types'
 
 interface DraftItem {
   title: string
@@ -118,6 +122,51 @@ function goToday() {
   store.selectNode({ kind: 'log', date: currentDate.value })
 }
 
+function computePeriodKey(type: WorkReportType): string {
+  const now = new Date()
+  if (type === 'weekly') {
+    const tmp = new Date(now)
+    tmp.setHours(0, 0, 0, 0)
+    tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7))
+    const yearStart = new Date(tmp.getFullYear(), 0, 1)
+    const week = Math.ceil((((tmp.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+    return `${tmp.getFullYear()}-W${String(week).padStart(2, '0')}`
+  }
+  if (type === 'monthly') {
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  }
+  if (type === 'halfyear') {
+    return `${now.getFullYear()}-H${now.getMonth() < 6 ? 1 : 2}`
+  }
+  return `${now.getFullYear()}`
+}
+
+function labelOf(type: WorkReportType): string {
+  return { weekly: '周报', monthly: '月报', halfyear: '半年报', yearly: '年报' }[type]
+}
+
+async function onGenerateReport(type: WorkReportType) {
+  const periodKey = computePeriodKey(type)
+  try {
+    await store.generateReport(type, periodKey, false)
+    store.selectNode({ kind: 'report', type, periodKey })
+  } catch (e: any) {
+    if (e?.response?.status === 409) {
+      try {
+        await ElMessageBox.confirm(
+          `${labelOf(type)} ${periodKey} 已存在，是否覆盖重新生成？`,
+          '覆盖确认',
+          { confirmButtonText: '覆盖', cancelButtonText: '取消' },
+        )
+        await store.generateReport(type, periodKey, true)
+        store.selectNode({ kind: 'report', type, periodKey })
+      } catch {
+        // user cancelled
+      }
+    }
+  }
+}
+
 watch(currentDate, (d) => {
   store.fetchTodayContext(d)
 })
@@ -140,7 +189,15 @@ watch(() => store.currentLog, (log) => {
   draftSummary.value = log.summary
 })
 
-onMounted(loadInitial)
+onMounted(async () => {
+  await loadInitial()
+  await Promise.all([
+    store.fetchReports('weekly'),
+    store.fetchReports('monthly'),
+    store.fetchReports('halfyear'),
+    store.fetchReports('yearly'),
+  ])
+})
 </script>
 
 <style scoped>
