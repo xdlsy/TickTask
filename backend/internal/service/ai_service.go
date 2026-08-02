@@ -346,6 +346,17 @@ func (s *AIService) IsConfigured() bool {
 	return s.client != nil
 }
 
+// CallLLM 公共调用入口：拼装 system+user 提示，调用底层 LLM。
+// 专为 work_log_ai_client 等"只调 LLM、不复用业务逻辑"的调用方设计。
+// 若 client 未配置（无 API key），返回错误。
+func (s *AIService) CallLLM(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	if s.client == nil {
+		return "", fmt.Errorf("AI service not configured")
+	}
+	combined := systemPrompt + "\n\n" + userPrompt
+	return s.client.ChatCompletion(ctx, combined)
+}
+
 // 辅助函数
 
 func parseClassifyResponse(response string) (*ClassificationResult, error) {
