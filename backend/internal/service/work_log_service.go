@@ -277,9 +277,204 @@ func (s *WorkLogService) ListWorkLogs(from, to string) ([]*model.WorkLog, error)
 	return s.repo.GetWorkLogsInRange(from, to)
 }
 
-// GenerateReport 生成报告（M4 实现，M1 stub）
+// GenerateReport 生成周期报告
 func (s *WorkLogService) GenerateReport(input GenerateReportInput) (*model.WorkReport, error) {
-	return nil, errors.New("GenerateReport not implemented yet (M4)")
+	if s.aiClient == nil {
+		return nil, ErrAIStructureFailed
+	}
+	moment := time.Now()
+	if input.PeriodKey != "" {
+		m, err := parsePeriodKeyMoment(input.Type, input.PeriodKey)
+		if err != nil {
+			return nil, err
+		}
+		moment = m
+	}
+	start, end := RangeForType(input.Type, moment)
+	startStr, endStr := DateRangeToYMD(start, end)
+	periodKey := KeyForType(input.Type, moment)
+
+	existing, err := s.repo.GetWorkReportByTypeAndPeriod(input.Type, periodKey)
+	if err != nil && !errors.Is(err, repository.ErrNotFound) {
+		return nil, err
+	}
+	if existing != nil && !input.Force {
+		return existing, ErrReportAlreadyExists
+	}
+
+	var summary *ReportSummary
+	switch input.Type {
+	case model.ReportWeekly:
+		summary, err = s.generateWeekly(startStr, endStr)
+	case model.ReportMonthly:
+		summary, err = s.generateMonthly(start, end, startStr, endStr)
+	case model.ReportHalfYear:
+		summary, err = s.generateHalfYear(startStr, endStr)
+	case model.ReportYearly:
+		summary, err = s.generateYearly(startStr, endStr)
+	default:
+		return nil, fmt.Errorf("unknown report type: %s", input.Type)
+	}
+	if err != nil {
+		return nil, err
+	}
+	summaryJSON, err := json.Marshal(summary)
+	if err != nil {
+		return nil, fmt.Errorf("marshal summary: %w", err)
+	}
+
+	logs, err := s.repo.GetWorkLogsInRange(startStr, endStr)
+	if err != nil {
+		return nil, err
+	}
+	existDates := make([]string, 0, len(logs))
+	for _, l := range logs {
+		existDates = append(existDates, l.Date)
+	}
+	missing := MissingDays(start, end, existDates)
+
+	report := &model.WorkReport{
+		ID:          s.idGenerator(),
+		Type:        input.Type,
+		PeriodKey:   periodKey,
+		StartDate:   startStr,
+		EndDate:     endStr,
+		SummaryJSON: string(summaryJSON),
+		MissingDays: missing,
+	}
+
+	if existing != nil {
+		report.ID = existing.ID
+		report.CreatedAt = existing.CreatedAt
+		if err := s.repo.UpdateWorkReport(report); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := s.repo.CreateWorkReport(report); err != nil {
+			return nil, err
+		}
+	}
+	return report, nil
+}
+
+// parsePeriodKeyMoment 从 period key 反推一个代表日期（取周期开始日）
+func parsePeriodKeyMoment(t model.WorkReportType, key string) (time.Time, error) {
+	switch t {
+	case model.ReportWeekly:
+		var year, week int
+		if _, err := fmt.Sscanf(key, "%d-W%d", &year, &week); err != nil {
+			return time.Time{}, fmt.Errorf("bad weekly key: %s", key)
+		}
+		cursor := time.Date(year, 1, 1, 0, 0, 0, 0, time.Local)
+		for cursor.Year() <= year+1 {
+			cy, cw := cursor.ISOWeek()
+			if cy == year && cw == week {
+				return cursor, nil
+			}
+			cursor = cursor.AddDate(0, 0, 1)
+		}
+		return time.Time{}, fmt.Errorf("weekly key not found: %s", key)
+	case model.ReportMonthly:
+		t2, err := time.Parse("2006-01", key)
+		if err != nil {
+			return time.Time{}, fmt.Errorf("bad monthly key: %s", key)
+		}
+		return t2, nil
+	case model.ReportHalfYear:
+		var year int
+		var h string
+		if _, err := fmt.Sscanf(key, "%d-%s", &year, &h); err != nil {
+			return time.Time{}, fmt.Errorf("bad halfyear key: %s", key)
+		}
+		month := 1
+		if h == "H2" {
+			month = 7
+		}
+		return time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local), nil
+	case model.ReportYearly:
+		var year int
+		if _, err := fmt.Sscanf(key, "%d", &year); err != nil {
+			return time.Time{}, fmt.Errorf("bad yearly key: %s", key)
+		}
+		return time.Date(year, 1, 1, 0, 0, 0, 0, time.Local), nil
+	}
+	return time.Time{}, fmt.Errorf("unknown type: %s", t)
+}
+
+// INVARIANT: weekly 只读 work_items，不读 reports
+func (s *WorkLogService) generateWeekly(startStr, endStr string) (*ReportSummary, error) {
+	logs, err := s.repo.GetWorkLogsInRange(startStr, endStr)
+	if err != nil {
+		return nil, err
+	}
+	var items []model.WorkItem
+	for _, l := range logs {
+		items = append(items, l.Items...)
+	}
+	return s.aiClient.GenerateWeeklyReport(items, startStr, endStr)
+}
+
+// INVARIANT: monthly 只读 weekly 报告 + 月内不属于完整周的零散 items，不读所有原始 items
+func (s *WorkLogService) generateMonthly(start, end time.Time, startStr, endStr string) (*ReportSummary, error) {
+	weeklies, err := s.repo.ListWorkReports(model.ReportWeekly)
+	if err != nil {
+		return nil, err
+	}
+	var in []*model.WorkReport
+	for _, w := range weeklies {
+		if w.EndDate >= startStr && w.StartDate <= endStr {
+			in = append(in, w)
+		}
+	}
+	covered := make(map[string]bool)
+	for _, w := range in {
+		ws, _ := time.Parse("2006-01-02", w.StartDate)
+		we, _ := time.Parse("2006-01-02", w.EndDate)
+		for d := ws; !d.After(we); d = d.AddDate(0, 0, 1) {
+			covered[d.Format("2006-01-02")] = true
+		}
+	}
+	logs, err := s.repo.GetWorkLogsInRange(startStr, endStr)
+	if err != nil {
+		return nil, err
+	}
+	var orphans []model.WorkItem
+	for _, l := range logs {
+		if !covered[l.Date] {
+			orphans = append(orphans, l.Items...)
+		}
+	}
+	return s.aiClient.GenerateMonthlyReport(in, orphans, startStr, endStr)
+}
+
+// INVARIANT: halfyear 只读 monthly 报告，绝不读原始 items
+func (s *WorkLogService) generateHalfYear(startStr, endStr string) (*ReportSummary, error) {
+	monthlies, err := s.repo.ListWorkReports(model.ReportMonthly)
+	if err != nil {
+		return nil, err
+	}
+	var in []*model.WorkReport
+	for _, m := range monthlies {
+		if m.EndDate >= startStr && m.StartDate <= endStr {
+			in = append(in, m)
+		}
+	}
+	return s.aiClient.GenerateHalfYearReport(in, startStr, endStr)
+}
+
+// INVARIANT: yearly 只读 monthly 报告，绝不读原始 items 或 weekly 报告
+func (s *WorkLogService) generateYearly(startStr, endStr string) (*ReportSummary, error) {
+	monthlies, err := s.repo.ListWorkReports(model.ReportMonthly)
+	if err != nil {
+		return nil, err
+	}
+	var in []*model.WorkReport
+	for _, m := range monthlies {
+		if m.StartDate >= startStr && m.EndDate <= endStr {
+			in = append(in, m)
+		}
+	}
+	return s.aiClient.GenerateYearlyReport(in, startStr, endStr)
 }
 
 // GetReport 读报告
