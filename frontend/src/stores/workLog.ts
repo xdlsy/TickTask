@@ -133,6 +133,34 @@ export const useWorkLogStore = defineStore('workLog', () => {
     }
   }
 
+  async function addWorkItemsBatch(
+    date: string,
+    items: CreateQuickEntryInput[],
+  ): Promise<{ successCount: number; failureIndices: number[] }> {
+    const failureIndices: number[] = []
+    let successCount = 0
+    for (let i = 0; i < items.length; i++) {
+      try {
+        await api.appendWorkItem(date, items[i])
+        successCount++
+      } catch {
+        failureIndices.push(i)
+      }
+    }
+    if (successCount > 0) {
+      await fetchLog(date)
+    }
+    return { successCount, failureIndices }
+  }
+
+  async function updateSummary(date: string, summary: string): Promise<void> {
+    try {
+      await api.updateWorkLogSummary(date, summary)
+    } catch (e: any) {
+      ElMessage.warning('保存今日小结失败：' + (e?.response?.data?.error || e?.message || ''))
+    }
+  }
+
   async function generateReport(type: WorkReportType, periodKey?: string, force = false) {
     try {
       const { data } = await api.generateWorkReport(type, periodKey, force)
@@ -181,5 +209,6 @@ export const useWorkLogStore = defineStore('workLog', () => {
     fetchInitialRange, fetchLog, fetchTodayContext, structureBrainDump,
     saveWorkLog, generateReport, fetchReports, fetchReport, selectNode,
     addQuickEntry, updateQuickEntry, deleteQuickEntry,
+    addWorkItemsBatch, updateSummary,
   }
 })

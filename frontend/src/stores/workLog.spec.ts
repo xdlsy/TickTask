@@ -15,11 +15,12 @@ vi.mock('@/api/client', () => ({
     appendWorkItem: vi.fn(),
     updateWorkItem: vi.fn(),
     deleteWorkItem: vi.fn(),
+    updateWorkLogSummary: vi.fn(),
   },
 }))
 
 vi.mock('element-plus', () => ({
-  ElMessage: { error: vi.fn(), success: vi.fn() },
+  ElMessage: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
 }))
 
 import { useWorkLogStore } from './workLog'
@@ -48,6 +49,7 @@ beforeEach(() => {
   mockApi.appendWorkItem.mockResolvedValue({ data: {} })
   mockApi.updateWorkItem.mockResolvedValue({ data: { ok: true } })
   mockApi.deleteWorkItem.mockResolvedValue({ data: { ok: true } })
+  mockApi.updateWorkLogSummary.mockResolvedValue({ data: { ok: true } })
 })
 
 describe('WorkLog Store', () => {
@@ -241,5 +243,59 @@ describe('WorkLog Store - quick entry', () => {
     const store = useWorkLogStore()
     await store.addQuickEntry('2026-08-02', { activity: 'x', start_time: '09:00', end_time: '10:00', quadrant: 1 })
     expect(mockApi.getTodayContext).not.toHaveBeenCalled()
+  })
+})
+
+describe('WorkLog Store - addWorkItemsBatch', () => {
+  beforeEach(() => {
+    mockApi.getWorkLog.mockResolvedValue({ data: { id: 'wl-1', date: '2026-08-03', items: [] } })
+  })
+
+  it('all success returns successCount=N, failureIndices=[]', async () => {
+    setActivePinia(createPinia())
+    mockApi.appendWorkItem.mockResolvedValue({ data: {} })
+    const store = useWorkLogStore()
+    const items = [
+      { activity: 'a', start_time: '09:00', end_time: '10:00', quadrant: 1 as const },
+      { activity: 'b', start_time: '10:00', end_time: '11:00', quadrant: 2 as const },
+    ]
+    const result = await store.addWorkItemsBatch('2026-08-03', items)
+    expect(result.successCount).toBe(2)
+    expect(result.failureIndices).toEqual([])
+    expect(mockApi.appendWorkItem).toHaveBeenCalledTimes(2)
+  })
+
+  it('mid-failure returns failureIndices=[i], partial success count', async () => {
+    setActivePinia(createPinia())
+    mockApi.appendWorkItem
+      .mockResolvedValueOnce({ data: {} })
+      .mockRejectedValueOnce(new Error('server error'))
+    const store = useWorkLogStore()
+    const items = [
+      { activity: 'a', start_time: '09:00', end_time: '10:00', quadrant: 1 as const },
+      { activity: 'b', start_time: '10:00', end_time: '11:00', quadrant: 2 as const },
+    ]
+    const result = await store.addWorkItemsBatch('2026-08-03', items)
+    expect(result.successCount).toBe(1)
+    expect(result.failureIndices).toEqual([1])
+  })
+})
+
+describe('WorkLog Store - updateSummary', () => {
+  it('success does not show warning toast', async () => {
+    setActivePinia(createPinia())
+    mockApi.updateWorkLogSummary.mockResolvedValue({ data: { ok: true } })
+    const store = useWorkLogStore()
+    await store.updateSummary('2026-08-03', '今日小结')
+    expect(mockApi.updateWorkLogSummary).toHaveBeenCalledWith('2026-08-03', '今日小结')
+    expect(mockEl.warning).not.toHaveBeenCalled()
+  })
+
+  it('failure shows warning toast but does not throw', async () => {
+    setActivePinia(createPinia())
+    mockApi.updateWorkLogSummary.mockRejectedValue(new Error('fail'))
+    const store = useWorkLogStore()
+    await expect(store.updateSummary('2026-08-03', 'x')).resolves.toBeUndefined()
+    expect(mockEl.warning).toHaveBeenCalled()
   })
 })
