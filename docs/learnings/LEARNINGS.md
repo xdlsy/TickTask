@@ -144,3 +144,25 @@
 - **教训**: 新增设置项时需同时定义 typed struct（如 `PomodoroSettings`）和对应的 JSON 序列化逻辑。不要直接操作 Setting 表的字符串值。
 
 <!-- HUMAN_REVIEW -->
+
+---
+
+### [LRN-20260802-015] time.Now().UnixNano() 作 ID 生成器会在高频调用下产生重复 ID
+
+- **分类**: correction
+- **现象**: `SaveWorkLog` 保存 2+ 个 items 时偶发主键冲突；单 item 总能成功。
+- **根因**: `idGenerator: func() string { return fmt.Sprintf("id-%d", time.Now().UnixNano()) }` 在 `buildWorkLogFromInput` 内被快速连续调用 1+N 次（log ID + 每个 item ID）。现代 CPU 上纳秒级分辨率不足以区分这些相邻调用，多次调用返回相同值。单元测试用 stub `func() string { return "test-id" }` 一直返回相同值但 mock repo 不在乎唯一性，所以测试全 PASS 掩盖了问题。
+- **教训**: 任何在循环或快速路径中调用的 ID 生成器必须用 UUID（`github.com/google/uuid`，已是依赖）。`time.Now().UnixNano()` 仅适合单次调用或低频场景。E2E 测试（含多 item POST）才能暴露此类 bug，单元测试不够。
+- **参考**: commit `dff255d` — `work_log_service.go` 改用 `uuid.New().String()`。
+- **适用范围**: 所有 ID 生成场景。
+
+---
+
+### [LRN-20260802-016] vue-tsc 阻塞 `npm run build`，但 `vite build` 可独立运行
+
+- **分类**: insight
+- **现象**: 修改前端代码后 `npm run build` 失败，但开发服务器（`npm run dev`）能正常运行。
+- **根因**: `package.json` 的 `build` 脚本是 `vue-tsc && vite build`——先做类型检查再打包。任何类型错误（即使与本次改动无关的预存错误）都会阻塞整个 build。
+- **教训**: 调试或验证打包时，可用 `npx vite build` 单独跑打包步骤，跳过 vue-tsc。但要意识到这不等于类型安全，生产 build 仍需 vue-tsc 通过。预存类型错误（如 `PomodoroSettings.scheduling_strategy`、`AISettings.cli_tool` 这类后端不存在的死字段）应及时清理，避免阻塞后续开发。
+- **参考**: commit `96a8168` — 清理 3 个预存 TS 错误。
+- **适用范围**: 整个前端项目。
