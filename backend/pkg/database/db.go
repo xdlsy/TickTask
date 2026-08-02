@@ -24,6 +24,11 @@ func Init(path string) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	// 一次性数据迁移：旧 manual items 的 title 从 activity 回填
+	if err := MigrateWorkItemsTitleBackfill(db); err != nil {
+		return nil, err
+	}
+
 	return db, nil
 }
 
