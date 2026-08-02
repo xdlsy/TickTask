@@ -166,3 +166,13 @@
 - **教训**: 调试或验证打包时，可用 `npx vite build` 单独跑打包步骤，跳过 vue-tsc。但要意识到这不等于类型安全，生产 build 仍需 vue-tsc 通过。预存类型错误（如 `PomodoroSettings.scheduling_strategy`、`AISettings.cli_tool` 这类后端不存在的死字段）应及时清理，避免阻塞后续开发。
 - **参考**: commit `96a8168` — 清理 3 个预存 TS 错误。
 - **适用范围**: 整个前端项目。
+
+---
+
+### [LRN-20260802-017] 本机 git 全局身份未配置——commit 需要 inline `-c` override
+
+- **分类**: best_practice
+- **现象**: 在本仓库执行 `git commit` 时报错 `fatal: unable to auto-detect email address` / `Author identity unknown`，导致 commit 失败。
+- **根因**: 本机（Windows VM `Administrator@P_V30315-GSAtW8`）的 `git config --global` 未设置 `user.name` / `user.email`，仓库本身也没 local config。CLAUDE.md 安全规则禁止 `git config --global` 写入。
+- **教训**: 用 inline 一次性 override：`git -c user.name="lsy" -c user.email="lsy@local" commit -m "..."`。这不修改任何 config 文件，符合安全规则。最近的 commit 都是 `lsy <lsy@local>`，沿用此身份即可。
+- **适用范围**: 本机所有 git commit 操作（直到用户手动配置 global identity）。
