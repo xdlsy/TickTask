@@ -579,3 +579,107 @@ func TestMapQuickEntryErrorStatus_Default500(t *testing.T) {
 		t.Fatalf("expected 500, got %d", got)
 	}
 }
+
+// ── Optional fields + UpdateSummary tests ──
+
+func TestAddQuickEntry_WithOptionalFields(t *testing.T) {
+	repo := newMockWorkLogRepository()
+	svc := service.NewWorkLogService(repo, nil, nil, nil)
+	h := NewWorkLogHandler(svc)
+	r := gin.New()
+	r.POST("/api/work-logs/:date/items", h.AddQuickEntry)
+
+	body, _ := json.Marshal(map[string]any{
+		"activity":       "x",
+		"start_time":     "09:00",
+		"end_time":       "10:00",
+		"quadrant":       1,
+		"content":        "可选内容",
+		"problem_solved": "解决了 Y",
+		"result":         "产出了 Z",
+		"impact":         "影响了 W",
+	})
+	req := httptest.NewRequest("POST", "/api/work-logs/2026-08-03/items", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp model.WorkItem
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	if resp.Content != "可选内容" {
+		t.Errorf("expected content '可选内容', got %q", resp.Content)
+	}
+	if resp.ProblemSolved != "解决了 Y" {
+		t.Errorf("expected problem_solved, got %q", resp.ProblemSolved)
+	}
+	if resp.Result != "产出了 Z" {
+		t.Errorf("expected result, got %q", resp.Result)
+	}
+	if resp.Impact != "影响了 W" {
+		t.Errorf("expected impact, got %q", resp.Impact)
+	}
+	if resp.Title != "x" {
+		t.Errorf("expected title synced from activity, got %q", resp.Title)
+	}
+}
+
+func TestUpdateSummary_HandlerSuccess(t *testing.T) {
+	repo := newMockWorkLogRepository()
+	repo.logs["2026-08-03"] = &model.WorkLog{ID: "log-1", Date: "2026-08-03", Summary: "old"}
+	svc := service.NewWorkLogService(repo, nil, nil, nil)
+	h := NewWorkLogHandler(svc)
+	r := gin.New()
+	r.PATCH("/api/work-logs/:date/summary", h.UpdateSummary)
+
+	body, _ := json.Marshal(map[string]any{"summary": "今日小结"})
+	req := httptest.NewRequest("PATCH", "/api/work-logs/2026-08-03/summary", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if repo.logs["2026-08-03"].Summary != "今日小结" {
+		t.Errorf("summary not updated: %q", repo.logs["2026-08-03"].Summary)
+	}
+}
+
+func TestUpdateSummary_HandlerReturns404ForMissingLog(t *testing.T) {
+	repo := newMockWorkLogRepository()
+	svc := service.NewWorkLogService(repo, nil, nil, nil)
+	h := NewWorkLogHandler(svc)
+	r := gin.New()
+	r.PATCH("/api/work-logs/:date/summary", h.UpdateSummary)
+
+	body, _ := json.Marshal(map[string]any{"summary": "x"})
+	req := httptest.NewRequest("PATCH", "/api/work-logs/2099-12-31/summary", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdateSummary_HandlerReturns400ForInvalidDate(t *testing.T) {
+	repo := newMockWorkLogRepository()
+	svc := service.NewWorkLogService(repo, nil, nil, nil)
+	h := NewWorkLogHandler(svc)
+	r := gin.New()
+	r.PATCH("/api/work-logs/:date/summary", h.UpdateSummary)
+
+	body, _ := json.Marshal(map[string]any{"summary": "x"})
+	req := httptest.NewRequest("PATCH", "/api/work-logs/not-a-date/summary", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}

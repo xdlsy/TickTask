@@ -204,17 +204,25 @@ func (h *WorkLogHandler) ListReports(c *gin.Context) {
 // ── 快捷录入端点 ──
 
 type createQuickEntryInput struct {
-	Activity  string `json:"activity" binding:"required"`
-	StartTime string `json:"start_time" binding:"required"`
-	EndTime   string `json:"end_time" binding:"required"`
-	Quadrant  int    `json:"quadrant" binding:"required,min=1,max=4"`
+	Activity      string `json:"activity" binding:"required"`
+	StartTime     string `json:"start_time" binding:"required"`
+	EndTime       string `json:"end_time" binding:"required"`
+	Quadrant      int    `json:"quadrant" binding:"required,min=1,max=4"`
+	Content       string `json:"content"`
+	ProblemSolved string `json:"problem_solved"`
+	Result        string `json:"result"`
+	Impact        string `json:"impact"`
 }
 
 type updateQuickEntryInput struct {
-	Activity  *string `json:"activity,omitempty"`
-	StartTime *string `json:"start_time,omitempty"`
-	EndTime   *string `json:"end_time,omitempty"`
-	Quadrant  *int    `json:"quadrant,omitempty" binding:"omitempty,min=1,max=4"`
+	Activity      *string `json:"activity,omitempty"`
+	StartTime     *string `json:"start_time,omitempty"`
+	EndTime       *string `json:"end_time,omitempty"`
+	Quadrant      *int    `json:"quadrant,omitempty" binding:"omitempty,min=1,max=4"`
+	Content       *string `json:"content,omitempty"`
+	ProblemSolved *string `json:"problem_solved,omitempty"`
+	Result        *string `json:"result,omitempty"`
+	Impact        *string `json:"impact,omitempty"`
 }
 
 // AddQuickEntry POST /api/work-logs/:date/items
@@ -226,10 +234,14 @@ func (h *WorkLogHandler) AddQuickEntry(c *gin.Context) {
 		return
 	}
 	item, err := h.svc.AddQuickEntry(date, service.CreateQuickEntryInput{
-		Activity:  req.Activity,
-		StartTime: req.StartTime,
-		EndTime:   req.EndTime,
-		Quadrant:  req.Quadrant,
+		Activity:      req.Activity,
+		StartTime:     req.StartTime,
+		EndTime:       req.EndTime,
+		Quadrant:      req.Quadrant,
+		Content:       req.Content,
+		ProblemSolved: req.ProblemSolved,
+		Result:        req.Result,
+		Impact:        req.Impact,
 	})
 	if err != nil {
 		status := mapQuickEntryErrorStatus(err)
@@ -249,10 +261,14 @@ func (h *WorkLogHandler) UpdateQuickEntry(c *gin.Context) {
 		return
 	}
 	err := h.svc.UpdateQuickEntry(date, itemID, service.UpdateQuickEntryInput{
-		Activity:  req.Activity,
-		StartTime: req.StartTime,
-		EndTime:   req.EndTime,
-		Quadrant:  req.Quadrant,
+		Activity:      req.Activity,
+		StartTime:     req.StartTime,
+		EndTime:       req.EndTime,
+		Quadrant:      req.Quadrant,
+		Content:       req.Content,
+		ProblemSolved: req.ProblemSolved,
+		Result:        req.Result,
+		Impact:        req.Impact,
 	})
 	if err != nil {
 		c.JSON(mapQuickEntryErrorStatus(err), gin.H{"error": err.Error()})
@@ -267,6 +283,34 @@ func (h *WorkLogHandler) DeleteQuickEntry(c *gin.Context) {
 	itemID := c.Param("itemId")
 	if err := h.svc.DeleteQuickEntry(date, itemID); err != nil {
 		c.JSON(mapQuickEntryErrorStatus(err), gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+type updateSummaryInput struct {
+	Summary string `json:"summary"`
+}
+
+// UpdateSummary PATCH /api/work-logs/:date/summary
+func (h *WorkLogHandler) UpdateSummary(c *gin.Context) {
+	date := c.Param("date")
+	var req updateSummaryInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	err := h.svc.UpdateSummary(date, req.Summary)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		}
+		status := http.StatusInternalServerError
+		if strings.HasPrefix(err.Error(), "invalid date:") {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
