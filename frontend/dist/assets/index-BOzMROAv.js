@@ -1,1 +1,0 @@
-const o={1:{id:1,name:"重要且紧急",description:"立即执行",color:"#ef4444"},2:{id:2,name:"重要不紧急",description:"计划安排",color:"#f59e0b"},3:{id:3,name:"紧急不重要",description:"委托他人",color:"#3b82f6"},4:{id:4,name:"不重要不紧急",description:"删除/减少",color:"#6b7280"}};export{o as Q};

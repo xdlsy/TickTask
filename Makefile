@@ -1,6 +1,6 @@
 # TickTask Makefile
 
-.PHONY: all dev prod build build-backend build frontend clean test help
+.PHONY: all dev prod build build-backend build frontend clean test test-e2e help
 
 # 默认目标
 all: build
@@ -39,6 +39,11 @@ test:
 	@echo "运行前端构建检查..."
 	cd frontend && npm run build
 
+# 运行 E2E 测试
+test-e2e:
+	@echo "运行 E2E 测试..."
+	cd frontend && npm run test:e2e
+
 # 清理构建产物
 clean:
 	@echo "清理构建产物..."
@@ -57,4 +62,5 @@ help:
 	@echo "  make build-frontend 仅构建前端"
 	@echo "  make install       安装依赖"
 	@echo "  make test          运行测试"
+	@echo "  make test-e2e      运行 E2E 测试"
 	@echo "  make clean         清理构建产物"

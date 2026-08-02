@@ -1,0 +1,43 @@
+# ===== Secrets — never commit (copy config.yaml.example -> config.yaml) =====
+backend/configs/config.yaml
+
+# ===== Dependencies =====
+node_modules/
+
+# ===== Build output =====
+frontend/dist/
+*.tsbuildinfo
+
+# ===== Database (runtime data) =====
+backend/data/*.db
+backend/data/*.db-journal
+
+# ===== Test / coverage artifacts =====
+frontend/coverage/
+frontend/test-results/
+frontend/playwright-report/
+
+# ===== Vite & tool caches =====
+.vite/
+
+# ===== Playwright MCP =====
+.playwright-mcp/
+
+# ===== AI tool private workspaces (local installs, not project deliverables) =====
+.aidoc/
+.opencode/
+.superpowers/
+
+# ===== Generated repo profile =====
+codebase-profile.json
+
+# ===== Debug / screenshot artifacts =====
+console.log
+page-snapshot.md
+schedule-page
+verify-*.png
+frontend-screenshot.png
+tasks-redesign.png
+
+# ===== OS / editor =====
+.DS_Store

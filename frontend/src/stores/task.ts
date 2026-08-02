@@ -1,13 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Task, Quadrant } from '@/types'
+import type { Task, TaskResponse, Quadrant } from '@/types'
 import { api } from '@/api/client'
 import { QUADRANT_INFO } from '@/types'
 
 export const useTaskStore = defineStore('task', () => {
   // State
-  const tasks = ref<Task[]>([])
-  const tasksByQuadrant = ref<Record<Quadrant, Task[]>>({
+  const tasks = ref<TaskResponse[]>([])
+  const tasksByQuadrant = ref<Record<Quadrant, TaskResponse[]>>({
     1: [],
     2: [],
     3: [],
@@ -32,7 +32,7 @@ export const useTaskStore = defineStore('task', () => {
     loading.value = true
     try {
       const res = await api.getTasksByQuadrant()
-      tasksByQuadrant.value = res.data as Record<Quadrant, Task[]>
+      tasksByQuadrant.value = res.data as Record<Quadrant, TaskResponse[]>
       // 确保四个象限都存在
       for (const q of [1, 2, 3, 4] as Quadrant[]) {
         if (!tasksByQuadrant.value[q]) {
@@ -64,7 +64,7 @@ export const useTaskStore = defineStore('task', () => {
   }) {
     try {
       const res = await api.createTask(data)
-      tasks.value.unshift(res.data)
+      tasks.value.unshift({ ...res.data, planned_pomodoros: 0, completed_pomodoros: 0, pomodoro_status: 'not_started' })
       await fetchTasksByQuadrant()
       return res.data
     } catch (error) {
@@ -73,7 +73,7 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
-  async function updateTask(id: string, data: Partial<Task>) {
+  async function updateTask(id: string, data: Partial<Task | TaskResponse>) {
     try {
       await api.updateTask(id, data)
       // 更新本地状态

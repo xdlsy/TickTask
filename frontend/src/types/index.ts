@@ -277,3 +277,37 @@ export interface MoveScheduleDTO {
 }
 
 export type ViewMode = 'day' | 'week' | 'month'
+
+// 番茄钟-任务关联类型
+export type PomodoroStatus = 'not_started' | 'in_progress' | 'completed' | 'exceeded'
+
+export interface TaskResponse extends Task {
+  planned_pomodoros: number
+  completed_pomodoros: number
+  pomodoro_status: PomodoroStatus
+}
+
+export interface PomodoroByTaskItem {
+  task_id: string
+  task_title: string
+  planned_pomodoros: number
+  completed_pomodoros: number
+  total_focus_minutes: number
+  status: string
+}
+
+export interface PomodoroByTaskResult {
+  tasks: PomodoroByTaskItem[]
+}
+
+export interface PomodoroTrendDay {
+  date: string
+  planned: number
+  actual: number
+  completed_tasks: number
+  exceeded_tasks: number
+}
+
+export interface PomodoroTrendsResult {
+  days: PomodoroTrendDay[]
+}

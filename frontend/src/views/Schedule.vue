@@ -40,6 +40,10 @@
         <button class="today-btn" @click="scheduleStore.goToToday()">今天</button>
       </div>
       <div class="toolbar-actions">
+        <el-button @click="onQuickStartPomodoro" :disabled="quickStartDisabled">
+          <el-icon><VideoPlay /></el-icon>
+          <span>{{ quickStartLabel }}</span>
+        </el-button>
         <el-button @click="resetSchedule" :disabled="scheduleStore.loading">
           <el-icon><Delete /></el-icon>
           <span>重置日程</span>
@@ -64,6 +68,7 @@
         v-if="scheduleStore.viewMode === 'day'"
         :current-date="scheduleStore.currentDate"
         :events="scheduleStore.events"
+        :tasks-map="tasksMap"
         @event-click="onEventClick"
         @slot-click="onSlotClick"
       />
@@ -71,6 +76,7 @@
         v-if="scheduleStore.viewMode === 'week'"
         :current-date="scheduleStore.currentDate"
         :events="scheduleStore.events"
+        :tasks-map="tasksMap"
         @event-click="onEventClick"
         @slot-click="onSlotClick"
       />
@@ -78,6 +84,7 @@
         v-if="scheduleStore.viewMode === 'month'"
         :current-date="scheduleStore.currentDate"
         :events="scheduleStore.events"
+        :tasks-map="tasksMap"
         @event-click="onEventClick"
         @day-click="onDayClick"
       />
@@ -180,22 +187,33 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <TaskPomodoroDetail ref="pomodoroDetailRef" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, h } from 'vue'
-import { Plus, MagicStick, Delete, Edit } from '@element-plus/icons-vue'
+import { Plus, MagicStick, Delete, Edit, VideoPlay } from '@element-plus/icons-vue'
 import TerminalOverlay from '@/components/schedule/TerminalOverlay.vue'
 import { useScheduleStore } from '@/stores/schedule'
+import { useTaskStore } from '@/stores/task'
+import { useTimerStore } from '@/stores/timer'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import WeekView from '@/components/schedule/WeekView.vue'
 import DayView from '@/components/schedule/DayView.vue'
 import MonthView from '@/components/schedule/MonthView.vue'
 import EventForm from '@/components/schedule/EventForm.vue'
-import type { ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO } from '@/types'
+import TaskPomodoroDetail from '@/components/tasks/TaskPomodoroDetail.vue'
+import { useRouter } from 'vue-router'
+import type { ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, TaskResponse } from '@/types'
 
 const scheduleStore = useScheduleStore()
+const taskStore = useTaskStore()
+const timerStore = useTimerStore()
+const router = useRouter()
+
+const pomodoroDetailRef = ref()
 
 const showForm = ref(false)
 const editingEvent = ref<ScheduleEvent | null>(null)
@@ -289,6 +307,14 @@ function onSlotClick(date: string, hour: number) {
 }
 
 function onEventClick(event: ScheduleEvent) {
+  // If event has a task linked, open TaskPomodoroDetail
+  if (event.task_id) {
+    const task = taskStore.tasks.find(t => t.id === event.task_id)
+    if (task) {
+      pomodoroDetailRef.value?.open(task)
+      return
+    }
+  }
   editingEvent.value = event
   showForm.value = true
 }
@@ -430,7 +456,51 @@ function getDateRange() {
 }
 
 onMounted(async () => {
-  await loadSchedules()
+  await Promise.all([taskStore.fetchTasks(), loadSchedules()])
+})
+
+// Quick-start pomodoro
+const hasActiveSession = computed(() => !!timerStore.currentSession && timerStore.currentSession.status !== 'completed' && timerStore.currentSession.status !== 'abandoned')
+
+const pendingTasks = computed(() => taskStore.tasks.filter(t => t.status !== 'completed' && t.estimated_time > 0))
+
+const quickStartLabel = computed(() => {
+  if (hasActiveSession.value) return '查看进行中'
+  if (pendingTasks.value.length === 0) return '开始番茄'
+  return '开始番茄'
+})
+
+const quickStartDisabled = computed(() => !hasActiveSession.value && pendingTasks.value.length === 0)
+
+async function onQuickStartPomodoro() {
+  if (hasActiveSession.value) {
+    router.push('/timer')
+    return
+  }
+  if (pendingTasks.value.length === 0) return
+  // Find the nearest upcoming task by deadline or just pick the first one
+  const sorted = [...pendingTasks.value].sort((a, b) => {
+    if (a.deadline && b.deadline) return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+    if (a.deadline) return -1
+    if (b.deadline) return 1
+    return 0
+  })
+  const task = sorted[0]
+  try {
+    await timerStore.createSession(task.id, 'work')
+    ElMessage.success(`开始专注：${task.title}`)
+  } catch {
+    ElMessage.error('启动番茄钟失败')
+  }
+}
+
+// Build task map for child views to look up pomodoro progress
+const tasksMap = computed(() => {
+  const map: Record<string, TaskResponse> = {}
+  for (const t of taskStore.tasks) {
+    map[t.id] = t
+  }
+  return map
 })
 
 // 监听日期和视图模式变化，自动刷新数据

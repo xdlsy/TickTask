@@ -45,6 +45,7 @@
             >
               <span class="event-time">{{ formatEventTime(item.event, day.date) }}</span>
               <span class="event-title">{{ item.event.title }}</span>
+              <span v-if="getPomodoroText(item.event)" class="event-pomodoro">{{ getPomodoroText(item.event) }}</span>
             </div>
           </div>
         </div>
@@ -63,11 +64,12 @@
 
 <script setup lang="ts">
 import { computed, ref, onUnmounted } from 'vue'
-import type { ScheduleEvent } from '@/types'
+import type { ScheduleEvent, TaskResponse } from '@/types'
 
 const props = defineProps<{
   currentDate: Date
   events: ScheduleEvent[]
+  tasksMap?: Record<string, TaskResponse>
 }>()
 
 const emit = defineEmits<{
@@ -252,6 +254,13 @@ function getStatusLabel(status: string): string {
   return labels[status] || ''
 }
 
+function getPomodoroText(event: ScheduleEvent): string {
+  if (!event.task_id || !props.tasksMap) return ''
+  const task = props.tasksMap[event.task_id]
+  if (!task || task.planned_pomodoros === 0) return ''
+  return `${task.completed_pomodoros}/${task.planned_pomodoros} 番茄钟`
+}
+
 onUnmounted(() => { if (tooltipTimer) clearTimeout(tooltipTimer) })
 </script>
 
@@ -397,6 +406,13 @@ onUnmounted(() => { if (tooltipTimer) clearTimeout(tooltipTimer) })
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.event-pomodoro {
+  display: block;
+  font-size: 9px;
+  opacity: 0.85;
+  margin-top: 1px;
 }
 </style>
 

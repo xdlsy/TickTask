@@ -50,6 +50,7 @@
           <div class="event-content">
             <span class="event-time">{{ formatEventTime(item.event) }}</span>
             <span class="event-title">{{ item.event.title }}</span>
+            <span v-if="getPomodoroText(item.event)" class="event-pomodoro">{{ getPomodoroText(item.event) }}</span>
             <span class="event-status" v-if="item.event.status !== 'planned'">
               {{ getStatusLabel(item.event.status) }}
             </span>
@@ -70,11 +71,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import type { ScheduleEvent } from '@/types'
+import type { ScheduleEvent, TaskResponse } from '@/types'
 
 const props = defineProps<{
   currentDate: Date
   events: ScheduleEvent[]
+  tasksMap?: Record<string, TaskResponse>
 }>()
 
 const emit = defineEmits<{
@@ -159,6 +161,13 @@ function getStatusLabel(status: string): string {
     cancelled: '已取消'
   }
   return labels[status] || ''
+}
+
+function getPomodoroText(event: ScheduleEvent): string {
+  if (!event.task_id || !props.tasksMap) return ''
+  const task = props.tasksMap[event.task_id]
+  if (!task || task.planned_pomodoros === 0) return ''
+  return `${task.completed_pomodoros}/${task.planned_pomodoros} 番茄钟`
 }
 
 function getEventColorByType(type: string): string {
@@ -503,6 +512,16 @@ onUnmounted(() => {
   padding: 1px 6px;
   border-radius: 3px;
   margin-top: 3px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.event-pomodoro {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-top: 3px;
+  margin-left: 4px;
   background: rgba(255, 255, 255, 0.2);
 }
 </style>

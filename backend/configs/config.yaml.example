@@ -1,0 +1,19 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  mode: "release"
+
+database:
+  path: "./data/ticktask.db"
+
+cors:
+  allowed_origins:
+    - "http://localhost:5173"
+
+ai:
+  provider: "openai"
+  # Set your OpenAI-compatible API key here (or via env). Never commit a real key.
+  api_key: ""
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-4o-mini"
+  timeout: 30s

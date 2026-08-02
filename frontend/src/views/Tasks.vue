@@ -193,6 +193,7 @@ function onSaveTask(data: any) {
 
 .tasks-content {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 

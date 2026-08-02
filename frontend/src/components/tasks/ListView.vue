@@ -72,6 +72,8 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13" class="tag-icon"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                 {{ task.estimated_time }} 分钟
               </span>
+              <span v-if="task.planned_pomodoros > 0" class="tag pomodoro-tag">{{ task.completed_pomodoros }}/{{ task.planned_pomodoros }} 番茄钟</span>
+              <span v-else class="tag pomodoro-tag pomodoro-na">—</span>
             </div>
           </div>
         </div>
@@ -102,6 +104,8 @@
       @close="showForm = false"
       @save="onSaveTask"
     />
+
+    <TaskPomodoroDetail ref="pomodoroDetailRef" />
   </div>
 </template>
 
@@ -110,9 +114,10 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import TaskForm from './TaskForm.vue'
+import TaskPomodoroDetail from './TaskPomodoroDetail.vue'
 import { useTaskStore } from '@/stores/task'
 import { useTimerStore } from '@/stores/timer'
-import type { Task, Quadrant } from '@/types'
+import type { Task, TaskResponse, Quadrant } from '@/types'
 
 const router = useRouter()
 const taskStore = useTaskStore()
@@ -120,6 +125,7 @@ const timerStore = useTimerStore()
 
 const showForm = ref(false)
 const editingTask = ref<Task | null>(null)
+const pomodoroDetailRef = ref()
 
 const statusFilter = ref('')
 const quadrantFilter = ref('')
@@ -173,8 +179,7 @@ function isOverdue(deadline: string): boolean {
 }
 
 function onEditTask(task: Task) {
-  editingTask.value = task
-  showForm.value = true
+  pomodoroDetailRef.value?.open(task as TaskResponse)
 }
 
 async function onCompleteTask(id: string) {
@@ -427,6 +432,14 @@ defineExpose({
 
 .tag.deadline.overdue {
   color: var(--accent-primary);
+}
+
+.pomodoro-tag {
+  color: var(--accent-primary) !important;
+}
+
+.pomodoro-tag.pomodoro-na {
+  color: var(--text-muted) !important;
 }
 
 .task-actions {

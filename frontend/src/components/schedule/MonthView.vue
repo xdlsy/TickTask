@@ -30,6 +30,7 @@
             @click.stop="onEventClick(event)"
           >
             <span class="event-title">{{ event.title }}</span>
+              <span v-if="getPomodoroText(event)" class="event-pomodoro-badge">{{ getPomodoroText(event) }}</span>
           </div>
           <div v-if="day.events.length > 3" class="more-events">
             +{{ day.events.length - 3 }} 更多
@@ -42,11 +43,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ScheduleEvent } from '@/types'
+import type { ScheduleEvent, TaskResponse } from '@/types'
 
 const props = defineProps<{
   currentDate: Date
   events: ScheduleEvent[]
+  tasksMap?: Record<string, TaskResponse>
 }>()
 
 const emit = defineEmits<{
@@ -128,6 +130,13 @@ function getEventColor(event: ScheduleEvent): string {
     task: '#B8452C', pomodoro: '#B8954D', break: '#6B8B6F', custom: '#9C9893'
   }
   return colors[event.type] || '#B8452C'
+}
+
+function getPomodoroText(event: ScheduleEvent): string {
+  if (!event.task_id || !props.tasksMap) return ''
+  const task = props.tasksMap[event.task_id]
+  if (!task || task.planned_pomodoros === 0) return ''
+  return `${task.completed_pomodoros}/${task.planned_pomodoros}`
 }
 </script>
 
@@ -242,6 +251,15 @@ function getEventColor(event: ScheduleEvent): string {
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 500;
+  flex: 1;
+  min-width: 0;
+}
+
+.event-pomodoro-badge {
+  font-size: 9px;
+  opacity: 0.8;
+  flex-shrink: 0;
+  margin-left: 2px;
 }
 
 .more-events {

@@ -145,7 +145,7 @@ import TaskCard from '@/components/tasks/TaskCard.vue'
 import { useTaskStore } from '@/stores/task'
 import { useTimerStore } from '@/stores/timer'
 import { useAIStore } from '@/stores/ai'
-import type { Task } from '@/types'
+import type { TaskResponse } from '@/types'
 
 const router = useRouter()
 const taskStore = useTaskStore()
@@ -163,7 +163,7 @@ const todayPomodoros = ref(0)
 const focusTime = ref(0)
 const completedTasks = ref(0)
 
-const priorityTasks = ref<Task[]>([])
+const priorityTasks = ref<TaskResponse[]>([])
 
 const pendingTasks = computed(() =>
   taskStore.tasks.filter(t => t.status === 'todo').length
@@ -201,7 +201,7 @@ async function getPrioritySuggestions() {
       const taskMap = new Map(taskStore.tasks.map(t => [t.id, t]))
       priorityTasks.value = result.priority_order
         .map(id => taskMap.get(id))
-        .filter((t): t is Task => t !== undefined && t.status === 'todo')
+        .filter((t): t is TaskResponse => t !== undefined && t.status === 'todo')
         .slice(0, 5)
     }
   } catch (error) {

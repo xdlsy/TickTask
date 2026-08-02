@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Task, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse } from '@/types'
+import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult } from '@/types'
 
 const client = axios.create({
   baseURL: '/api',
@@ -30,9 +30,9 @@ client.interceptors.response.use(
 
 export const api = {
   // 任务相关
-  getTasks: () => client.get<Task[]>('/tasks'),
-  getTasksByQuadrant: () => client.get<Record<string, Task[]>>('/tasks/quadrant'),
-  getTask: (id: string) => client.get<Task>(`/tasks/${id}`),
+  getTasks: () => client.get<TaskResponse[]>('/tasks'),
+  getTasksByQuadrant: () => client.get<Record<string, TaskResponse[]>>('/tasks/quadrant'),
+  getTask: (id: string) => client.get<TaskResponse>(`/tasks/${id}`),
   createTask: (data: any) => client.post<Task>('/tasks', data),
   updateTask: (id: string, data: any) => client.put(`/tasks/${id}`, data),
   deleteTask: (id: string) => client.delete(`/tasks/${id}`),
@@ -66,6 +66,8 @@ export const api = {
   getAnalyticsSummary: (date?: string) => client.get<DailySummary>('/analytics/summary', { params: { date } }),
   getAnalyticsTrend: (days?: number) => client.get<TrendData>('/analytics/trend', { params: { days } }),
   getAnalyticsDistribution: (start?: string, end?: string) => client.get<DistributionStats>('/analytics/distribution', { params: { start, end } }),
+  getPomodoroByTask: (period?: string) => client.get<PomodoroByTaskResult>('/analytics/pomodoro-by-task', { params: { period } }),
+  getPomodoroTrends: (period?: string) => client.get<PomodoroTrendsResult>('/analytics/pomodoro-trends', { params: { period } }),
 
   // 日程相关
   getSchedules: (start?: string, end?: string) => client.get<{ events: ScheduleEvent[] }>('/schedules', { params: { start, end } }),

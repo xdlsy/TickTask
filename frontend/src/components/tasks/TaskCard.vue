@@ -8,6 +8,10 @@
         <span class="task-title">{{ task.title }}</span>
         <span v-if="task.estimated_time" class="row-time">{{ task.estimated_time }}m</span>
         <span v-if="task.deadline" class="row-deadline">{{ formatDate(task.deadline) }}</span>
+        <span v-if="task.planned_pomodoros > 0 && task.status === 'completed'" class="row-pomodoro row-pomodoro-done">{{ task.completed_pomodoros }}/{{ task.planned_pomodoros }} ✓</span>
+        <span v-else-if="task.planned_pomodoros > 0" class="row-pomodoro">{{ task.completed_pomodoros }}/{{ task.planned_pomodoros }} 番茄钟</span>
+        <span v-else class="row-pomodoro row-pomodoro-na">—</span>
+        <span v-if="task.status !== 'completed'" class="row-pomodoro-btn" @click.stop="$emit('start-pomodoro', task.id)" title="开始番茄钟">▶</span>
         <span class="row-more" @click.stop>
           <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
         </span>
@@ -64,16 +68,16 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { Task, TaskStatus, ClassificationResult } from '@/types'
+import type { TaskResponse, TaskStatus, ClassificationResult } from '@/types'
 import { QUADRANT_INFO } from '@/types'
 import { useAIStore } from '@/stores/ai'
 import { useTaskStore } from '@/stores/task'
 import { useTimerStore } from '@/stores/timer'
 import { useRouter } from 'vue-router'
 
-interface Props { task: Task; mode?: 'card' | 'row' }
+interface Props { task: TaskResponse; mode?: 'card' | 'row' }
 const props = defineProps<Props>()
-const emit = defineEmits<{ 'drag-start': [event: DragEvent, task: Task]; 'edit': [task: Task]; 'complete': [id: string]; 'delete': [id: string] }>()
+const emit = defineEmits<{ 'drag-start': [event: DragEvent, task: TaskResponse]; 'edit': [task: TaskResponse]; 'complete': [id: string]; 'delete': [id: string]; 'start-pomodoro': [taskId: string]; 'show-detail': [task: TaskResponse] }>()
 const aiStore = useAIStore()
 const taskStore = useTaskStore()
 const timerStore = useTimerStore()
@@ -111,7 +115,7 @@ async function applyClassification() {
   showClassifyResult.value = false
 }
 
-function showDetail() { emit('edit', props.task) }
+function showDetail() { emit('show-detail', props.task) }
 function onRowCheckbox() {
   if (props.task.status === 'completed') {
     taskStore.updateTask(props.task.id, { status: 'todo' })
@@ -362,5 +366,46 @@ function onRowCheckbox() {
   background: rgba(0, 0, 0, 0.03);
   padding: 2px 8px;
   border-radius: 4px;
+}
+
+/* Pomodoro progress in row mode */
+.row-pomodoro {
+  font-size: 11px;
+  color: var(--accent-primary);
+  background: rgba(184, 69, 44, 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.row-pomodoro-btn {
+  width: 28px;
+  height: 28px;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.row-pomodoro-btn:hover {
+  opacity: 0.85;
+}
+
+.row-pomodoro-done {
+  color: var(--accent-sage);
+  background: rgba(107, 139, 111, 0.08);
+}
+
+.row-pomodoro-na {
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.03);
 }
 </style>

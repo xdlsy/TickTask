@@ -150,6 +150,103 @@
           </div>
         </div>
 
+        <!-- 番茄钟排行榜 -->
+        <div class="card">
+          <div class="card-header">
+            <h3>番茄钟排行榜</h3>
+            <div class="pomodoro-period-select">
+              <button v-for="p in pomodoroPeriods" :key="p.value" :class="['period-btn', { active: pomodoroPeriod === p.value }]" @click="pomodoroPeriod = p.value; fetchPomodoroStats()">{{ p.label }}</button>
+            </div>
+          </div>
+          <div v-if="pomodoroByTask.length === 0" class="empty-state compact">
+            <p>暂无番茄钟数据</p>
+            <p class="hint">完成任务后这里会显示统计</p>
+          </div>
+          <div v-else class="ranking-list">
+            <div v-for="(item, index) in pomodoroByTask" :key="item.task_id" class="ranking-item">
+              <span class="ranking-index">{{ index + 1 }}</span>
+              <span class="ranking-title">{{ item.task_title }}</span>
+              <div class="ranking-bar-wrapper">
+                <div class="ranking-bar" :style="{ width: getRankingBarWidth(item.completed_pomodoros) }"></div>
+              </div>
+              <span class="ranking-count">{{ item.completed_pomodoros }} 番茄</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 计划 vs 实际趋势 -->
+        <div class="card">
+          <div class="card-header">
+            <h3>计划 vs 实际</h3>
+            <div class="pomodoro-period-select">
+              <button v-for="p in pomodoroPeriods" :key="p.value" :class="['period-btn', { active: pomodoroTrendPeriod === p.value }]" @click="pomodoroTrendPeriod = p.value; fetchPomodoroTrends()">{{ p.label }}</button>
+            </div>
+          </div>
+          <div v-if="pomodoroTrends.length === 0" class="empty-state compact">
+            <p>暂无趋势数据</p>
+          </div>
+          <div v-else class="trend-comparison">
+            <div class="trend-legend">
+              <span class="legend-item"><span class="legend-dot planned"></span>计划</span>
+              <span class="legend-item"><span class="legend-dot actual"></span>实际</span>
+            </div>
+            <div class="trend-bars">
+              <div v-for="day in pomodoroTrends" :key="day.date" class="trend-day">
+                <div class="trend-bar-group">
+                  <div class="trend-bar planned" :style="{ height: getTrendBarHeight(day.planned) }" :title="`计划: ${day.planned}`"></div>
+                  <div class="trend-bar actual" :style="{ height: getTrendBarHeight(day.actual) }" :title="`实际: ${day.actual}`"></div>
+                </div>
+                <span class="trend-label">{{ formatTrendLabel(day.date) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 番茄钟完成率 -->
+        <div class="card">
+          <div class="card-header">
+            <h3>番茄钟完成率</h3>
+            <div class="pomodoro-period-select">
+              <button v-for="p in pomodoroPeriods" :key="p.value" :class="['period-btn', { active: pomodoroCompletionPeriod === p.value }]" @click="pomodoroCompletionPeriod = p.value; fetchPomodoroStats()">{{ p.label }}</button>
+            </div>
+          </div>
+          <div v-if="pomodoroByTask.length === 0" class="empty-state compact">
+            <p>暂无数据</p>
+          </div>
+          <div v-else class="completion-rings">
+            <div class="ring-item">
+              <div class="ring-container">
+                <svg viewBox="0 0 36 36" class="ring-svg">
+                  <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="ring-fill on-time" :stroke-dasharray="`${onTimeRate}, 100`" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <span class="ring-value">{{ onTimeRate }}%</span>
+              </div>
+              <span class="ring-label">按时完成</span>
+            </div>
+            <div class="ring-item">
+              <div class="ring-container">
+                <svg viewBox="0 0 36 36" class="ring-svg">
+                  <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="ring-fill exceeded" :stroke-dasharray="`${exceededRate}, 100`" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <span class="ring-value">{{ exceededRate }}%</span>
+              </div>
+              <span class="ring-label">超时完成</span>
+            </div>
+            <div class="ring-item">
+              <div class="ring-container">
+                <svg viewBox="0 0 36 36" class="ring-svg">
+                  <path class="ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="ring-fill incomplete" :stroke-dasharray="`${incompleteRate}, 100`" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <span class="ring-value">{{ incompleteRate }}%</span>
+              </div>
+              <span class="ring-label">未完成</span>
+            </div>
+          </div>
+        </div>
+
         <!-- AI 每日洞察 -->
         <div class="card ai-insights-card" v-if="aiStore.configured">
           <div class="card-header">
@@ -197,7 +294,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '@/api/client'
 import { QUADRANT_INFO } from '@/types'
 import { useAIStore } from '@/stores/ai'
-import type { TaskTimeStats, DailySummary, TrendDataPoint, DistributionStats, DailyInsights } from '@/types'
+import type { TaskTimeStats, DailySummary, TrendDataPoint, DistributionStats, DailyInsights, PomodoroByTaskItem, PomodoroTrendDay } from '@/types'
 
 const aiStore = useAIStore()
 const quadrantInfo = QUADRANT_INFO
@@ -223,6 +320,40 @@ const trendData = ref<TrendDataPoint[]>([])
 const distribution = ref<DistributionStats>({
   quadrant_stats: { 1: { total: 0, completed: 0 }, 2: { total: 0, completed: 0 }, 3: { total: 0, completed: 0 }, 4: { total: 0, completed: 0 } },
   task_stats: { total: 0, completed: 0, completion_rate: 0 }
+})
+
+// Pomodoro statistics state
+const pomodoroByTask = ref<PomodoroByTaskItem[]>([])
+const pomodoroTrends = ref<PomodoroTrendDay[]>([])
+const pomodoroPeriod = ref<'week' | 'month'>('week')
+const pomodoroTrendPeriod = ref<'week' | 'month'>('week')
+const pomodoroCompletionPeriod = ref<'week' | 'month'>('week')
+
+const pomodoroPeriods = [
+  { label: '周', value: 'week' as const },
+  { label: '月', value: 'month' as const }
+]
+
+// Completion rate computed
+const onTimeRate = computed(() => {
+  const tasks = pomodoroByTask.value
+  if (tasks.length === 0) return 0
+  const onTime = tasks.filter(t => t.status === 'completed').length
+  return Math.round((onTime / tasks.length) * 100)
+})
+
+const exceededRate = computed(() => {
+  const tasks = pomodoroByTask.value
+  if (tasks.length === 0) return 0
+  const exceeded = tasks.filter(t => t.status === 'exceeded').length
+  return Math.round((exceeded / tasks.length) * 100)
+})
+
+const incompleteRate = computed(() => {
+  const tasks = pomodoroByTask.value
+  if (tasks.length === 0) return 0
+  const incomplete = tasks.filter(t => t.status === 'not_started' || t.status === 'in_progress').length
+  return Math.round((incomplete / tasks.length) * 100)
 })
 
 const maxFocusTime = computed(() => {
@@ -328,6 +459,42 @@ async function fetchData() {
   }
 }
 
+async function fetchPomodoroStats() {
+  try {
+    const res = await api.getPomodoroByTask(pomodoroPeriod.value)
+    pomodoroByTask.value = res.data.tasks || []
+  } catch (error) {
+    console.error('Failed to fetch pomodoro by task:', error)
+  }
+}
+
+async function fetchPomodoroTrends() {
+  try {
+    const res = await api.getPomodoroTrends(pomodoroTrendPeriod.value)
+    pomodoroTrends.value = res.data.days || []
+  } catch (error) {
+    console.error('Failed to fetch pomodoro trends:', error)
+  }
+}
+
+function getRankingBarWidth(count: number): string {
+  const maxCount = Math.max(...pomodoroByTask.value.map(t => t.completed_pomodoros), 1)
+  return `${(count / maxCount) * 100}%`
+}
+
+const maxTrendValue = computed(() => {
+  return Math.max(...pomodoroTrends.value.flatMap(d => [d.planned, d.actual]), 1)
+})
+
+function getTrendBarHeight(value: number): string {
+  return `${Math.max((value / maxTrendValue.value) * 100, 2)}%`
+}
+
+function formatTrendLabel(dateStr: string): string {
+  const date = new Date(dateStr)
+  return `${date.getMonth() + 1}/${date.getDate()}`
+}
+
 function getScoreClass(score: number): string {
   if (score >= 80) return 'score-high'
   if (score >= 60) return 'score-mid'
@@ -369,6 +536,8 @@ watch(currentFilter, () => {
 
 onMounted(() => {
   fetchData()
+  fetchPomodoroStats()
+  fetchPomodoroTrends()
 })
 </script>
 
@@ -985,5 +1154,239 @@ onMounted(() => {
   .right-column {
     flex-direction: column;
   }
+}
+
+/* Pomodoro statistics */
+.pomodoro-period-select {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.period-btn {
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+
+.period-btn.active {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+.ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ranking-index {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.ranking-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ranking-bar-wrapper {
+  flex: 1;
+  height: 8px;
+  background: #e8e4df;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ranking-bar {
+  height: 100%;
+  background: #B8452C;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.ranking-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  width: 60px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.empty-state.compact {
+  padding: 20px 16px;
+}
+
+.empty-state.compact p {
+  font-size: 13px;
+}
+
+/* Trend comparison */
+.trend-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  justify-content: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.legend-dot.planned {
+  background: #e8e4df;
+}
+
+.legend-dot.actual {
+  background: #B8452C;
+}
+
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 160px;
+}
+
+.trend-day {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.trend-bar-group {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  width: 100%;
+}
+
+.trend-bar {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: height 0.3s ease;
+  cursor: pointer;
+}
+
+.trend-bar.planned {
+  background: #e8e4df;
+}
+
+.trend-bar.actual {
+  background: #B8452C;
+}
+
+.trend-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  white-space: nowrap;
+}
+
+/* Completion rings */
+.completion-rings {
+  display: flex;
+  justify-content: space-around;
+  padding: 16px 0;
+}
+
+.ring-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.ring-container {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.ring-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.ring-bg {
+  fill: none;
+  stroke: #e8e4df;
+  stroke-width: 3;
+}
+
+.ring-fill {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.5s ease;
+}
+
+.ring-fill.on-time {
+  stroke: #6B8B6F;
+}
+
+.ring-fill.exceeded {
+  stroke: #C4973D;
+}
+
+.ring-fill.incomplete {
+  stroke: #B8452C;
+}
+
+.ring-value {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.ring-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 </style>
