@@ -537,6 +537,12 @@ func (s *WorkLogService) AddQuickEntry(date string, in CreateQuickEntryInput) (*
 	if _, err := time.Parse("2006-01-02", date); err != nil {
 		return nil, fmt.Errorf("invalid date: %w", err)
 	}
+	if _, err := time.Parse("15:04", in.StartTime); err != nil {
+		return nil, fmt.Errorf("invalid time format: %w", err)
+	}
+	if _, err := time.Parse("15:04", in.EndTime); err != nil {
+		return nil, fmt.Errorf("invalid time format: %w", err)
+	}
 	if in.StartTime >= in.EndTime {
 		return nil, errors.New("end_time must be after start_time")
 	}
@@ -584,6 +590,16 @@ func (s *WorkLogService) AddQuickEntry(date string, in CreateQuickEntryInput) (*
 func (s *WorkLogService) UpdateQuickEntry(date string, itemID string, in UpdateQuickEntryInput) error {
 	if _, err := time.Parse("2006-01-02", date); err != nil {
 		return fmt.Errorf("invalid date: %w", err)
+	}
+	if in.StartTime != nil {
+		if _, err := time.Parse("15:04", *in.StartTime); err != nil {
+			return fmt.Errorf("invalid time format: %w", err)
+		}
+	}
+	if in.EndTime != nil {
+		if _, err := time.Parse("15:04", *in.EndTime); err != nil {
+			return fmt.Errorf("invalid time format: %w", err)
+		}
 	}
 	// 注意：仅当本次同时提供 start_time 和 end_time 时才校验顺序。
 	// 若用户只改一项，无法在服务层判断最终顺序（另一项依赖库里现值）。

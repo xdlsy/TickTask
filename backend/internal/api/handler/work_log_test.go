@@ -430,8 +430,20 @@ func TestAddQuickEntry_HandlerHappyPath(t *testing.T) {
 	}
 	var resp model.WorkItem
 	json.Unmarshal(w.Body.Bytes(), &resp)
-	if resp.Source != "manual" || resp.Activity == nil || *resp.Activity != "晨会" {
-		t.Fatalf("bad response: %+v", resp)
+	if resp.Source != "manual" {
+		t.Fatalf("bad source: %s", resp.Source)
+	}
+	if resp.Activity == nil || *resp.Activity != "晨会" {
+		t.Fatalf("bad activity: %+v", resp.Activity)
+	}
+	if resp.StartTime == nil || *resp.StartTime != "09:00" {
+		t.Fatalf("bad start_time: %+v", resp.StartTime)
+	}
+	if resp.EndTime == nil || *resp.EndTime != "10:00" {
+		t.Fatalf("bad end_time: %+v", resp.EndTime)
+	}
+	if resp.Quadrant == nil || *resp.Quadrant != 1 {
+		t.Fatalf("bad quadrant: %+v", resp.Quadrant)
 	}
 }
 
@@ -472,5 +484,94 @@ func TestDeleteQuickEntry_HandlerReturns403ForAIItem(t *testing.T) {
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// ── UpdateQuickEntry handler tests ──
+
+func TestUpdateQuickEntry_HandlerHappyPath(t *testing.T) {
+	repo := newMockWorkLogRepository()
+	svc := service.NewWorkLogService(repo, nil, nil, nil)
+	h := NewWorkLogHandler(svc)
+	r := gin.New()
+	r.POST("/api/work-logs/:date/items", h.AddQuickEntry)
+	r.PATCH("/api/work-logs/:date/items/:itemId", h.UpdateQuickEntry)
+
+	// 先用 AddQuickEntry 创建一条
+	createBody, _ := json.Marshal(map[string]any{
+		"activity": "old", "start_time": "09:00", "end_time": "10:00", "quadrant": 1,
+	})
+	req1 := httptest.NewRequest("POST", "/api/work-logs/2026-08-02/items", bytes.NewReader(createBody))
+	req1.Header.Set("Content-Type", "application/json")
+	w1 := httptest.NewRecorder()
+	r.ServeHTTP(w1, req1)
+	if w1.Code != http.StatusCreated {
+		t.Fatalf("setup create failed: %d %s", w1.Code, w1.Body.String())
+	}
+	var created model.WorkItem
+	json.Unmarshal(w1.Body.Bytes(), &created)
+	if created.ID == "" {
+		t.Fatalf("no item ID returned: %+v", created)
+	}
+
+	// PATCH 改 activity
+	updateBody, _ := json.Marshal(map[string]any{"activity": "new"})
+	req2 := httptest.NewRequest("PATCH", "/api/work-logs/2026-08-02/items/"+created.ID, bytes.NewReader(updateBody))
+	req2.Header.Set("Content-Type", "application/json")
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w2.Code, w2.Body.String())
+	}
+}
+
+func TestUpdateQuickEntry_HandlerReturns404ForMissingItem(t *testing.T) {
+	repo := newMockWorkLogRepository()
+	svc := service.NewWorkLogService(repo, nil, nil, nil)
+	h := NewWorkLogHandler(svc)
+	r := gin.New()
+	r.PATCH("/api/work-logs/:date/items/:itemId", h.UpdateQuickEntry)
+
+	body, _ := json.Marshal(map[string]any{"activity": "x"})
+	req := httptest.NewRequest("PATCH", "/api/work-logs/2026-08-02/items/nonexistent", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdateQuickEntry_HandlerReturns403ForAIItem(t *testing.T) {
+	repo := newMockWorkLogRepository()
+	svc := service.NewWorkLogService(repo, nil, nil, nil)
+	h := NewWorkLogHandler(svc)
+	r := gin.New()
+	r.PATCH("/api/work-logs/:date/items/:itemId", h.UpdateQuickEntry)
+
+	aiItem := model.WorkItem{ID: "ai-1", WorkLogID: "log-1", Source: "ai", Title: "x"}
+	repo.logs["2026-08-02"] = &model.WorkLog{ID: "log-1", Date: "2026-08-02", Items: []model.WorkItem{aiItem}}
+	repo.items["ai-1"] = &aiItem
+
+	body, _ := json.Marshal(map[string]any{"activity": "y"})
+	req := httptest.NewRequest("PATCH", "/api/work-logs/2026-08-02/items/ai-1", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// ── mapQuickEntryErrorStatus unit tests ──
+
+func TestMapQuickEntryErrorStatus_Default500(t *testing.T) {
+	// 未识别的错误应回落到 500，避免把任意内部错误暴露为 4xx
+	err := errors.New("some unexpected internal error")
+	if got := mapQuickEntryErrorStatus(err); got != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", got)
 	}
 }

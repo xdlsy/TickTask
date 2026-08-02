@@ -150,5 +150,30 @@ func TestDeleteQuickEntry_HappyPath(t *testing.T) {
 	}
 }
 
+func TestAddQuickEntry_RejectsBadTimeFormat(t *testing.T) {
+	svc := newQuickService(t)
+	// "25:00" 是非法小时值，time.Parse 应失败 — 必须先校验格式再做词法比较
+	_, err := svc.AddQuickEntry("2026-08-02", CreateQuickEntryInput{
+		Activity: "x", StartTime: "25:00", EndTime: "10:00", Quadrant: 1,
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid time format")
+	}
+}
+
+func TestUpdateQuickEntry_RejectsBadTimeFormat(t *testing.T) {
+	svc := newQuickService(t)
+	item, _ := svc.AddQuickEntry("2026-08-02", CreateQuickEntryInput{
+		Activity: "x", StartTime: "09:00", EndTime: "10:00", Quadrant: 1,
+	})
+	bad := "99:99"
+	err := svc.UpdateQuickEntry("2026-08-02", item.ID, UpdateQuickEntryInput{
+		StartTime: &bad,
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid time format")
+	}
+}
+
 // 局部 helper：避免污染包级别
 func strPtrService(s string) *string { return &s }

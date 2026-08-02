@@ -282,6 +282,9 @@ func mapQuickEntryErrorStatus(err error) int {
 	if strings.HasPrefix(err.Error(), "invalid date:") {
 		return http.StatusBadRequest
 	}
+	if strings.HasPrefix(err.Error(), "invalid time format:") {
+		return http.StatusBadRequest
+	}
 	if err.Error() == "end_time must be after start_time" {
 		return http.StatusBadRequest
 	}
