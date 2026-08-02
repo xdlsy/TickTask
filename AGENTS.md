@@ -12,6 +12,7 @@ Key features:
 - Calendar schedule management with day/week/month views, schedule revision workflow
 - Recurring tasks with preferred time slots and AI scheduling integration
 - Usage analytics (focus time, completion rates, quadrant distribution)
+- Work log: brain-dump → AI-structured 4-dimensional items → daily logs → layered period reports (weekly/monthly/halfyear/yearly)
 
 **Tech stack**: Go 1.21 / Gin 1.10 / GORM 1.25 / SQLite | Vue 3.5 / Pinia 2.2 / Element Plus 2.8 / Vite 5.4 / TypeScript 5.6 (strict)
 
@@ -22,12 +23,12 @@ TickTask/
 ├── backend/                    # Go backend (Gin + GORM + SQLite)
 │   ├── cmd/server/main.go      # Entry point — manual DI wiring
 │   ├── internal/
-│   │   ├── model/              # Domain models: Task, Session, Schedule, Setting, Analytics
-│   │   ├── repository/         # Data access (GORM/SQLite), interface + private struct, 5 repos + errors.go
-│   │   ├── service/            # Business logic: Task, Timer, AI, Schedule, Analytics
-│   │   ├── ai/                 # OpenAI-compatible client + prompt templates
+│   │   ├── model/              # Domain models: Task, Session, Schedule, Setting, Analytics, WorkLog/WorkItem/WorkReport
+│   │   ├── repository/         # Data access (GORM/SQLite), interface + private struct, 6 repos (incl. work_log_repo) + errors.go
+│   │   ├── service/            # Business logic: Task, Timer, AI, Schedule, Analytics, WorkLog (incl. work_log_calendar)
+│   │   ├── ai/                 # OpenAI-compatible client + prompt templates (incl. work_log_prompts)
 │   │   ├── api/
-│   │   │   ├── handler/        # Thin HTTP handlers (6), bind JSON -> service -> JSON
+│   │   │   ├── handler/        # Thin HTTP handlers (7), bind JSON -> service -> JSON
 │   │   │   └── middleware/     # CORS middleware
 │   │   └── websocket/          # WebSocket hub for real-time timer broadcasts
 │   ├── pkg/                    # Shared: config (YAML), database (SQLite+seed), logger (slog)
@@ -35,9 +36,9 @@ TickTask/
 ├── frontend/                   # Vue 3 + TypeScript + Element Plus SPA
 │   ├── src/
 │   │   ├── api/                # Axios HTTP client (singleton)
-│   │   ├── components/         # Feature components: schedule/, tasks/, timer/
-│   │   ├── views/              # Pages: Dashboard, Tasks, Schedule, Timer, Analytics, Settings
-│   │   ├── stores/             # Pinia stores: task, timer, schedule, ai, app
+│   │   ├── components/         # Feature components: schedule/, tasks/, timer/, work-log/
+│   │   ├── views/              # Pages: Dashboard, Tasks, Schedule, Timer, Analytics, WorkLog, Settings
+│   │   ├── stores/             # Pinia stores: task, timer, schedule, ai, app, workLog
 │   │   ├── router/             # Vue Router (lazy-loaded, HTML5 history)
 │   │   ├── types/              # Single barrel file: index.ts (ALL shared types)
 │   │   └── utils/              # WebSocket client (singleton) + time utilities
@@ -52,6 +53,7 @@ TickTask/
 
 ```
 pkg/* -> internal/model -> internal/repository -> internal/ai -> internal/service -> internal/websocket -> internal/api -> cmd/server
+                                                              ↑ work_log_calendar (helper used by WorkLogService)
 ```
 
 No circular dependencies detected.
@@ -206,3 +208,9 @@ Mermaid + C4 模型可视化知识库：
 - [openspec-archive-change](docs/skills/openspec-archive-change/SKILL.md) — 归档已完成变更
 - [openspec-explore](docs/skills/openspec-explore/SKILL.md) — 浏览规范结构
 - [openspec-sync-specs](docs/skills/openspec-sync-specs/SKILL.md) — 同步规范文件
+
+### 工作日志
+- 原生集成在 `/work-log` 页面（无独立 skill 文件）。
+- 核心流程：脑暴输入 → AI 拆条成 4 维 items（content/problem_solved/result/impact） → 编辑预览 → 保存日报。
+- 周期报告：周报（读 items）/ 月报（读周报+孤儿 items）/ 半年报（读月报）/ 年报（读月报），不变式由 service 测试守门。
+- 触发词："写日报"、"工作日志"、"生成周报/月报/半年报/年报"。
