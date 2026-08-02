@@ -19,13 +19,13 @@
       <div class="detail-area">
         <!-- 日报视图 -->
         <template v-if="!store.selected || store.selected.kind === 'log'">
-          <QuickEntryForm
+          <WorkItemForm
             v-if="!editingItemId"
             :date="currentDate"
             mode="add"
             @added="onQuickAdded"
           />
-          <QuickEntryForm
+          <WorkItemForm
             v-else
             :key="editingItemId"
             :date="currentDate"
@@ -44,19 +44,16 @@
             @structure="onStructure"
           />
 
-          <WorkItemList
-            v-if="draftItems.length || draftSummary"
+          <BatchTableEditor
+            v-if="draftItems.length"
+            :date="currentDate"
             :items="draftItems"
             :summary="draftSummary"
             @update:items="draftItems = $event"
             @update:summary="draftSummary = $event"
+            @save="onBatchSaved"
+            @discard="onBatchDiscard"
           />
-
-          <div class="save-bar" v-if="draftItems.length">
-            <button class="save-btn" :disabled="saving" @click="onSave">
-              {{ saving ? '保存中…' : (isUpdate ? '更新今日日报' : '保存日报') }}
-            </button>
-          </div>
         </template>
 
         <!-- 报告视图 -->
@@ -74,34 +71,21 @@ import { useWorkLogStore } from '@/stores/workLog'
 import Timeline from '@/components/work-log/Timeline.vue'
 import TodayContextCard from '@/components/work-log/TodayContextCard.vue'
 import BrainDumpInput from '@/components/work-log/BrainDumpInput.vue'
-import WorkItemList from '@/components/work-log/WorkItemList.vue'
 import ReportActions from '@/components/work-log/ReportActions.vue'
 import ReportDetail from '@/components/work-log/ReportDetail.vue'
-import QuickEntryForm from '@/components/work-log/QuickEntryForm.vue'
+import WorkItemForm from '@/components/work-log/WorkItemForm.vue'
+import BatchTableEditor, { type DraftWorkItem } from '@/components/work-log/BatchTableEditor.vue'
 import TodayPanorama from '@/components/work-log/TodayPanorama.vue'
 import { ElMessageBox } from 'element-plus'
-import type { StructuredWorkLog, SaveWorkLogInput, WorkReportType } from '@/types'
-
-interface DraftItem {
-  title: string
-  content: string
-  problem_solved: string
-  result: string
-  impact: string
-}
+import type { StructuredWorkLog, WorkReportType } from '@/types'
 
 const store = useWorkLogStore()
 
 const structuring = ref(false)
-const saving = ref(false)
-const draftItems = ref<DraftItem[]>([])
+const draftItems = ref<DraftWorkItem[]>([])
 const draftSummary = ref('')
 const currentDate = ref(new Date().toISOString().slice(0, 10))
 const editingItemId = ref<string | null>(null)
-
-const isUpdate = computed(() =>
-  store.logs.some(l => l.date === currentDate.value),
-)
 
 const editingInitial = computed(() => {
   if (!editingItemId.value || !store.currentLog) return {}
@@ -112,6 +96,10 @@ const editingInitial = computed(() => {
     start_time: it.start_time ?? '09:00',
     end_time: it.end_time ?? '10:00',
     quadrant: it.quadrant ?? 2,
+    content: it.content ?? '',
+    problem_solved: it.problem_solved ?? '',
+    result: it.result ?? '',
+    impact: it.impact ?? '',
   }
 })
 
@@ -127,26 +115,20 @@ async function onStructure(text: string) {
   try {
     const out: StructuredWorkLog | null = await store.structureBrainDump(text)
     if (out) {
-      draftItems.value = out.items.map(it => ({ ...it, title: it.title ?? '' }))
+      draftItems.value = out.items.map(it => ({
+        activity: '',
+        start_time: '09:00',
+        end_time: '10:00',
+        quadrant: 2,
+        content: it.content ?? '',
+        problem_solved: it.problem_solved ?? '',
+        result: it.result ?? '',
+        impact: it.impact ?? '',
+      } as DraftWorkItem))
       draftSummary.value = out.summary
     }
   } finally {
     structuring.value = false
-  }
-}
-
-async function onSave() {
-  saving.value = true
-  try {
-    const payload: SaveWorkLogInput = {
-      date: currentDate.value,
-      summary: draftSummary.value,
-      raw_brain_dump: '',
-      items: draftItems.value.map((it, idx) => ({ seq: idx + 1, ...it })),
-    }
-    await store.saveWorkLog(payload)
-  } finally {
-    saving.value = false
   }
 }
 
@@ -169,6 +151,16 @@ function onEditSaved() {
 
 function onQuickAdded() {
   // store 已经 fetchLog 过，panorama 通过 computed 自动刷新
+}
+
+function onBatchSaved() {
+  draftItems.value = []
+  draftSummary.value = ''
+}
+
+function onBatchDiscard() {
+  draftItems.value = []
+  draftSummary.value = ''
 }
 
 function computePeriodKey(type: WorkReportType): string {
@@ -226,18 +218,6 @@ watch(() => store.selected, (s) => {
   }
 })
 
-watch(() => store.currentLog, (log) => {
-  if (!log || log.date !== currentDate.value) return
-  draftItems.value = log.items.map(it => ({
-    title: it.title,
-    content: it.content,
-    problem_solved: it.problem_solved,
-    result: it.result,
-    impact: it.impact,
-  }))
-  draftSummary.value = log.summary
-})
-
 onMounted(async () => {
   await loadInitial()
   await Promise.all([
@@ -292,28 +272,6 @@ onMounted(async () => {
   flex: 1;
   padding: 24px 32px;
   overflow-y: auto;
-}
-.save-bar {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-}
-.save-btn {
-  background: var(--accent-primary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: 8px 20px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-}
-.save-btn:hover:not(:disabled) {
-  background: var(--accent-secondary);
-}
-.save-btn:disabled {
-  background: var(--text-muted);
-  cursor: not-allowed;
 }
 .report-placeholder {
   padding: 40px;
