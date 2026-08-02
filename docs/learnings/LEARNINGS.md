@@ -198,3 +198,14 @@
 - **根因**: el-table 渲染时把用户传的 props/attrs 用于组件内部状态，不直接绑到 `<tr>` DOM。但 el-table 默认给行加 `.el-table__row` class，这个 class 是稳定的。
 - **教训**: 测 Element Plus 表格行用 `wrapper.findAll('.el-table__row')`，不要用自定义 `data-test` attr。
 - **适用范围**: 所有用 Element Plus el-table 的 Vue 组件测试。
+
+---
+
+### [LRN-20260803-020] el-table 异步渲染——测试查行内容前必须 `await nextTick()`
+
+- **分类**: best_practice
+- **现象**: 测试用 `wrapper.findAll('.el-table__row')` 找到 N 个行，但每行 `.text()` 是空字符串，断言 `expect(rows[0].text()).toContain('a')` 失败。
+- **根因**: el-table 用虚拟 DOM + slots 渲染，行 DOM 在 `nextTick` 之后才填充 cell 内容。`mount()` 后立即查询只能拿到空壳。
+- **教训**: el-table 测试模式：`mount() → await nextTick() → await nextTick() → 查行/触发事件`。两次 nextTick 是稳妥做法（第一次让 layout 完成，第二次让 slot content 渲染）。
+- **参考**: commit `d47310f` — TodayPanorama.spec.ts。
+- **适用范围**: 所有用 el-table 的 Vue 组件测试。
