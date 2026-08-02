@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"gorm.io/driver/sqlite"
@@ -177,3 +178,37 @@ func TestUpdateQuickEntry_RejectsBadTimeFormat(t *testing.T) {
 
 // 局部 helper：避免污染包级别
 func strPtrService(s string) *string { return &s }
+
+func TestUpdateSummary_UpdatesSummary(t *testing.T) {
+	svc := newQuickService(t)
+	// 先建一个 WorkLog
+	svc.AddQuickEntry("2026-08-01", CreateQuickEntryInput{
+		Activity: "x", StartTime: "09:00", EndTime: "10:00", Quadrant: 1,
+	})
+
+	err := svc.UpdateSummary("2026-08-01", "今日小结文本")
+	if err != nil {
+		t.Fatalf("update summary: %v", err)
+	}
+
+	log, _ := svc.repo.GetWorkLogByDate("2026-08-01")
+	if log.Summary != "今日小结文本" {
+		t.Fatalf("expected summary updated, got %q", log.Summary)
+	}
+}
+
+func TestUpdateSummary_MissingWorkLogReturnsNotFound(t *testing.T) {
+	svc := newQuickService(t)
+	err := svc.UpdateSummary("2099-12-31", "x")
+	if !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestUpdateSummary_InvalidDateReturnsBadRequest(t *testing.T) {
+	svc := newQuickService(t)
+	err := svc.UpdateSummary("not-a-date", "x")
+	if err == nil || !strings.HasPrefix(err.Error(), "invalid date:") {
+		t.Fatalf("expected invalid date error, got %v", err)
+	}
+}

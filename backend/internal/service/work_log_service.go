@@ -652,5 +652,14 @@ func (s *WorkLogService) DeleteQuickEntry(date string, itemID string) error {
 	return s.repo.DeleteItem(log.ID, itemID)
 }
 
+// UpdateSummary 仅更新 WorkLog.summary 字段，不动 items。
+// 若 WorkLog 不存在返回 ErrNotFound（不自动创建，避免空日报）。
+func (s *WorkLogService) UpdateSummary(date string, summary string) error {
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		return fmt.Errorf("invalid date: %w", err)
+	}
+	return s.repo.UpdateWorkLogSummary(date, summary)
+}
+
 // 确保 ReportSummary / TodayContext 能 JSON 序列化（避免 unused 警告）
 var _ = json.Marshal

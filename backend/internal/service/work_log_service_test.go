@@ -110,6 +110,15 @@ func (m *mockWorkLogRepo) DeleteItem(workLogID string, itemID string) error {
 	return errors.New("DeleteItem not supported in this mock")
 }
 
+func (m *mockWorkLogRepo) UpdateWorkLogSummary(date string, summary string) error {
+	l, ok := m.logs[date]
+	if !ok {
+		return repository.ErrNotFound
+	}
+	l.Summary = summary
+	return nil
+}
+
 // ── Mock AI client ──
 
 type mockAIClient struct {
