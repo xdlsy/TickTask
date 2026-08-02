@@ -32,7 +32,11 @@ func (h *WorkLogHandler) GetTodayContext(c *gin.Context) {
 	}
 	ctx, err := h.svc.GetTodayContext(date)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if strings.HasPrefix(err.Error(), "invalid date:") {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, ctx)
@@ -85,7 +89,11 @@ func (h *WorkLogHandler) CreateWorkLog(c *gin.Context) {
 			})
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if strings.HasPrefix(err.Error(), "invalid date:") {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusCreated, log)
@@ -129,7 +137,11 @@ func (h *WorkLogHandler) UpdateWorkLog(c *gin.Context) {
 	req.Date = date
 	log, err := h.svc.UpdateWorkLog(req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		status := http.StatusInternalServerError
+		if strings.HasPrefix(err.Error(), "invalid date:") {
+			status = http.StatusBadRequest
+		}
+		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, log)
