@@ -425,3 +425,70 @@ export interface ReportSummary {
   open_issues: string
   next_focus: string
 }
+
+// ── 数据导入导出 ──
+
+export type ImportPolicy = 'add_new_only' | 'merge_file' | 'merge_current' | 'replace'
+export type ImportChoice = 'file' | 'current'
+
+export interface BackupData {
+  tasks: unknown[]
+  sessions: unknown[]
+  schedules: unknown[]
+  work_logs: unknown[]
+  work_reports: unknown[]
+  settings: { pomodoro: PomodoroSettings; ai: AISettings }
+}
+
+export interface BackupEnvelope {
+  app: string
+  schema_version: number
+  exported_at: string
+  data: BackupData
+}
+
+export interface FieldDiff {
+  field: string
+  current: unknown
+  imported: unknown
+}
+export interface RecordConflict {
+  id: string
+  fields: FieldDiff[]
+}
+export interface SettingsFieldDiff {
+  section: 'pomodoro' | 'ai'
+  field: string
+  current: unknown
+  imported: unknown
+}
+export interface ModulePreview {
+  new: number
+  identical: number
+  conflict: number
+  orphan: number
+  conflicts: RecordConflict[]
+  settings_conflicts: SettingsFieldDiff[]
+}
+export interface ImportPreview {
+  schema_version: number
+  schema_warning: string
+  modules: Record<string, ModulePreview>
+}
+
+export interface ModuleApply {
+  policy: ImportPolicy
+  overrides: Record<string, ImportChoice>
+}
+export interface ApplyImportRequest {
+  data: BackupData
+  modules: Record<string, ModuleApply>
+}
+export interface ModuleApplyResult {
+  inserted: number
+  updated: number
+  deleted: number
+}
+export interface ApplyResult {
+  applied: Record<string, ModuleApplyResult>
+}

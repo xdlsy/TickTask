@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkItem, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput, CreateQuickEntryInput, UpdateQuickEntryInput, UpdateSummaryInput } from '@/types'
+import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkItem, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput, CreateQuickEntryInput, UpdateQuickEntryInput, UpdateSummaryInput, ImportPreview, ApplyImportRequest, ApplyResult } from '@/types'
 
 const client = axios.create({
   baseURL: '/api',
@@ -106,5 +106,18 @@ export const api = {
     client.delete<{ ok: boolean }>(`/work-logs/${date}/items/${itemId}`),
 
   updateWorkLogSummary: (date: string, summary: string) =>
-    client.patch<{ ok: boolean }>(`/work-logs/${date}/summary`, { summary } as UpdateSummaryInput)
+    client.patch<{ ok: boolean }>(`/work-logs/${date}/summary`, { summary } as UpdateSummaryInput),
+
+  // 数据导入导出
+  exportData: () =>
+    client.get<Blob>('/data/export', { responseType: 'blob' }),
+  previewImport: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return client.post<ImportPreview>('/data/import/preview', form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+  applyImport: (payload: ApplyImportRequest) =>
+    client.post<ApplyResult>('/data/import/apply', payload),
 }

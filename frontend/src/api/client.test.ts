@@ -247,7 +247,7 @@ describe('Schedule API', () => {
       expect(mockAxios.post).toHaveBeenCalledWith('/schedules/generate', {
         start_time: '09:00',
         end_time: '18:00'
-      })
+      }, { timeout: 360000 })
       expect(result.data.events).toHaveLength(1)
     })
 
@@ -262,7 +262,7 @@ describe('Schedule API', () => {
       expect(mockAxios.post).toHaveBeenCalledWith('/schedules/generate', {
         start_time: undefined,
         end_time: undefined
-      })
+      }, { timeout: 360000 })
     })
   })
 })
@@ -301,5 +301,72 @@ describe('Schedule API Error Handling', () => {
     ;(mockAxios.get as ReturnType<typeof vi.fn>).mockRejectedValue(error)
 
     await expect(api.getSchedules()).rejects.toThrow('Network Error')
+  })
+})
+
+describe('Data Import/Export API', () => {
+  let mockAxios: ReturnType<typeof axios.create>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAxios = axios.create()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  describe('exportData', () => {
+    it('should call GET /data/export with blob responseType', async () => {
+      const mockResponse = { data: new Blob(['{}'], { type: 'application/json' }) }
+      ;(mockAxios.get as ReturnType<typeof vi.fn>).mockResolvedValue(mockResponse)
+
+      await api.exportData()
+
+      expect(mockAxios.get).toHaveBeenCalledWith('/data/export', { responseType: 'blob' })
+    })
+  })
+
+  describe('previewImport', () => {
+    it('should POST /data/import/preview with FormData + multipart header', async () => {
+      const mockResponse = {
+        data: {
+          schema_version: 1,
+          schema_warning: '',
+          modules: {}
+        }
+      }
+      ;(mockAxios.post as ReturnType<typeof vi.fn>).mockResolvedValue(mockResponse)
+
+      const file = new File(['{}'], 'b.json')
+      await api.previewImport(file)
+
+      const args = (mockAxios.post as ReturnType<typeof vi.fn>).mock.calls[0]
+      expect(args[0]).toBe('/data/import/preview')
+      expect(args[1]).toBeInstanceOf(FormData)
+      expect(args[2]?.headers?.['Content-Type']).toContain('multipart/form-data')
+    })
+  })
+
+  describe('applyImport', () => {
+    it('should POST /data/import/apply with JSON body', async () => {
+      const mockResponse = { data: { applied: {} } }
+      ;(mockAxios.post as ReturnType<typeof vi.fn>).mockResolvedValue(mockResponse)
+
+      const payload = {
+        data: {
+          tasks: [],
+          sessions: [],
+          schedules: [],
+          work_logs: [],
+          work_reports: [],
+          settings: { pomodoro: {} as any, ai: {} as any }
+        },
+        modules: {}
+      }
+      await api.applyImport(payload)
+
+      expect(mockAxios.post).toHaveBeenCalledWith('/data/import/apply', payload)
+    })
   })
 })
