@@ -216,19 +216,115 @@
 
 ## 10. 测试策略
 
-沿用项目约定(Go 标准 `testing` + 手写 in-memory mock + 表驱动;Vitest + `@vue/test-utils`)。
+沿用项目约定(Go 标准 `testing` + 手写 in-memory mock + 表驱动;Vitest + `@vue/test-utils`)。编号前缀:`S`=后端 service、`H`=后端 handler、`F`=前端、`M`=手工。
 
-**后端 · `data_service_test.go`**(mock `BackupRepository`)
-- 导出:空库→空信封;有数据→结构正确;settings 组装;work_items 嵌套;**DailyStats 不在导出**
-- 预览(表驱动 × 模块状态):全 new / 全 identical / 冲突含字段 diff / orphan 计数 / settings 逐字段 diff(含 api_key)/ schema 版本不匹配告警
-- 应用(表驱动:4 策略 × 场景):每策略正确 inserted/updated/deleted;逐条 override 盖过策略;`replace` 删 orphan;settings 选定值落表;**事务回滚不变式**(注入中途错误→零提交);work_items 随 work_log 的 FK 顺序
-- 校验:坏 JSON / 错 app / 缺 data / 超大 → 正确错误
+### 后端 · `data_service_test.go`(mock `BackupRepository`)
 
-**后端 · `data_test.go`(handler)**:复用 `mocks_test.go` 模式;export→200+attachment 头;preview→200 / 坏文件→400;apply→200 / 坏请求→400
+**导出**
 
-**前端 · Vitest**:`ImportWizard.vue`(步骤流转、渲染计数、策略选择产出正确 apply payload、api_key 掩码、replace 二次确认)、`Settings.vue` 新卡片按钮、api client 三方法形态
+| # | 场景 | 预期 |
+|---|---|---|
+| S-1 | 空库导出 | 合法信封,各数组空,settings 为默认 pomodoro/ai |
+| S-2 | 有数据导出 | 各表记录数与 mock 一致 |
+| S-3 | settings 组装 | 表行正确组装为 `{pomodoro, ai}` |
+| S-4 | work_items 嵌套 | item 归入所属 work_log.items |
+| S-5 | 排除 DailyStats | 信封无 daily_stats |
+| S-6 | 信封元信息 | `app`/`schema_version=1`/`exported_at` 非空 |
 
-**手工验证(非自动化,文档记录)**:导出 → 清库 → 导入(replace)→ 数据一致。留给实现后的 verify 流程跑。
+**预览(只读 diff)**
+
+| # | 场景 | 预期 |
+|---|---|---|
+| S-7 | 全 new | 每模块 new=N,其余 0 |
+| S-8 | 全 identical | identical=N,其余 0 |
+| S-9 | 单条冲突 | conflict=1,conflicts 含逐字段 diff |
+| S-10 | orphan 存在 | orphan 计数正确 |
+| S-11 | 四桶混合 | 四桶计数全对 |
+| S-12 | settings 逐字段 diff | 每个不同字段进 conflicts |
+| S-13 | settings api_key 冲突 | 列入 conflicts(后端不掩码) |
+| S-14 | work_logs 标量冲突 | 该 log 判 conflict |
+| S-15 | work_logs 嵌套 item 冲突 | 整条 log 判 conflict(原子) |
+| S-16 | work_logs 全相同(含 items) | identical |
+| S-17 | schema_version 不匹配 | 返回预览 + schema_warning 非空 |
+| S-18 | identical 判定边界 | canonical JSON 逐字节相等才判 identical |
+
+**应用(单事务)**
+
+| # | 场景 | 预期 |
+|---|---|---|
+| S-19 | `add_new_only` | 只插 new,inserted=N |
+| S-20 | `merge_file` | 插 new + 冲突用文件值,orphan 保留 |
+| S-21 | `merge_current` | 插 new + 冲突保留当前,orphan 保留 |
+| S-22 | `replace` | 插 new + 冲突用文件值 + 删 orphan |
+| S-23 | override=file 盖过 merge_current | 那条用文件值 |
+| S-24 | override=current 盖过 merge_file | 那条保留当前 |
+| S-25 | override 作用 orphan | 不生效 |
+| S-26 | work_logs replace | 整条 log+items 用文件版 |
+| S-27 | settings 字段选定值落表 | 正确 upsert |
+| S-28 | **事务回滚不变式** | 中途写失败 → 零提交 |
+| S-29 | FK 写入顺序 | work_items 随 work_log 写入 |
+| S-30 | 全空操作 | 无写,counts 全 0 |
+
+**校验**
+
+| # | 场景 | 预期 |
+|---|---|---|
+| S-31 | 坏 JSON | 「文件格式无效」 |
+| S-32 | `app != ticktask` | 「不是有效的 TickTask 备份文件」 |
+| S-33 | 缺 `data` | 错误 |
+| S-34 | 文件 >50MB | 拒绝 |
+| S-35 | 非法 policy 枚举 | 错误 |
+| S-36 | 未知 override id | 静默忽略 |
+
+### 后端 · `data_test.go`(handler · 复用 `mocks_test.go`)
+
+| # | 场景 | 预期 |
+|---|---|---|
+| H-1 | `GET /api/data/export` | 200 + attachment 头 + 合法 JSON |
+| H-2 | export 空库 | 200 + 空信封 |
+| H-3 | `POST /import/preview` 合法 | 200 + ImportPreview |
+| H-4 | `POST /import/preview` 坏文件 | 400 |
+| H-5 | `POST /import/apply` 合法 | 200 + ApplyResult |
+| H-6 | `POST /import/apply` 非法 policy | 400 |
+| H-7 | `POST /import/apply` 服务层错误 | 500 |
+
+### 前端 · Vitest
+
+**`ImportWizard.vue`**
+
+| # | 场景 | 预期 |
+|---|---|---|
+| F-1 | 步骤流转 | 选文件→预览→应用 正确推进 |
+| F-2 | 渲染模块计数 | 四桶计数正确 |
+| F-3 | settings 字段 diff | 列出 current vs imported |
+| F-4 | api_key 掩码 | `••••`,不露明文 |
+| F-5 | 策略下拉变更 | 更新 apply payload |
+| F-6 | 逐条 override 切换 | 更新 overrides |
+| F-7 | 选 replace | 弹二次确认 |
+| F-8 | 取消二次确认 | 不发起 apply |
+| F-9 | 收集 payload | 调 applyImport,形态正确 |
+| F-10 | apply 成功 | 关闭向导 + 触发重载 |
+| F-11 | apply 失败 | ElMessage.error + 向导不关 |
+| F-12 | 预览失败 | ElMessage.error + 停选文件步 |
+
+**`Settings.vue` + api client**
+
+| # | 场景 | 预期 |
+|---|---|---|
+| F-13 | 「数据管理」卡片 | 渲染,含两按钮 |
+| F-14 | 点导出 | 调 api.exportData |
+| F-15 | 点导入 | 打开 ImportWizard |
+| F-16 | exportData() | GET,下载/blob 正确 |
+| F-17 | previewImport(file) | POST multipart,字段名 file |
+| F-18 | applyImport(payload) | POST JSON,形态正确 |
+
+### 手工验证(非自动化 · verify 流程)
+
+| # | 场景 | 预期 |
+|---|---|---|
+| M-1 | 导出→清库→导入(replace)→比对 | 与原库完全一致 |
+| M-2 | 含 api_key 导入→设置页 AI 卡 | api_key 正确还原 |
+| M-3 | dangling task_id 导入 | 不报错,预览有警告 |
 
 ## 11. 未来扩展(本期不做)
 
