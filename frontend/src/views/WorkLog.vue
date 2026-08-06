@@ -39,7 +39,9 @@
 
           <TodayContextCard :context="store.todayContext" />
 
+          <!-- AI 脑暴入口暂时隐藏，组件/逻辑保留以便后续恢复 -->
           <BrainDumpInput
+            v-if="false"
             :loading="structuring"
             @structure="onStructure"
           />
