@@ -71,8 +71,12 @@ func main() {
 	workLogAIClient := service.NewWorkLogAIClient(aiService)
 	workLogService := service.NewWorkLogService(workLogRepo, taskRepo, sessionRepo, workLogAIClient)
 
+	// 初始化 Data Service（数据导入导出）
+	dataRepo := repository.NewDataRepository(db)
+	dataService := service.NewDataService(dataRepo)
+
 	// 设置路由
-	router := api.SetupRouter(cfg, taskService, timerService, aiService, analyticsService, scheduleService, workLogService, wsHub, settingRepo)
+	router := api.SetupRouter(cfg, taskService, timerService, aiService, analyticsService, scheduleService, workLogService, wsHub, settingRepo, dataService)
 
 	// 启动服务器
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

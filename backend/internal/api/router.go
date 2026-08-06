@@ -25,6 +25,7 @@ func SetupRouter(
 	workLogService *service.WorkLogService,
 	wsHub *websocket.Hub,
 	settingRepo repository.SettingRepository,
+	dataService service.DataService,
 ) *gin.Engine {
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -83,6 +84,15 @@ func SetupRouter(
 			settings.GET("", settingHandler.GetSettings)
 			settings.PUT("/pomodoro", settingHandler.UpdatePomodoroSettings)
 			settings.PUT("/ai", settingHandler.UpdateAISettings)
+		}
+
+		// 数据导入导出
+		data := api.Group("/data")
+		{
+			dataHandler := handler.NewDataHandler(dataService)
+			data.GET("/export", dataHandler.Export)
+			data.POST("/import/preview", dataHandler.PreviewImport)
+			data.POST("/import/apply", dataHandler.ApplyImport)
 		}
 
 		// 数据分析
