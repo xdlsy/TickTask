@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -65,6 +66,10 @@ func (h *DataHandler) ApplyImport(c *gin.Context) {
 	}
 	res, err := h.svc.ApplyImport(&req)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidPolicy) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

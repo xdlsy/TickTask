@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"ticktask/internal/model"
@@ -11,6 +12,9 @@ import (
 )
 
 const backupApp = "ticktask"
+
+// ErrInvalidPolicy 标识 ApplyImport 收到了非法的 policy 枚举值。handler 据此返回 400。
+var ErrInvalidPolicy = errors.New("invalid policy")
 
 type DataService interface {
 	Export(includeAPIKey bool) (*model.BackupEnvelope, error)
@@ -71,10 +75,10 @@ var validPolicies = map[string]bool{
 }
 
 func (s *dataService) ApplyImport(req *model.ApplyImportRequest) (*model.ApplyResult, error) {
-	// 1. 策略校验(把非法 policy 转为 error,handler 呈现为 400)
+	// 1. 策略校验(把非法 policy 转为 error,handler 据此返回 400)
 	for key, mod := range req.Modules {
 		if !validPolicies[mod.Policy] {
-			return nil, fmt.Errorf("invalid policy %q for module %q", mod.Policy, key)
+			return nil, fmt.Errorf("%w: %q for module %q", ErrInvalidPolicy, mod.Policy, key)
 		}
 	}
 

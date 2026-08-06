@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 	"ticktask/internal/model"
+	"ticktask/internal/service"
 )
 
 var errBoom = errors.New("boom")
@@ -174,5 +175,21 @@ func TestDataHandler_ApplyImport_ServiceError(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestDataHandler_ApplyImport_InvalidPolicy(t *testing.T) {
+	h := NewDataHandler(&mockDataService{applyErr: service.ErrInvalidPolicy})
+	r := setupTestRouter()
+	r.POST("/api/data/import/apply", h.ApplyImport)
+
+	reqBody, _ := json.Marshal(model.ApplyImportRequest{Data: model.BackupData{}, Modules: map[string]model.ModuleApply{}})
+	req, _ := http.NewRequest("POST", "/api/data/import/apply", bytes.NewBuffer(reqBody))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid policy, got %d", w.Code)
 	}
 }

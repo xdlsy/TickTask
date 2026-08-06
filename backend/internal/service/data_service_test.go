@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"testing"
 	"ticktask/internal/model"
 )
@@ -324,6 +325,9 @@ func TestDataService_ApplyImport_InvalidPolicy(t *testing.T) {
 		Modules: map[string]model.ModuleApply{"tasks": {Policy: "bogus"}},
 	})
 	if err == nil {
-		t.Error("invalid policy should error")
+		t.Fatal("invalid policy should error")
+	}
+	if !errors.Is(err, ErrInvalidPolicy) {
+		t.Errorf("error should wrap ErrInvalidPolicy, got %v", err)
 	}
 }
