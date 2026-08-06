@@ -161,3 +161,139 @@ func TestDataService_PreviewImport_SchemaWarning(t *testing.T) {
 		t.Error("mismatched version should produce a warning")
 	}
 }
+
+func TestDataService_ApplyImport_Policies(t *testing.T) {
+	// 当前库:t1(title=x);文件:t1(title=changed) + t2(new)
+	cur := newSnapshot()
+	file := &model.BackupData{Tasks: []model.Task{
+		{ID: "t1", Title: "changed"},
+		{ID: "t2", Title: "brand"},
+	}}
+
+	cases := []struct {
+		policy                        string
+		inserted, updated, deleted    int
+	}{
+		{model.PolicyAddNewOnly, 1, 0, 0},
+		{model.PolicyMergeFile, 1, 1, 0},
+		{model.PolicyMergeCurrent, 1, 0, 0},
+		{model.PolicyReplace, 1, 1, 0},
+	}
+	for _, c := range cases {
+		t.Run(c.policy, func(t *testing.T) {
+			repo := &mockBackupRepo{snapshot: cur}
+			svc := NewDataService(repo)
+			res, err := svc.ApplyImport(&model.ApplyImportRequest{
+				Data:    *file,
+				Modules: map[string]model.ModuleApply{"tasks": {Policy: c.policy}},
+			})
+			if err != nil {
+				t.Fatalf("apply: %v", err)
+			}
+			tr := res.Applied["tasks"]
+			if tr.Inserted != c.inserted || tr.Updated != c.updated || tr.Deleted != c.deleted {
+				t.Errorf("counts: got i%d u%d d%d, want i%d u%d d%d", tr.Inserted, tr.Updated, tr.Deleted, c.inserted, c.updated, c.deleted)
+			}
+			// updated>0 ⇒ t1 was resolved to file ⇒ must be in plan.
+			// updated==0 ⇒ t1 kept current ⇒ must NOT be in plan.
+			t1InPlan := false
+			for _, x := range repo.lastPlan.Tasks {
+				if x.ID == "t1" {
+					t1InPlan = true
+				}
+			}
+			if c.updated > 0 && !t1InPlan {
+				t.Errorf("policy %s: expected t1 in plan (file wins), not found", c.policy)
+			}
+			if c.updated == 0 && t1InPlan {
+				t.Errorf("policy %s: expected t1 NOT in plan (current kept), but found", c.policy)
+			}
+		})
+	}
+}
+
+func TestDataService_ApplyImport_ReplaceDeletesOrphans(t *testing.T) {
+	cur := &model.BackupData{Tasks: []model.Task{{ID: "orphan", Title: "o"}}}
+	file := &model.BackupData{Tasks: []model.Task{}} // 文件没有 orphan
+	repo := &mockBackupRepo{snapshot: cur}
+	svc := NewDataService(repo)
+	res, err := svc.ApplyImport(&model.ApplyImportRequest{
+		Data:    *file,
+		Modules: map[string]model.ModuleApply{"tasks": {Policy: model.PolicyReplace}},
+	})
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if res.Applied["tasks"].Deleted != 1 {
+		t.Errorf("replace should delete orphan, got deleted=%d", res.Applied["tasks"].Deleted)
+	}
+	if len(repo.lastPlan.DeleteTasks) != 1 || repo.lastPlan.DeleteTasks[0] != "orphan" {
+		t.Errorf("orphan not in delete plan: %+v", repo.lastPlan.DeleteTasks)
+	}
+}
+
+func TestDataService_ApplyImport_OverrideBeatsPolicy(t *testing.T) {
+	cur := newSnapshot()
+	file := &model.BackupData{Tasks: []model.Task{{ID: "t1", Title: "changed"}}}
+	repo := &mockBackupRepo{snapshot: cur}
+	svc := NewDataService(repo)
+	_, err := svc.ApplyImport(&model.ApplyImportRequest{
+		Data: *file,
+		Modules: map[string]model.ModuleApply{"tasks": {
+			Policy:    model.PolicyMergeFile,            // 本应把 t1 放进 plan
+			Overrides: map[string]string{"t1": model.ChoiceCurrent}, // 但 override 强制保留当前
+		}},
+	})
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	for _, x := range repo.lastPlan.Tasks {
+		if x.ID == "t1" {
+			t.Errorf("override=current should keep t1 OUT of plan, but found %+v", x)
+		}
+	}
+}
+
+func TestDataService_ApplyImport_SettingsWritten(t *testing.T) {
+	cur := newSnapshot()
+	pomo := model.DefaultPomodoroSettings()
+	pomo.WorkDuration = 1800
+	file := &model.BackupData{Settings: model.SettingsBundle{Pomodoro: pomo, AI: model.DefaultAISettings()}}
+	repo := &mockBackupRepo{snapshot: cur}
+	svc := NewDataService(repo)
+	_, err := svc.ApplyImport(&model.ApplyImportRequest{Data: *file, Modules: map[string]model.ModuleApply{}})
+	if err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if repo.lastPlan.Settings == nil || repo.lastPlan.Settings.Pomodoro.WorkDuration != 1800 {
+		t.Errorf("settings not in plan: %+v", repo.lastPlan.Settings)
+	}
+}
+
+func TestDataService_ApplyImport_UnknownOverrideIgnored(t *testing.T) {
+	cur := newSnapshot()
+	file := newSnapshot()
+	repo := &mockBackupRepo{snapshot: cur}
+	svc := NewDataService(repo)
+	_, err := svc.ApplyImport(&model.ApplyImportRequest{
+		Data: *file,
+		Modules: map[string]model.ModuleApply{"tasks": {
+			Policy:    model.PolicyMergeFile,
+			Overrides: map[string]string{"does-not-exist": model.ChoiceFile},
+		}},
+	})
+	if err != nil {
+		t.Errorf("unknown override id should be ignored, not error: %v", err)
+	}
+}
+
+func TestDataService_ApplyImport_InvalidPolicy(t *testing.T) {
+	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()})
+	_, err := svc.ApplyImport(&model.ApplyImportRequest{
+		Data:    *newSnapshot(),
+		Modules: map[string]model.ModuleApply{"tasks": {Policy: "bogus"}},
+	})
+	if err == nil {
+		t.Error("invalid policy should error")
+	}
+}

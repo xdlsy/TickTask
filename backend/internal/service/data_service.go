@@ -62,8 +62,102 @@ func (s *dataService) PreviewImport(file *model.BackupData, fileVersion int) (*m
 	}, nil
 }
 
+var validPolicies = map[string]bool{
+	model.PolicyAddNewOnly: true, model.PolicyMergeFile: true,
+	model.PolicyMergeCurrent: true, model.PolicyReplace: true,
+}
+
 func (s *dataService) ApplyImport(req *model.ApplyImportRequest) (*model.ApplyResult, error) {
-	return nil, nil // Task 6
+	// 1. 策略校验(把非法 policy 转为 error,handler 呈现为 400)
+	for key, mod := range req.Modules {
+		if !validPolicies[mod.Policy] {
+			return nil, fmt.Errorf("invalid policy %q for module %q", mod.Policy, key)
+		}
+	}
+
+	// 2. 读当前库,构造 plan
+	cur, err := s.repo.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+	plan := model.ApplyPlan{Settings: &req.Data.Settings}
+	result := &model.ApplyResult{Applied: map[string]model.ModuleApplyResult{}}
+
+	// 3. 每模块按 policy + override 计算 upsert/delete + 计数
+	plan.Tasks, plan.DeleteTasks, result.Applied["tasks"] = resolveModule(
+		cur.Tasks, req.Data.Tasks, req.Modules["tasks"], idOfTask)
+	plan.Sessions, plan.DeleteSessions, result.Applied["sessions"] = resolveModule(
+		cur.Sessions, req.Data.Sessions, req.Modules["sessions"], idOfSession)
+	plan.Schedules, plan.DeleteSchedules, result.Applied["schedules"] = resolveModule(
+		cur.Schedules, req.Data.Schedules, req.Modules["schedules"], idOfSchedule)
+	plan.WorkReports, plan.DeleteWorkReports, result.Applied["work_reports"] = resolveModule(
+		cur.WorkReports, req.Data.WorkReports, req.Modules["work_reports"], idOfWorkReport)
+	plan.WorkLogs, plan.DeleteWorkLogs, result.Applied["work_logs"] = resolveModule(
+		cur.WorkLogs, req.Data.WorkLogs, req.Modules["work_logs"], func(l model.WorkLog) string { return l.ID })
+
+	// 4. 单事务执行
+	if err := s.repo.Apply(plan); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// resolveModule 按 policy + overrides 计算某表的 upsert/delete 集合 + 计数。
+// 返回:toUpsert(新增 + 冲突解决为 file 的),toDelete(replace 下的 orphan),计数。
+func resolveModule[T any](cur, file []T, mod model.ModuleApply, idOf func(T) string) (upsert []T, del []string, r model.ModuleApplyResult) {
+	if !validPolicies[mod.Policy] {
+		return nil, nil, model.ModuleApplyResult{}
+	}
+	curByID := map[string]T{}
+	for _, x := range cur {
+		curByID[idOf(x)] = x
+	}
+	fileByID := map[string]T{}
+	for _, x := range file {
+		fileByID[idOf(x)] = x
+	}
+	upsert = []T{}
+	del = []string{}
+
+	wantFile := func(id string) bool {
+		if ch, ok := mod.Overrides[id]; ok {
+			return ch == model.ChoiceFile
+		}
+		switch mod.Policy {
+		case model.PolicyMergeFile, model.PolicyReplace:
+			return true
+		default: // add_new_only, merge_current
+			return false
+		}
+	}
+
+	for _, x := range file {
+		id := idOf(x)
+		ex, inCur := curByID[id]
+		if !inCur {
+			upsert = append(upsert, x) // 新增:所有策略都插入
+			r.Inserted++
+			continue
+		}
+		if jsonEqual(x, ex) {
+			continue // identical:跳过
+		}
+		// 冲突
+		if wantFile(id) {
+			upsert = append(upsert, x)
+			r.Updated++
+		}
+		// 否则保留当前,不动
+	}
+	if mod.Policy == model.PolicyReplace {
+		for id := range curByID {
+			if _, inFile := fileByID[id]; !inFile {
+				del = append(del, id)
+				r.Deleted++
+			}
+		}
+	}
+	return upsert, del, r
 }
 
 // classify 泛型分类:按 id 把 file 记录归入 new/identical/conflict,把 cur 独有的归入 orphan。
