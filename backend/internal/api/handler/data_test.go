@@ -146,6 +146,48 @@ func TestDataHandler_PreviewImport_BadFile(t *testing.T) {
 	}
 }
 
+func TestDataHandler_PreviewImport_NotTickType(t *testing.T) {
+	h := NewDataHandler(&mockDataService{})
+	r := setupTestRouter()
+	r.POST("/api/data/import/preview", h.PreviewImport)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	fw, _ := writer.CreateFormFile("file", "b.json")
+	fw.Write([]byte(`{"app":"other","schema_version":1,"data":{}}`))
+	writer.Close()
+
+	req, _ := http.NewRequest("POST", "/api/data/import/preview", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for wrong app tag, got %d body %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDataHandler_PreviewImport_MissingData(t *testing.T) {
+	h := NewDataHandler(&mockDataService{})
+	r := setupTestRouter()
+	r.POST("/api/data/import/preview", h.PreviewImport)
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	fw, _ := writer.CreateFormFile("file", "b.json")
+	fw.Write([]byte(`{"app":"ticktask","schema_version":1}`))
+	writer.Close()
+
+	req, _ := http.NewRequest("POST", "/api/data/import/preview", body)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for missing data key, got %d body %s", w.Code, w.Body.String())
+	}
+}
+
 func TestDataHandler_ApplyImport(t *testing.T) {
 	h := NewDataHandler(&mockDataService{applyResult: &model.ApplyResult{Applied: map[string]model.ModuleApplyResult{"tasks": {Inserted: 1}}}})
 	r := setupTestRouter()

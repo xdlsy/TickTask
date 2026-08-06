@@ -90,6 +90,14 @@ func readBackupUpload(c *gin.Context) (*model.BackupEnvelope, error) {
 	if len(raw) > maxImportSize {
 		return nil, fmt.Errorf("文件过大(>50MB)")
 	}
+	// 先探针:必须是对象,且含 data 键,否则不是 TickTask 备份。
+	var probe map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &probe); err != nil {
+		return nil, fmt.Errorf("文件格式无效")
+	}
+	if _, ok := probe["data"]; !ok {
+		return nil, fmt.Errorf("不是有效的 TickTask 备份文件")
+	}
 	var env model.BackupEnvelope
 	if err := json.Unmarshal(raw, &env); err != nil {
 		return nil, fmt.Errorf("文件格式无效")
