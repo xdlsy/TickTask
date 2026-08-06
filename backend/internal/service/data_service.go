@@ -13,7 +13,7 @@ import (
 const backupApp = "ticktask"
 
 type DataService interface {
-	Export() (*model.BackupEnvelope, error)
+	Export(includeAPIKey bool) (*model.BackupEnvelope, error)
 	PreviewImport(file *model.BackupData, fileVersion int) (*model.ImportPreview, error)
 	ApplyImport(req *model.ApplyImportRequest) (*model.ApplyResult, error)
 }
@@ -26,10 +26,13 @@ func NewDataService(repo repository.BackupRepository) DataService {
 	return &dataService{repo: repo}
 }
 
-func (s *dataService) Export() (*model.BackupEnvelope, error) {
+func (s *dataService) Export(includeAPIKey bool) (*model.BackupEnvelope, error) {
 	data, err := s.repo.ReadAll()
 	if err != nil {
 		return nil, err
+	}
+	if !includeAPIKey && data.Settings.AI != nil {
+		data.Settings.AI.APIKey = ""
 	}
 	return &model.BackupEnvelope{
 		App:           backupApp,

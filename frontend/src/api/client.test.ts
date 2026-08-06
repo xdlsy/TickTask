@@ -323,7 +323,7 @@ describe('Data Import/Export API', () => {
 
       await api.exportData()
 
-      expect(mockAxios.get).toHaveBeenCalledWith('/data/export', { responseType: 'blob' })
+      expect(mockAxios.get).toHaveBeenCalledWith('/data/export', { params: { include_api_key: true }, responseType: 'blob' })
     })
   })
 

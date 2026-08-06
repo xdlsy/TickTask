@@ -109,8 +109,8 @@ export const api = {
     client.patch<{ ok: boolean }>(`/work-logs/${date}/summary`, { summary } as UpdateSummaryInput),
 
   // 数据导入导出
-  exportData: () =>
-    client.get<Blob>('/data/export', { responseType: 'blob' }),
+  exportData: (includeKey = true) =>
+    client.get<Blob>('/data/export', { params: { include_api_key: includeKey }, responseType: 'blob' }),
   previewImport: (file: File) => {
     const form = new FormData()
     form.append('file', file)

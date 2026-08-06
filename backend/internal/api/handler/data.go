@@ -25,7 +25,8 @@ func NewDataHandler(svc service.DataService) *DataHandler {
 
 // Export GET /api/data/export → 下载 JSON
 func (h *DataHandler) Export(c *gin.Context) {
-	env, err := h.svc.Export()
+	includeKey := c.Query("include_api_key") != "false" // 默认 true;仅当字面量为 "false" 时关闭
+	env, err := h.svc.Export(includeKey)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

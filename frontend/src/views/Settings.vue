@@ -245,6 +245,9 @@
       </div>
       <div class="card-content">
         <p class="form-tip">导出全部数据为 JSON 备份;或从备份文件导入(支持冲突人工解决)。</p>
+        <div class="data-export-row">
+          <el-checkbox v-model="includeAPIKey" data-test="include-api-key">包含 AI API Key</el-checkbox>
+        </div>
         <div class="card-actions">
           <el-button type="primary" size="large" data-test="export-btn" @click="exportData" :loading="exporting">导出全部数据</el-button>
           <el-button size="large" data-test="import-btn" @click="importVisible = true">导入数据</el-button>
@@ -449,11 +452,12 @@ async function testAIConnection() {
 
 const exporting = ref(false)
 const importVisible = ref(false)
+const includeAPIKey = ref(true)
 
 async function exportData() {
   exporting.value = true
   try {
-    const res = await api.exportData()
+    const res = await api.exportData(includeAPIKey.value)
     const url = URL.createObjectURL(res.data)
     const a = document.createElement('a')
     a.href = url
@@ -620,6 +624,10 @@ onMounted(() => {
 .card-actions {
   display: flex;
   gap: 14px;
+}
+
+.data-export-row {
+  margin-bottom: 14px;
 }
 
 .ai-preference-section {

@@ -31,7 +31,7 @@ func newSnapshot() *model.BackupData {
 
 func TestDataService_Export(t *testing.T) {
 	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()})
-	env, err := svc.Export()
+	env, err := svc.Export(true)
 	if err != nil {
 		t.Fatalf("export: %v", err)
 	}
@@ -54,12 +54,42 @@ func TestDataService_Export(t *testing.T) {
 
 func TestDataService_Export_Empty(t *testing.T) {
 	svc := NewDataService(&mockBackupRepo{snapshot: &model.BackupData{}})
-	env, err := svc.Export()
+	env, err := svc.Export(true)
 	if err != nil {
 		t.Fatalf("export empty: %v", err)
 	}
 	if len(env.Data.Tasks) != 0 {
 		t.Error("empty snapshot should export empty arrays")
+	}
+}
+
+func TestDataService_Export_ExcludesAPIKey(t *testing.T) {
+	// snapshot with a real AI key present
+	snap := newSnapshot()
+	snap.Settings.AI = &model.AISettings{APIKey: "secret"}
+
+	cases := []struct {
+		name        string
+		include     bool
+		wantAPIKey  string
+	}{
+		{"include key (default)", true, "secret"},
+		{"exclude key", false, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			svc := NewDataService(&mockBackupRepo{snapshot: snap})
+			env, err := svc.Export(c.include)
+			if err != nil {
+				t.Fatalf("export: %v", err)
+			}
+			if env.Data.Settings.AI == nil {
+				t.Fatal("AI settings nil")
+			}
+			if env.Data.Settings.AI.APIKey != c.wantAPIKey {
+				t.Errorf("api_key: got %q, want %q", env.Data.Settings.AI.APIKey, c.wantAPIKey)
+			}
+		})
 	}
 }
 

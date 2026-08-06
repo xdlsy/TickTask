@@ -23,9 +23,13 @@ type mockDataService struct {
 	applyResult      *model.ApplyResult
 	applyErr         error
 	lastFileVersion  int
+	lastIncludeKey   bool
 }
 
-func (m *mockDataService) Export() (*model.BackupEnvelope, error) { return m.exportEnvelop, m.exportErr }
+func (m *mockDataService) Export(includeAPIKey bool) (*model.BackupEnvelope, error) {
+	m.lastIncludeKey = includeAPIKey
+	return m.exportEnvelop, m.exportErr
+}
 func (m *mockDataService) PreviewImport(file *model.BackupData, fileVersion int) (*model.ImportPreview, error) {
 	m.lastFileVersion = fileVersion
 	return m.previewResult, m.previewErr
@@ -35,7 +39,8 @@ func (m *mockDataService) ApplyImport(req *model.ApplyImportRequest) (*model.App
 }
 
 func TestDataHandler_Export(t *testing.T) {
-	h := NewDataHandler(&mockDataService{exportEnvelop: &model.BackupEnvelope{App: "ticktask", SchemaVersion: 1, Data: model.BackupData{}}})
+	mock := &mockDataService{exportEnvelop: &model.BackupEnvelope{App: "ticktask", SchemaVersion: 1, Data: model.BackupData{}}}
+	h := NewDataHandler(mock)
 	r := setupTestRouter()
 	r.GET("/api/data/export", h.Export)
 
@@ -53,6 +58,41 @@ func TestDataHandler_Export(t *testing.T) {
 	json.Unmarshal(w.Body.Bytes(), &env)
 	if env.App != "ticktask" {
 		t.Errorf("body not envelope: %s", w.Body.String())
+	}
+	// default (no query) → include API key
+	if !mock.lastIncludeKey {
+		t.Errorf("default export should include API key, got include=%v", mock.lastIncludeKey)
+	}
+}
+
+func TestDataHandler_Export_IncludeAPIKeyParam(t *testing.T) {
+	cases := []struct {
+		query      string
+		wantInclude bool
+	}{
+		{"", true},                  // default: include
+		{"?include_api_key=true", true},
+		{"?include_api_key=false", false},
+		{"?include_api_key=0", true}, // only literal "false" disables
+	}
+	for _, c := range cases {
+		t.Run(c.query, func(t *testing.T) {
+			mock := &mockDataService{exportEnvelop: &model.BackupEnvelope{App: "ticktask", SchemaVersion: 1, Data: model.BackupData{}}}
+			h := NewDataHandler(mock)
+			r := setupTestRouter()
+			r.GET("/api/data/export", h.Export)
+
+			req, _ := http.NewRequest("GET", "/api/data/export"+c.query, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Fatalf("status %d", w.Code)
+			}
+			if mock.lastIncludeKey != c.wantInclude {
+				t.Errorf("query %q: include=%v, want %v", c.query, mock.lastIncludeKey, c.wantInclude)
+			}
+		})
 	}
 }
 
