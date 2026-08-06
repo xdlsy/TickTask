@@ -55,6 +55,99 @@ func (r *dataRepository) ReadAll() (*model.BackupData, error) {
 }
 
 func (r *dataRepository) Apply(plan model.ApplyPlan) error {
-	// Task 3 实现
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := upsertSlice(tx, plan.Tasks); err != nil {
+			return err
+		}
+		if err := upsertSlice(tx, plan.Sessions); err != nil {
+			return err
+		}
+		if err := upsertSlice(tx, plan.Schedules); err != nil {
+			return err
+		}
+		if err := upsertSlice(tx, plan.WorkReports); err != nil {
+			return err
+		}
+		if err := applyWorkLogs(tx, plan.WorkLogs); err != nil {
+			return err
+		}
+
+		if err := deleteByIDs(tx, &model.Task{}, plan.DeleteTasks); err != nil {
+			return err
+		}
+		if err := deleteByIDs(tx, &model.PomodoroSession{}, plan.DeleteSessions); err != nil {
+			return err
+		}
+		if err := deleteByIDs(tx, &model.Schedule{}, plan.DeleteSchedules); err != nil {
+			return err
+		}
+		if err := deleteByIDs(tx, &model.WorkReport{}, plan.DeleteWorkReports); err != nil {
+			return err
+		}
+		if err := deleteWorkLogOrphans(tx, plan.DeleteWorkLogs); err != nil {
+			return err
+		}
+
+		if plan.Settings != nil {
+			if err := writeSetting(tx, "pomodoro.settings", plan.Settings.Pomodoro); err != nil {
+				return err
+			}
+			if err := writeSetting(tx, "ai.settings", plan.Settings.AI); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// upsertSlice 用 Save 批量 upsert(按主键)。
+func upsertSlice[T any](tx *gorm.DB, records []T) error {
+	if len(records) == 0 {
+		return nil
+	}
+	return tx.Save(&records).Error
+}
+
+func deleteByIDs(tx *gorm.DB, dest any, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return tx.Where("id IN ?", ids).Delete(dest).Error
+}
+
+// applyWorkLogs 每条 log:Save 标量 → 删旧 items → 建新 items(原子)。
+func applyWorkLogs(tx *gorm.DB, logs []model.WorkLog) error {
+	for i := range logs {
+		log := logs[i]
+		if err := tx.Save(&log).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("work_log_id = ?", log.ID).Delete(&model.WorkItem{}).Error; err != nil {
+			return err
+		}
+		if len(log.Items) > 0 {
+			if err := tx.Create(&log.Items).Error; err != nil {
+				return err
+			}
+		}
+	}
 	return nil
+}
+
+func deleteWorkLogOrphans(tx *gorm.DB, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	if err := tx.Where("work_log_id IN ?", ids).Delete(&model.WorkItem{}).Error; err != nil {
+		return err
+	}
+	return tx.Where("id IN ?", ids).Delete(&model.WorkLog{}).Error
+}
+
+func writeSetting(tx *gorm.DB, key string, value any) error {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	return tx.Save(&model.Setting{Key: key, Value: string(raw)}).Error
 }
