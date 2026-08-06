@@ -114,4 +114,54 @@ describe('ImportWizard', () => {
     await flushPromises()
     expect(w.emitted('applied')).toBeFalsy()
   })
+
+  describe('per-record conflict override (spec §5.2)', () => {
+    it('default overrides are empty', async () => {
+      const w = mount(ImportWizard)
+      await toPreview(w)
+      expect((w.vm as any).applyPayload.modules.tasks.overrides).toEqual({})
+    })
+
+    it('setOverride file propagates into apply payload', async () => {
+      const w = mount(ImportWizard)
+      await toPreview(w)
+      ;(w.vm as any).setOverride('tasks', 't1', 'file')
+      expect((w.vm as any).applyPayload.modules.tasks.overrides.t1).toBe('file')
+    })
+
+    it('setOverride current propagates into apply payload', async () => {
+      const w = mount(ImportWizard)
+      await toPreview(w)
+      ;(w.vm as any).setOverride('tasks', 't1', 'current')
+      expect((w.vm as any).applyPayload.modules.tasks.overrides.t1).toBe('current')
+    })
+
+    it('setOverride policy removes the override (falls back to module policy)', async () => {
+      const w = mount(ImportWizard)
+      await toPreview(w)
+      ;(w.vm as any).setOverride('tasks', 't1', 'file')
+      ;(w.vm as any).setOverride('tasks', 't1', 'policy')
+      expect((w.vm as any).applyPayload.modules.tasks.overrides.t1).toBeUndefined()
+    })
+
+    it('resets overrides when loading a new file', async () => {
+      const w = mount(ImportWizard)
+      await toPreview(w)
+      ;(w.vm as any).setOverride('tasks', 't1', 'file')
+      // reload a fresh file
+      ;(w.vm as any).onFileSelected(makeFile())
+      await flushPromises()
+      expect((w.vm as any).applyPayload.modules.tasks.overrides).toEqual({})
+    })
+
+    it('renders conflict list with field diffs for conflicting module', async () => {
+      const w = mount(ImportWizard)
+      await toPreview(w)
+      const text = w.text()
+      // conflict record id present
+      expect(text).toContain('t1')
+      // field diff label present
+      expect(text).toContain('status')
+    })
+  })
 })

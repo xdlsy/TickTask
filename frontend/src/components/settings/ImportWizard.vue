@@ -25,6 +25,27 @@
           <el-option label="当前优先" value="merge_current" />
           <el-option label="整模块覆盖" value="replace" />
         </el-select>
+        <!-- 冲突清单:可展开,逐条覆盖 -->
+        <details v-if="preview.modules[key]?.conflicts?.length" class="conflict-list">
+          <summary>冲突清单 ({{ preview.modules[key].conflicts.length }})</summary>
+          <div v-for="c in preview.modules[key].conflicts" :key="c.id" class="conflict-item">
+            <div class="conflict-id">{{ c.id }}</div>
+            <ul class="conflict-fields">
+              <li v-for="f in c.fields" :key="f.field">
+                {{ f.field }}: {{ displayValue('', '', f.current) }} → {{ displayValue('', '', f.imported) }}
+              </li>
+            </ul>
+            <el-radio-group
+              :model-value="overrides[key]?.[c.id] || 'policy'"
+              @update:model-value="setOverride(key, c.id, $event)"
+              size="small"
+            >
+              <el-radio value="policy">跟随策略</el-radio>
+              <el-radio value="current">当前</el-radio>
+              <el-radio value="file">文件</el-radio>
+            </el-radio-group>
+          </div>
+        </details>
       </div>
 
       <!-- 设置字段级 diff -->
@@ -69,13 +90,15 @@ const moduleLabel: Record<string, string> = {
 
 const policies = reactive<Record<string, ImportPolicy>>({})
 const settingsChoice = reactive<Record<string, 'current' | 'file'>>({})
+// 逐条冲突覆盖:module → id → 'file' | 'current'。'policy' 表示不写入,跟随模块策略。
+const overrides = reactive<Record<string, Record<string, 'file' | 'current'>>>({})
 
 const settingsConflicts = computed(() => preview.value.modules['settings']?.settings_conflicts || [])
 
 const applyPayload = computed<ApplyImportRequest>(() => {
   const modules: ApplyImportRequest['modules'] = {}
   for (const k of collectionKeys) {
-    modules[k] = { policy: policies[k] || 'add_new_only', overrides: {} }
+    modules[k] = { policy: policies[k] || 'add_new_only', overrides: overrides[k] || {} }
   }
   return { data: resolvedData(), modules }
 })
@@ -108,6 +131,8 @@ async function onFileSelected(file: File) {
     filePayload.value = env.data as BackupData
     const res = await api.previewImport(file)
     preview.value = res.data
+    // 重置逐条覆盖(新文件不沿用旧选择)
+    for (const k of Object.keys(overrides)) delete overrides[k]
     for (const c of preview.value.modules['settings']?.settings_conflicts || []) {
       settingsChoice[c.section + '.' + c.field] = 'current'
     }
@@ -126,6 +151,15 @@ function setPolicy(key: string, p: ImportPolicy) {
 }
 function setSettingsChoice(section: string, field: string, choice: 'current' | 'file') {
   settingsChoice[section + '.' + field] = choice
+}
+// 设置冲突记录的 override;'policy' 删除 override(回退到模块策略),'file'/'current' 写入。
+function setOverride(module: string, id: string, choice: 'file' | 'current' | 'policy') {
+  if (!overrides[module]) overrides[module] = {}
+  if (choice === 'policy') {
+    delete overrides[module][id]
+  } else {
+    overrides[module][id] = choice
+  }
 }
 
 async function clickApply() {
@@ -148,15 +182,20 @@ async function clickApply() {
 }
 
 defineExpose({
-  step, preview, applyPayload, displayValue,
-  onFileSelected, setPolicy, setSettingsChoice, clickApply
+  step, preview, applyPayload, displayValue, overrides,
+  onFileSelected, setPolicy, setSettingsChoice, setOverride, clickApply
 })
 </script>
 
 <style scoped>
-.module-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
-.module-summary { display: flex; gap: 12px; align-items: center; }
+.module-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color); gap: 8px; }
+.module-summary { display: flex; gap: 12px; align-items: center; flex: 1; }
 .module-summary span { font-size: 13px; color: var(--text-muted); }
+.conflict-list { flex-basis: 100%; width: 100%; margin-top: 8px; padding: 8px; background: var(--bg-primary, #faf9f6); border-radius: 4px; }
+.conflict-item { padding: 6px 0; border-top: 1px dashed var(--border-color); }
+.conflict-item:first-child { border-top: none; }
+.conflict-id { font-weight: 500; font-size: 13px; margin-bottom: 4px; }
+.conflict-fields { margin: 0 0 6px 16px; padding: 0; font-size: 12px; color: var(--text-muted); list-style: disc; }
 .settings-diff { margin-top: 16px; }
 .diff-row { display: flex; gap: 12px; align-items: center; padding: 6px 0; }
 .diff-field { width: 160px; font-weight: 500; }
