@@ -231,6 +231,28 @@
       </div>
     </div>
 
+    <!-- 数据管理 -->
+    <div class="settings-card">
+      <div class="card-header">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="card-icon">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span>数据管理</span>
+        </div>
+      </div>
+      <div class="card-content">
+        <p class="form-tip">导出全部数据为 JSON 备份;或从备份文件导入(支持冲突人工解决)。</p>
+        <div class="card-actions">
+          <el-button type="primary" size="large" data-test="export-btn" @click="exportData" :loading="exporting">导出全部数据</el-button>
+          <el-button size="large" data-test="import-btn" @click="importVisible = true">导入数据</el-button>
+        </div>
+        <ImportWizard v-model="importVisible" @applied="onImported" />
+      </div>
+    </div>
+
     <!-- 关于 -->
     <div class="settings-card about-card">
       <div class="card-header">
@@ -271,6 +293,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/api/client'
 import { useAIStore } from '@/stores/ai'
+import ImportWizard from '@/components/settings/ImportWizard.vue'
 import type { PomodoroSettings, AISettings } from '@/types'
 
 const aiStore = useAIStore()
@@ -422,6 +445,34 @@ async function testAIConnection() {
   } finally {
     testing.value = false
   }
+}
+
+const exporting = ref(false)
+const importVisible = ref(false)
+
+async function exportData() {
+  exporting.value = true
+  try {
+    const res = await api.exportData()
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ticktask-backup-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch {
+    ElMessage.error('导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
+
+async function onImported() {
+  await loadSettings()
+  await aiStore.checkStatus()
 }
 
 onMounted(() => {

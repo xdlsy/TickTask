@@ -26,7 +26,10 @@ vi.mock('@/api/client', () => ({
   api: {
     getSettings: vi.fn(),
     updatePomodoroSettings: vi.fn(),
-    updateAISettings: vi.fn()
+    updateAISettings: vi.fn(),
+    exportData: vi.fn().mockResolvedValue({ data: new Blob(['{}']) }),
+    previewImport: vi.fn(),
+    applyImport: vi.fn()
   }
 }))
 
@@ -256,6 +259,37 @@ describe('Settings.vue', () => {
 
       // Should render without errors even without strategy
       expect(wrapper.find('.settings-page, .page-header, form').exists()).toBe(true)
+    })
+  })
+
+  describe('Settings data card', () => {
+    it('renders data management card with export/import buttons', async () => {
+      const { api } = await import('@/api/client')
+      ;(api.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: { pomodoro: mockPomodoroSettings, ai: mockAISettings }
+      })
+
+      const wrapper = mount(Settings, { global: { stubs: { ...elStubs, ImportWizard: true } } })
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      expect(wrapper.text()).toContain('数据管理')
+      expect(wrapper.text()).toContain('导出全部数据')
+      expect(wrapper.text()).toContain('导入数据')
+    })
+
+    it('clicking export calls api.exportData', async () => {
+      const { api } = await import('@/api/client')
+      ;(api.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: { pomodoro: mockPomodoroSettings, ai: mockAISettings }
+      })
+
+      const wrapper = mount(Settings, { global: { stubs: { ...elStubs, ImportWizard: true } } })
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      await wrapper.get('[data-test="export-btn"]').trigger('click')
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      expect(api.exportData).toHaveBeenCalled()
     })
   })
 })
