@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig, configDefaults } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
 
@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
+    exclude: [...configDefaults.exclude, 'tests/**'],
   },
   resolve: {
     alias: {
