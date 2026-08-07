@@ -17,14 +17,16 @@ var errBoom = errors.New("boom")
 
 // mockDataService 实现 service.DataService
 type mockDataService struct {
-	exportEnvelop    *model.BackupEnvelope
-	exportErr        error
-	previewResult    *model.ImportPreview
-	previewErr       error
-	applyResult      *model.ApplyResult
-	applyErr         error
-	lastFileVersion  int
-	lastIncludeKey   bool
+	exportEnvelop   *model.BackupEnvelope
+	exportErr       error
+	previewResult   *model.ImportPreview
+	previewErr      error
+	applyResult     *model.ApplyResult
+	applyErr        error
+	clearResult     *model.ClearResult
+	clearErr        error
+	lastFileVersion int
+	lastIncludeKey  bool
 }
 
 func (m *mockDataService) Export(includeAPIKey bool) (*model.BackupEnvelope, error) {
@@ -37,6 +39,9 @@ func (m *mockDataService) PreviewImport(file *model.BackupData, fileVersion int)
 }
 func (m *mockDataService) ApplyImport(req *model.ApplyImportRequest) (*model.ApplyResult, error) {
 	return m.applyResult, m.applyErr
+}
+func (m *mockDataService) ClearAll() (*model.ClearResult, error) {
+	return m.clearResult, m.clearErr
 }
 
 func TestDataHandler_Export(t *testing.T) {
@@ -68,10 +73,10 @@ func TestDataHandler_Export(t *testing.T) {
 
 func TestDataHandler_Export_IncludeAPIKeyParam(t *testing.T) {
 	cases := []struct {
-		query      string
+		query       string
 		wantInclude bool
 	}{
-		{"", true},                  // default: include
+		{"", true}, // default: include
 		{"?include_api_key=true", true},
 		{"?include_api_key=false", false},
 		{"?include_api_key=0", true}, // only literal "false" disables

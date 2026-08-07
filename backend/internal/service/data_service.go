@@ -20,6 +20,7 @@ type DataService interface {
 	Export(includeAPIKey bool) (*model.BackupEnvelope, error)
 	PreviewImport(file *model.BackupData, fileVersion int) (*model.ImportPreview, error)
 	ApplyImport(req *model.ApplyImportRequest) (*model.ApplyResult, error)
+	ClearAll() (*model.ClearResult, error)
 }
 
 type dataService struct {
@@ -107,6 +108,10 @@ func (s *dataService) ApplyImport(req *model.ApplyImportRequest) (*model.ApplyRe
 		return nil, err
 	}
 	return result, nil
+}
+
+func (s *dataService) ClearAll() (*model.ClearResult, error) {
+	return s.repo.ClearAll()
 }
 
 // resolveModule 按 policy + overrides 计算某表的 upsert/delete 集合 + 计数。

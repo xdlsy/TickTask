@@ -76,9 +76,9 @@ func TestDataService_Export_ExcludesAPIKey(t *testing.T) {
 	snap.Settings.AI = &model.AISettings{APIKey: "secret"}
 
 	cases := []struct {
-		name        string
-		include     bool
-		wantAPIKey  string
+		name       string
+		include    bool
+		wantAPIKey string
 	}{
 		{"include key (default)", true, "secret"},
 		{"exclude key", false, ""},
@@ -208,8 +208,8 @@ func TestDataService_ApplyImport_Policies(t *testing.T) {
 	}}
 
 	cases := []struct {
-		policy                        string
-		inserted, updated, deleted    int
+		policy                     string
+		inserted, updated, deleted int
 	}{
 		{model.PolicyAddNewOnly, 1, 0, 0},
 		{model.PolicyMergeFile, 1, 1, 0},
@@ -277,7 +277,7 @@ func TestDataService_ApplyImport_OverrideBeatsPolicy(t *testing.T) {
 	_, err := svc.ApplyImport(&model.ApplyImportRequest{
 		Data: *file,
 		Modules: map[string]model.ModuleApply{"tasks": {
-			Policy:    model.PolicyMergeFile,            // 本应把 t1 放进 plan
+			Policy:    model.PolicyMergeFile,                        // 本应把 t1 放进 plan
 			Overrides: map[string]string{"t1": model.ChoiceCurrent}, // 但 override 强制保留当前
 		}},
 	})
@@ -335,5 +335,17 @@ func TestDataService_ApplyImport_InvalidPolicy(t *testing.T) {
 	}
 	if !errors.Is(err, ErrInvalidPolicy) {
 		t.Errorf("error should wrap ErrInvalidPolicy, got %v", err)
+	}
+}
+
+func TestDataService_ClearAll_Passthrough(t *testing.T) {
+	want := &model.ClearResult{Tasks: 3, Sessions: 5, WorkLogs: 1}
+	svc := NewDataService(&mockBackupRepo{clearResult: want})
+	got, err := svc.ClearAll()
+	if err != nil {
+		t.Fatalf("clearall: %v", err)
+	}
+	if got != want {
+		t.Errorf("ClearAll should pass the repo result through: got %+v, want %+v", got, want)
 	}
 }
