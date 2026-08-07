@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import Settings from './Settings.vue'
 
@@ -28,13 +28,14 @@ vi.mock('@/api/client', () => ({
     updatePomodoroSettings: vi.fn(),
     updateAISettings: vi.fn(),
     previewImport: vi.fn(),
-    applyImport: vi.fn()
+    applyImport: vi.fn(),
+    clearAll: vi.fn()
   }
 }))
 
 vi.mock('element-plus', () => ({
   ElMessage: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
-  ElMessageBox: { confirm: vi.fn() }
+  ElMessageBox: { confirm: vi.fn(), prompt: vi.fn() }
 }))
 
 const elStubs = {
@@ -64,6 +65,35 @@ describe('Settings.vue', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  describe('Clear All Data', () => {
+    it('calls clearAll after backup-confirm and type-confirm', async () => {
+      vi.useFakeTimers()
+      const { api } = await import('@/api/client')
+      const { ElMessage, ElMessageBox } = await import('element-plus')
+      ;(api.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: { pomodoro: mockPomodoroSettings, ai: mockAISettings }
+      })
+      ;(api.clearAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: { tasks: 1, sessions: 0, schedules: 0, work_logs: 0, work_reports: 0, daily_stats: 0 }
+      })
+      ;(ElMessageBox.confirm as ReturnType<typeof vi.fn>).mockResolvedValue('confirm')
+      ;(ElMessageBox.prompt as ReturnType<typeof vi.fn>).mockResolvedValue({ value: '清空' })
+
+      const wrapper = mount(Settings, { global: { stubs: { ...elStubs, ImportWizard: true } } })
+      await flushPromises()
+
+      await wrapper.find('[data-test="clear-btn"]').trigger('click')
+      // advance the async chain: confirm → (export) → prompt → api.clearAll
+      await flushPromises()
+      await flushPromises()
+      await flushPromises()
+
+      expect(api.clearAll).toHaveBeenCalled()
+      expect(ElMessage.success).toHaveBeenCalled()
+      vi.useRealTimers()
+    })
   })
 
   describe('API Key Security (R07 P0)', () => {

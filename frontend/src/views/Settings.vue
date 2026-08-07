@@ -251,6 +251,14 @@
           <el-button size="large" data-test="import-btn" @click="importVisible = true">导入数据</el-button>
         </div>
         <ImportWizard v-model="importVisible" @applied="onImported" />
+
+        <div class="clear-zone">
+          <div class="clear-text">
+            <span class="clear-title">清空全部数据</span>
+            <span class="clear-desc">删除所有任务、番茄记录、日程与工作日志(配置与 AI Key 保留)。操作不可恢复。</span>
+          </div>
+          <el-button type="danger" size="large" data-test="clear-btn" :loading="clearing" @click="clearAllData">清空全部数据</el-button>
+        </div>
       </div>
     </div>
 
@@ -291,11 +299,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/api/client'
 import { useAIStore } from '@/stores/ai'
 import ImportWizard from '@/components/settings/ImportWizard.vue'
-import type { PomodoroSettings, AISettings } from '@/types'
+import type { PomodoroSettings, AISettings, ClearResult } from '@/types'
 
 const aiStore = useAIStore()
 
@@ -450,6 +458,7 @@ async function testAIConnection() {
 
 const exporting = ref(false)
 const importVisible = ref(false)
+const clearing = ref(false)
 
 function exportData() {
   // 直接走真实端点 URL(而非 blob URL):服务端用 Content-Disposition 决定文件名
@@ -465,6 +474,60 @@ function exportData() {
   document.body.removeChild(a)
   ElMessage.success('导出成功')
   setTimeout(() => { exporting.value = false }, 800)
+}
+
+async function clearAllData() {
+  // 1. 是否先备份:confirm = 先备份再清空;cancel = 直接清空;close(X/Esc) = 取消
+  let backup = false
+  try {
+    await ElMessageBox.confirm(
+      '此操作将清空所有任务、番茄记录、日程与工作日志,且不可恢复。配置与 AI Key 会保留。',
+      '清空全部数据',
+      {
+        confirmButtonText: '先备份再清空',
+        cancelButtonText: '直接清空',
+        distinguishCancelAndClose: true,
+        type: 'warning'
+      }
+    )
+    backup = true
+  } catch (action) {
+    if (action === 'cancel') {
+      backup = false
+    } else {
+      return // close → 用户放弃
+    }
+  }
+
+  if (backup) {
+    exportData() // 触发与「导出全部数据」相同的下载
+  }
+
+  // 2. 最终确认:输入「清空」
+  try {
+    await ElMessageBox.prompt('请输入「清空」以确认。', '最终确认', {
+      confirmButtonText: '清空全部数据',
+      cancelButtonText: '取消',
+      inputPlaceholder: '清空',
+      inputValidator: (v: string) => v === '清空' || '请输入「清空」以确认',
+      type: 'error'
+    })
+  } catch {
+    return
+  }
+
+  // 3. 执行
+  clearing.value = true
+  try {
+    const { data }: { data: ClearResult } = await api.clearAll()
+    const total = data.tasks + data.sessions + data.schedules + data.work_logs + data.work_reports + data.daily_stats
+    ElMessage.success(`已清空 ${total} 条记录`)
+    setTimeout(() => location.reload(), 600)
+  } catch {
+    ElMessage.error('清空失败,请重试')
+  } finally {
+    clearing.value = false
+  }
 }
 
 async function onImported() {
@@ -703,6 +766,41 @@ onMounted(() => {
 .card-actions .el-button {
   min-width: 130px;
   border-radius: var(--radius-md);
+}
+
+.clear-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.clear-text {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.clear-title {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 40;
+  font-size: 15px;
+  font-weight: 440;
+  color: var(--accent-crimson);
+  letter-spacing: -0.01em;
+}
+
+.clear-desc {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.clear-zone .el-button {
+  flex-shrink: 0;
 }
 
 /* el-slider — dark (not covered by global App.vue overrides) */
