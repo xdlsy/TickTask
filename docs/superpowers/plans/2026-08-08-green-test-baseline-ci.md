@@ -78,6 +78,43 @@ npx vitest run 2>&1 | tee /tmp/vitest-baseline.txt
 ```
 Expected: the **10 schedule color tests fail** (4 in `DayView.test.ts`, 3 in `WeekView.test.ts`, 3 in `MonthView.test.ts`). The `scheduling_strategy` tests may or may not appear (their `vi.fn` mocks and `if (saveBtn)` guards can make them vacuously pass) — **record the actual count and list** from `/tmp/vitest-baseline.txt`. Reconcile against the documented "11" (AGENTS.md:137); the real number governs the rest of this plan.
 
+> **AMENDMENT (discovered during execution):** The first baseline run reported `Test Files 52 failed` — but those are **collection-level** crashes, not test-case failures. Root cause: vitest has no `exclude`, so its default glob picks up the **22 Playwright e2e specs under `tests/e2e/`** (which import `@playwright/test` and crash vitest collection). The vitest config itself is correct (vue plugin + `@` alias work — scoped runs succeed). Fix in Step 3a.
+
+- [ ] **Step 3a: Exclude the Playwright e2e dir from vitest, then re-capture the clean baseline**
+
+The e2e specs belong to Playwright (`npm run test:e2e`, `playwright.config.ts` `testDir: './tests/e2e'`), not vitest. Edit `frontend/vitest.config.ts` to merge an `exclude` with the defaults:
+
+```ts
+import { defineConfig, configDefaults } from 'vitest/config'
+import vue from '@vitejs/plugin-vue'
+import { fileURLToPath, URL } from 'node:url'
+
+export default defineConfig({
+  plugins: [vue()],
+  test: {
+    globals: true,
+    environment: 'happy-dom',
+    exclude: [...configDefaults.exclude, 'tests/**'],
+  },
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  }
+})
+```
+
+Then re-run and record the clean baseline:
+```bash
+cd frontend
+npx vitest run 2>&1 | tee /tmp/vitest-baseline-clean.txt
+```
+Expected: the 22 e2e files are gone; the real unit-test failures remain — the **10 schedule color tests** (rgb-vs-hex) and possibly the `scheduling_strategy` tests. **Record the exact list/count** from `/tmp/vitest-baseline-clean.txt`. If any OTHER unit test fails (e.g. `src/router/index.test.ts` "window is not defined"), record it for triage — do not ignore. Commit:
+```bash
+git add frontend/vitest.config.ts
+git -c user.name="lsy" -c user.email="lsy@local" commit -m "chore(test): exclude Playwright e2e specs from vitest unit run"
+```
+
 - [ ] **Step 4: Confirm backend is green (sanity)**
 
 ```bash
@@ -306,7 +343,7 @@ In `frontend/package.json`, delete this line from `devDependencies`:
 cd frontend
 npm install
 ```
-Expected: completes; `package-lock.json` no longer contains a `jsdom` entry (verify with `grep -c jsdom frontend/package-lock.json` → `0`).
+Expected: completes; `jsdom` is removed from `package.json` `devDependencies` (verify `grep jsdom frontend/package.json` → none). NOTE: jsdom will likely still appear in `package-lock.json`/`node_modules` because **vitest declares jsdom as an optional peer dependency** and npm 7+ auto-installs it — that is expected and harmless (vitest uses happy-dom per config). The goal is dropping jsdom as a *direct* devDep, which this achieves. Do not add `legacy-peer-deps` to force it out — that ignores all peers and risks the Vue plugin.
 
 - [ ] **Step 3: Verify the suite still runs green on happy-dom**
 
