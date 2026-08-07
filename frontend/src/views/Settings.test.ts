@@ -65,6 +65,7 @@ describe('Settings.vue', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
   describe('Clear All Data', () => {
@@ -92,7 +93,31 @@ describe('Settings.vue', () => {
 
       expect(api.clearAll).toHaveBeenCalled()
       expect(ElMessage.success).toHaveBeenCalled()
-      vi.useRealTimers()
+    })
+
+    it('does NOT clearAll when the type-confirm prompt is cancelled', async () => {
+      vi.useFakeTimers()
+      const { api } = await import('@/api/client')
+      const { ElMessageBox } = await import('element-plus')
+      ;(api.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: { pomodoro: mockPomodoroSettings, ai: mockAISettings }
+      })
+      ;(api.clearAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+        data: { tasks: 1, sessions: 0, schedules: 0, work_logs: 0, work_reports: 0, daily_stats: 0 }
+      })
+      // backup-confirm accepted (直接清空 path is fine), but the type-confirm prompt is cancelled
+      ;(ElMessageBox.confirm as ReturnType<typeof vi.fn>).mockResolvedValue('confirm')
+      ;(ElMessageBox.prompt as ReturnType<typeof vi.fn>).mockRejectedValue('cancel')
+
+      const wrapper = mount(Settings, { global: { stubs: { ...elStubs, ImportWizard: true } } })
+      await flushPromises()
+
+      await wrapper.find('[data-test="clear-btn"]').trigger('click')
+      await flushPromises()
+      await flushPromises()
+      await flushPromises()
+
+      expect(api.clearAll).not.toHaveBeenCalled()
     })
   })
 
