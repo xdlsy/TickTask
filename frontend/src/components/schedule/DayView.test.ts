@@ -178,7 +178,7 @@ describe('DayView', () => {
       })
 
       const eventBlock = wrapper.find('.event-block')
-      expect(eventBlock.attributes('style')).toContain('background-color: rgb(168, 85, 247)')
+      expect(eventBlock.attributes('style')).toContain('background-color: #a855f7')
     })
 
     it('没有颜色时使用类型默认颜色', () => {
@@ -192,7 +192,7 @@ describe('DayView', () => {
       })
 
       const eventBlock = wrapper.find('.event-block')
-      expect(eventBlock.attributes('style')).toContain('background-color: rgb(184, 149, 77)')
+      expect(eventBlock.attributes('style')).toContain('background-color: #B8954D')
     })
 
     it('任务类型默认蓝色', () => {
@@ -206,7 +206,7 @@ describe('DayView', () => {
       })
 
       const eventBlock = wrapper.find('.event-block')
-      expect(eventBlock.attributes('style')).toContain('background-color: rgb(184, 69, 44)')
+      expect(eventBlock.attributes('style')).toContain('background-color: #B8452C')
     })
 
     it('休息类型默认绿色', () => {
@@ -220,7 +220,7 @@ describe('DayView', () => {
       })
 
       const eventBlock = wrapper.find('.event-block')
-      expect(eventBlock.attributes('style')).toContain('background-color: rgb(107, 139, 111)')
+      expect(eventBlock.attributes('style')).toContain('background-color: #6B8B6F')
     })
   })
 
