@@ -8,9 +8,11 @@ import (
 
 // mockBackupRepo 实现 repository.BackupRepository,内存快照 + 捕获 Apply。
 type mockBackupRepo struct {
-	snapshot *model.BackupData
-	lastPlan *model.ApplyPlan
-	applyErr error
+	snapshot    *model.BackupData
+	lastPlan    *model.ApplyPlan
+	applyErr    error
+	clearResult *model.ClearResult
+	clearErr    error
 }
 
 func (m *mockBackupRepo) ReadAll() (*model.BackupData, error) {
@@ -19,6 +21,10 @@ func (m *mockBackupRepo) ReadAll() (*model.BackupData, error) {
 func (m *mockBackupRepo) Apply(plan model.ApplyPlan) error {
 	m.lastPlan = &plan
 	return m.applyErr
+}
+
+func (m *mockBackupRepo) ClearAll() (*model.ClearResult, error) {
+	return m.clearResult, m.clearErr
 }
 
 func newSnapshot() *model.BackupData {

@@ -116,3 +116,13 @@ type ModuleApplyResult struct {
 type ApplyResult struct {
 	Applied map[string]ModuleApplyResult `json:"applied"`
 }
+
+// ClearResult 各用户数据表的清除计数(Setting 不在内,配置保留)。
+type ClearResult struct {
+	Tasks       int64 `json:"tasks"`
+	Sessions    int64 `json:"sessions"`
+	Schedules   int64 `json:"schedules"`
+	WorkLogs    int64 `json:"work_logs"`
+	WorkReports int64 `json:"work_reports"`
+	DailyStats  int64 `json:"daily_stats"`
+}

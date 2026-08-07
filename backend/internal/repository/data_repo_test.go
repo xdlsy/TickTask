@@ -2,6 +2,7 @@ package repository
 
 import (
 	"testing"
+	"time"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -200,5 +201,48 @@ func TestBackupRepo_Apply_DeleteOrphans(t *testing.T) {
 	db.Model(&model.WorkItem{}).Where("work_log_id = ?", "wl-del").Count(&n)
 	if n != 0 {
 		t.Errorf("worklog orphan's items should be deleted, count=%d", n)
+	}
+}
+
+func TestBackupRepo_ClearAll_KeepsSettings(t *testing.T) {
+	db := newDataTestDB(t)
+	// Seed one row in each user-data table + two setting rows.
+	db.Create(&model.Task{ID: "t1", Title: "x", Status: model.StatusTodo, Quadrant: model.Quadrant1})
+	db.Create(&model.PomodoroSession{ID: "s1", Type: model.SessionWork, PlannedDuration: 1500})
+	db.Create(&model.Schedule{ID: "sch1", Title: "s", StartTime: time.Now(), EndTime: time.Now()})
+	db.Create(&model.WorkLog{ID: "wl1", Date: "2026-08-07"})
+	db.Create(&model.WorkItem{ID: "wi1", WorkLogID: "wl1", Seq: 1, Source: "ai"})
+	db.Create(&model.WorkReport{ID: "wr1", Type: "weekly", PeriodKey: "2026-W31", StartDate: "2026-08-01", EndDate: "2026-08-07"})
+	db.Create(&model.DailyStats{})
+	db.Create(&model.Setting{Key: "pomodoro.settings", Value: "{}"})
+	db.Create(&model.Setting{Key: "ai.settings", Value: "{}"})
+
+	repo := NewDataRepository(db)
+	res, err := repo.ClearAll()
+	if err != nil {
+		t.Fatalf("clearall: %v", err)
+	}
+	if res.Tasks != 1 || res.Sessions != 1 || res.Schedules != 1 ||
+		res.WorkLogs != 1 || res.WorkReports != 1 || res.DailyStats != 1 {
+		t.Errorf("counts wrong: %+v", res)
+	}
+
+	// Every user-data table is now empty.
+	for _, dest := range []any{
+		&model.Task{}, &model.PomodoroSession{}, &model.Schedule{},
+		&model.WorkLog{}, &model.WorkItem{}, &model.WorkReport{}, &model.DailyStats{},
+	} {
+		var n int64
+		db.Model(dest).Count(&n)
+		if n != 0 {
+			t.Errorf("%T not cleared: %d rows remain", dest, n)
+		}
+	}
+
+	// Settings are RETAINED.
+	var settingCount int64
+	db.Model(&model.Setting{}).Count(&settingCount)
+	if settingCount != 2 {
+		t.Errorf("settings should be retained (2 rows), got %d", settingCount)
 	}
 }

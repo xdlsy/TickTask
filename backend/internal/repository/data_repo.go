@@ -11,6 +11,7 @@ import (
 type BackupRepository interface {
 	ReadAll() (*model.BackupData, error)
 	Apply(plan model.ApplyPlan) error
+	ClearAll() (*model.ClearResult, error)
 }
 
 type dataRepository struct {
@@ -150,4 +151,52 @@ func writeSetting(tx *gorm.DB, key string, value any) error {
 		return err
 	}
 	return tx.Save(&model.Setting{Key: key, Value: string(raw)}).Error
+}
+
+// ClearAll 单事务清空全部用户数据;Setting 表保留(配置不丢)。
+func (r *dataRepository) ClearAll() (*model.ClearResult, error) {
+	res := &model.ClearResult{}
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		// 子表先删:WorkItem 属于 WorkLog(不计入 ClearResult)。
+		if _, err = clearTable(tx, &model.WorkItem{}); err != nil {
+			return err
+		}
+		if res.WorkLogs, err = clearTable(tx, &model.WorkLog{}); err != nil {
+			return err
+		}
+		if res.WorkReports, err = clearTable(tx, &model.WorkReport{}); err != nil {
+			return err
+		}
+		if res.Tasks, err = clearTable(tx, &model.Task{}); err != nil {
+			return err
+		}
+		if res.Sessions, err = clearTable(tx, &model.PomodoroSession{}); err != nil {
+			return err
+		}
+		if res.Schedules, err = clearTable(tx, &model.Schedule{}); err != nil {
+			return err
+		}
+		if res.DailyStats, err = clearTable(tx, &model.DailyStats{}); err != nil {
+			return err
+		}
+		// Setting 故意不清。
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+// clearTable 先计数再删全表,返回删除行数。
+func clearTable(tx *gorm.DB, dest any) (int64, error) {
+	var n int64
+	if err := tx.Model(dest).Count(&n).Error; err != nil {
+		return 0, err
+	}
+	if err := tx.Where("1 = 1").Delete(dest).Error; err != nil {
+		return 0, err
+	}
+	return n, nil
 }
