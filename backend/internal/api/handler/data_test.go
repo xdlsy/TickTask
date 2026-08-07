@@ -240,3 +240,38 @@ func TestDataHandler_ApplyImport_InvalidPolicy(t *testing.T) {
 		t.Errorf("expected 400 for invalid policy, got %d", w.Code)
 	}
 }
+
+func TestDataHandler_ClearAll(t *testing.T) {
+	h := NewDataHandler(&mockDataService{clearResult: &model.ClearResult{Tasks: 2, Sessions: 1}})
+	r := setupTestRouter()
+	r.DELETE("/api/data/all", h.ClearAll)
+
+	req, _ := http.NewRequest("DELETE", "/api/data/all", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d body %s", w.Code, w.Body.String())
+	}
+	var res model.ClearResult
+	if err := json.Unmarshal(w.Body.Bytes(), &res); err != nil {
+		t.Fatalf("unmarshal: %v body %s", err, w.Body.String())
+	}
+	if res.Tasks != 2 || res.Sessions != 1 {
+		t.Errorf("counts not returned: %+v", res)
+	}
+}
+
+func TestDataHandler_ClearAll_ServiceError(t *testing.T) {
+	h := NewDataHandler(&mockDataService{clearErr: errBoom})
+	r := setupTestRouter()
+	r.DELETE("/api/data/all", h.ClearAll)
+
+	req, _ := http.NewRequest("DELETE", "/api/data/all", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d", w.Code)
+	}
+}

@@ -76,6 +76,16 @@ func (h *DataHandler) ApplyImport(c *gin.Context) {
 	c.JSON(http.StatusOK, res)
 }
 
+// ClearAll DELETE /api/data/all → 清空全部用户数据(保留配置)
+func (h *DataHandler) ClearAll(c *gin.Context) {
+	res, err := h.svc.ClearAll()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
 // readBackupUpload 读 multipart 文件并解析信封,做基础校验。
 func readBackupUpload(c *gin.Context) (*model.BackupEnvelope, error) {
 	file, _, err := c.Request.FormFile("file")

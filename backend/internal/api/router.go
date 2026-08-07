@@ -93,6 +93,7 @@ func SetupRouter(
 			data.GET("/export", dataHandler.Export)
 			data.POST("/import/preview", dataHandler.PreviewImport)
 			data.POST("/import/apply", dataHandler.ApplyImport)
+			data.DELETE("/all", dataHandler.ClearAll)
 		}
 
 		// 数据分析
