@@ -334,7 +334,7 @@ onUnmounted(() => {
 .day-view {
   display: flex;
   flex-direction: column;
-  background: var(--bg-card);
+  background: var(--gradient-card);
   border-radius: var(--radius-xl);
   overflow: hidden;
   border: 1px solid var(--border-color);
@@ -361,15 +361,21 @@ onUnmounted(() => {
 }
 
 .day-number {
-  font-size: 32px;
-  font-weight: 600;
-  color: var(--text-primary);
   font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144;
+  font-size: 34px;
+  font-weight: 360;
+  color: var(--text-primary);
+  letter-spacing: -0.04em;
+  font-feature-settings: 'tnum';
+  line-height: 1;
 }
 
 .day-date {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
 }
 
 .day-stats {
@@ -381,8 +387,10 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
 }
 
 .stat-item svg {
@@ -466,18 +474,24 @@ onUnmounted(() => {
 }
 
 .hour-slot:hover {
-  background: rgba(0, 0, 0, 0.02);
+  background: rgba(239, 231, 215, 0.03);
 }
 
 .event-block {
   position: absolute;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   overflow: hidden;
-  transition: opacity var(--transition-fast);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
   display: flex;
-  color: #fff;
+  color: var(--text-primary);
   z-index: 2;
+  box-shadow: var(--shadow-xs);
+}
+
+.event-block:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .event-block:hover {
@@ -532,8 +546,8 @@ onUnmounted(() => {
   color: var(--text-primary);
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-pop);
+  border: 1px solid var(--border-accent);
   z-index: 9999;
   pointer-events: none;
   min-width: 150px;

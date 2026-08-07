@@ -76,9 +76,9 @@ describe('Task Store', () => {
   it('getQuadrantColor returns correct colors', () => {
     const store = useTaskStore()
 
-    expect(store.getQuadrantColor(1)).toBe('#ef4444') // red
-    expect(store.getQuadrantColor(2)).toBe('#f59e0b') // yellow
-    expect(store.getQuadrantColor(3)).toBe('#3b82f6') // blue
-    expect(store.getQuadrantColor(4)).toBe('#6b7280') // gray
+    expect(store.getQuadrantColor(1)).toBe('#D86F54') // clay
+    expect(store.getQuadrantColor(2)).toBe('#E6A23C') // amber
+    expect(store.getQuadrantColor(3)).toBe('#7FA8C0') // sky
+    expect(store.getQuadrantColor(4)).toBe('#8A8273') // muted
   })
 })

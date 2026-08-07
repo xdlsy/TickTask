@@ -40,9 +40,9 @@
               @update:model-value="setOverride(key, c.id, $event)"
               size="small"
             >
-              <el-radio value="policy">跟随策略</el-radio>
-              <el-radio value="current">当前</el-radio>
-              <el-radio value="file">文件</el-radio>
+              <el-radio value="policy" class="opt-policy">跟随策略</el-radio>
+              <el-radio value="current" class="opt-current">当前</el-radio>
+              <el-radio value="file" class="opt-file">文件</el-radio>
             </el-radio-group>
           </div>
         </details>
@@ -54,8 +54,8 @@
         <div v-for="c in settingsConflicts" :key="c.section + '.' + c.field" class="diff-row">
           <span class="diff-field">{{ c.section }}.{{ c.field }}</span>
           <el-radio-group :model-value="settingsChoice[c.section + '.' + c.field] || 'current'" @update:model-value="setSettingsChoice(c.section, c.field, $event)">
-            <el-radio value="current">当前:{{ displayValue(c.section, c.field, c.current) }}</el-radio>
-            <el-radio value="file">导入:{{ displayValue(c.section, c.field, c.imported) }}</el-radio>
+            <el-radio value="current" class="opt-current">当前:{{ displayValue(c.section, c.field, c.current) }}</el-radio>
+            <el-radio value="file" class="opt-file">导入:{{ displayValue(c.section, c.field, c.imported) }}</el-radio>
           </el-radio-group>
         </div>
       </div>
@@ -188,17 +188,219 @@ defineExpose({
 </script>
 
 <style scoped>
-.module-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-color); gap: 8px; }
-.module-summary { display: flex; gap: 12px; align-items: center; flex: 1; }
-.module-summary span { font-size: 13px; color: var(--text-muted); }
-.conflict-list { flex-basis: 100%; width: 100%; margin-top: 8px; padding: 8px; background: var(--bg-primary, #faf9f6); border-radius: 4px; }
-.conflict-item { padding: 6px 0; border-top: 1px dashed var(--border-color); }
-.conflict-item:first-child { border-top: none; }
-.conflict-id { font-weight: 500; font-size: 13px; margin-bottom: 4px; }
-.conflict-fields { margin: 0 0 6px 16px; padding: 0; font-size: 12px; color: var(--text-muted); list-style: disc; }
-.settings-diff { margin-top: 16px; }
-.diff-row { display: flex; gap: 12px; align-items: center; padding: 6px 0; }
-.diff-field { width: 160px; font-weight: 500; }
-.section-label { font-weight: 600; margin-bottom: 8px; }
-.error { color: var(--accent-primary); }
+/* native file input — dark themed (raw HTML, not covered by global overrides) */
+input[type="file"] {
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+input[type="file"]::file-selector-button {
+  background: var(--accent-primary);
+  color: var(--bg-primary);
+  border: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  margin-right: 12px;
+  transition: background var(--transition-fast);
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: var(--accent-secondary);
+}
+
+.error {
+  color: var(--accent-crimson);
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+/* module rows: summary counts get semantic colour */
+.module-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-color);
+  gap: 10px;
+}
+
+.module-summary {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.module-summary strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 92px;
+}
+
+.module-summary span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.module-summary span:nth-child(2) { color: var(--accent-primary); }   /* 新增 */
+.module-summary span:nth-child(3) { color: var(--text-secondary); }   /* 相同 */
+.module-summary span:nth-child(4) { color: var(--accent-crimson); }   /* 冲突 */
+.module-summary span:nth-child(5) { color: var(--text-muted); }       /* 仅当前 */
+
+/* conflict list (per-record overrides) */
+.conflict-list {
+  flex-basis: 100%;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.conflict-list summary {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent-crimson);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  list-style: none;
+}
+
+.conflict-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.conflict-list summary::before {
+  content: '▸';
+  opacity: 0.7;
+}
+
+.conflict-list[open] summary::before {
+  content: '▾';
+}
+
+.conflict-list[open] summary {
+  margin-bottom: 12px;
+}
+
+.conflict-item {
+  padding: 10px 0;
+  border-top: 1px dashed var(--border-color);
+}
+
+.conflict-item:first-child {
+  border-top: none;
+}
+
+.conflict-id {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+
+.conflict-fields {
+  margin: 0 0 8px 4px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  list-style: none;
+}
+
+.conflict-fields li {
+  padding: 2px 0;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+.conflict-fields li::before {
+  content: '→ ';
+  color: var(--accent-crimson);
+  opacity: 0.7;
+}
+
+.conflict-item :deep(.el-radio-group) {
+  margin-top: 2px;
+}
+
+.conflict-item :deep(.el-radio__label) {
+  font-size: 12px;
+}
+
+/* per-record override radio semantics:
+   policy = skip (muted), current = keep (sage), file = overwrite (amber via global) */
+:deep(.opt-policy .el-radio__input.is-checked .el-radio__inner) {
+  background-color: var(--bg-elevated) !important;
+  border-color: var(--border-strong) !important;
+}
+
+:deep(.opt-policy .el-radio__input.is-checked .el-radio__inner::after) {
+  background-color: var(--text-muted) !important;
+}
+
+:deep(.opt-policy .el-radio__input.is-checked + .el-radio__label) {
+  color: var(--text-muted) !important;
+}
+
+:deep(.opt-current .el-radio__input.is-checked .el-radio__inner) {
+  background-color: var(--accent-sage) !important;
+  border-color: var(--accent-sage) !important;
+}
+
+:deep(.opt-current .el-radio__input.is-checked + .el-radio__label) {
+  color: var(--accent-sage) !important;
+}
+
+/* settings diff */
+.settings-diff {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.diff-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.diff-field {
+  width: 180px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.section-label {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
+  font-size: 15px;
+  font-weight: 440;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  letter-spacing: -0.01em;
+}
 </style>

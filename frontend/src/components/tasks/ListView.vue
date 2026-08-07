@@ -277,7 +277,7 @@ defineExpose({
   text-align: center;
   padding: 64px 24px;
   border-radius: var(--radius-lg);
-  border: 1px dashed var(--border-color);
+  border: 1px dashed var(--border-accent);
 }
 
 .empty-icon {
@@ -306,11 +306,12 @@ defineExpose({
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: border-color var(--transition-fast);
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .task-item:hover {
   border-color: var(--border-accent);
+  transform: translateY(-1px);
 }
 
 .task-item.completed {
@@ -325,7 +326,7 @@ defineExpose({
 .task-checkbox {
   width: 20px;
   height: 20px;
-  border: 2px solid var(--border-accent);
+  border: 2px solid var(--border-strong);
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -346,7 +347,7 @@ defineExpose({
 }
 
 .check-icon {
-  color: #fff;
+  color: var(--bg-primary);
 }
 
 .task-main {
@@ -363,7 +364,7 @@ defineExpose({
 
 .task-title {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -371,30 +372,32 @@ defineExpose({
 }
 
 .task-quadrant {
-  font-size: 11px;
+  font-size: 10px;
   padding: 2px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: 999px;
   font-weight: 500;
   flex-shrink: 0;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
 }
 
 .task-quadrant.quadrant-1 {
-  background: rgba(184, 69, 44, 0.06);
-  color: var(--accent-primary);
+  background: var(--crimson-fill);
+  color: var(--accent-crimson);
 }
 
 .task-quadrant.quadrant-2 {
-  background: rgba(0, 0, 0, 0.04);
-  color: var(--text-secondary);
+  background: var(--accent-fill);
+  color: var(--accent-primary);
 }
 
 .task-quadrant.quadrant-3 {
-  background: rgba(0, 0, 0, 0.04);
-  color: var(--text-secondary);
+  background: var(--sky-fill);
+  color: var(--accent-sky);
 }
 
 .task-quadrant.quadrant-4 {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(239, 231, 215, 0.05);
   color: var(--text-muted);
 }
 
@@ -405,7 +408,7 @@ defineExpose({
 }
 
 .task-desc {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -419,7 +422,7 @@ defineExpose({
 }
 
 .tag {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
   display: flex;
   align-items: center;
@@ -431,7 +434,7 @@ defineExpose({
 }
 
 .tag.deadline.overdue {
-  color: var(--accent-primary);
+  color: var(--accent-crimson);
 }
 
 .pomodoro-tag {
@@ -452,14 +455,14 @@ defineExpose({
   justify-content: center;
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: var(--text-muted);
   transition: all var(--transition-fast);
 }
 
 .action-btn:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(239, 231, 215, 0.05);
   color: var(--text-primary);
 }
 

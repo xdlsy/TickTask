@@ -233,20 +233,21 @@ function handleDelete() {
 }
 
 .color-option {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: opacity var(--transition-fast);
-  border: 2px solid transparent;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  border: 1px solid var(--border-accent);
+  box-shadow: 0 0 0 0 rgba(230, 162, 60, 0);
 }
 
 .color-option:hover {
-  opacity: 0.8;
+  transform: scale(1.08);
 }
 
 .color-option.active {
-  border-color: var(--text-primary);
-  opacity: 1;
+  box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 3px var(--accent-primary);
+  border-color: var(--accent-primary);
 }
 </style>

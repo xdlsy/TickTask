@@ -8,8 +8,8 @@
           :cy="size / 2"
           :r="radius"
           fill="none"
-          stroke="rgba(0, 0, 0, 0.06)"
-          stroke-width="4"
+          stroke="rgba(239, 231, 215, 0.05)"
+          stroke-width="14"
         />
         <circle
           class="progress-ring-circle"
@@ -18,7 +18,7 @@
           :r="radius"
           fill="none"
           :stroke="color"
-          stroke-width="4"
+          stroke-width="6"
           :stroke-dasharray="circumference"
           :stroke-dashoffset="strokeDashoffset"
           stroke-linecap="round"
@@ -28,7 +28,7 @@
         <div v-if="currentTask" class="task-name">{{ currentTask.title }}</div>
         <div class="timer-icon" v-html="timerSvgIcon"></div>
         <div class="timer-time">{{ formattedTime }}</div>
-        <div class="timer-label">{{ label }}</div>
+        <div class="timer-label" :class="{ live: timerStore.isRunning }">{{ label }}</div>
       </div>
     </div>
   </div>
@@ -114,10 +114,11 @@ const color = computed(() => {
 
 .progress-ring {
   transform: rotate(-90deg);
+  filter: drop-shadow(0 0 24px rgba(230, 162, 60, 0.16));
 }
 
 .progress-ring-circle {
-  transition: stroke-dashoffset 0.5s ease-out;
+  transition: stroke-dashoffset 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .timer-content {
@@ -126,6 +127,9 @@ const color = computed(() => {
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .timer-icon {
@@ -139,40 +143,71 @@ const color = computed(() => {
 }
 
 .task-name {
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 12.5px;
+  color: var(--text-secondary);
   margin-bottom: 14px;
-  max-width: 200px;
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 .timer-time {
-  font-size: 52px;
-  font-weight: 500;
+  font-size: 68px;
+  font-weight: 360;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  letter-spacing: -1.5px;
+  letter-spacing: -0.04em;
   font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144;
 }
 
 .timer-label {
-  font-size: 12px;
+  font-size: 10.5px;
   color: var(--text-muted);
-  margin-top: 14px;
+  margin-top: 16px;
   font-weight: 500;
-  letter-spacing: 2px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.timer-label.live {
+  color: var(--accent-primary);
+}
+
+.timer-label.live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  box-shadow: 0 0 10px var(--accent-primary);
+  animation: timerPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
 
 @media (max-width: 480px) {
   .timer-time {
-    font-size: 40px;
+    font-size: 48px;
   }
 
   .timer-label {
-    font-size: 11px;
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timer-label.live::before {
+    animation: none;
   }
 }
 </style>

@@ -197,48 +197,71 @@ async function onSave() {
 
 <style scoped>
 .batch-table-editor {
-  background: var(--bg-card, #FFFEFC);
-  border: 1px solid var(--accent-tertiary, #D98A75);
-  border-radius: var(--radius-md);
-  padding: 14px 18px;
+  position: relative;
+  background: var(--gradient-card);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
   margin-bottom: 16px;
+  box-shadow: var(--shadow-card);
+}
+/* 草稿卡:顶端琥珀细线,提示「AI 待入库」的特殊态 */
+.batch-table-editor::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent-primary), transparent 70%);
+  opacity: 0.5;
 }
 .bte-header {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .bte-title {
   font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 600;
+  font-variation-settings: 'opsz' 60;
+  font-size: 16px;
+  font-weight: 420;
   margin: 0;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 .bte-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
-  background: var(--bg-elevated);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 .bte-table th, .bte-table td {
-  padding: 6px 8px;
+  padding: 7px 9px;
   text-align: left;
   border-bottom: 1px solid var(--border-color);
 }
 .bte-table th {
-  background: var(--bg-secondary);
+  background: var(--bg-elevated);
+  font-family: var(--font-mono);
   font-weight: 500;
   color: var(--text-muted);
   font-size: 10px;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 .bte-row {
-  transition: background 0.15s;
+  transition: background var(--transition-fast);
+}
+.bte-row:hover {
+  background: rgba(239, 231, 215, 0.025);
 }
 .bte-row-error {
-  background: rgba(184, 69, 44, 0.05);
+  background: var(--crimson-fill);
+}
+.bte-row-error:hover {
+  background: var(--crimson-fill);
 }
 .bte-cell {
   width: 100%;
@@ -247,38 +270,52 @@ async function onSave() {
   font-family: var(--font-body);
   font-size: 12px;
   color: var(--text-primary);
-  padding: 3px 5px;
-  border-radius: 2px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
   outline: none;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.bte-cell::placeholder {
+  color: var(--text-muted);
 }
 .bte-cell:focus {
-  background: var(--bg-elevated);
+  background: rgba(239, 231, 215, 0.05);
   border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(230, 162, 60, 0.10);
 }
 .bte-time-pair {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   color: var(--text-muted);
+  font-family: var(--font-mono);
 }
 .bte-quadrant {
   display: flex;
-  gap: 2px;
+  gap: 3px;
 }
 .bte-quad-btn {
   width: 22px;
-  height: 18px;
+  height: 20px;
   border: 1px solid var(--border-accent);
   background: var(--bg-elevated);
+  font-family: var(--font-mono);
   font-size: 10px;
   color: var(--text-secondary);
   cursor: pointer;
   padding: 0;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+.bte-quad-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 .bte-quad-btn.active {
   background: var(--accent-primary);
-  color: white;
+  color: var(--bg-primary);
   border-color: var(--accent-primary);
+  font-weight: 600;
 }
 .bte-delete {
   background: transparent;
@@ -286,36 +323,51 @@ async function onSave() {
   color: var(--text-muted);
   cursor: pointer;
   font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
 }
 .bte-delete:hover {
-  color: var(--accent-primary);
+  color: var(--accent-crimson);
+  background: var(--crimson-fill);
 }
 .bte-add-cell {
   text-align: center;
-  padding: 6px;
+  padding: 8px;
 }
 .bte-add {
   background: transparent;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
-  padding: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
 }
 .bte-add:hover {
   color: var(--accent-primary);
+  background: var(--accent-fill);
 }
 .bte-summary {
-  margin-top: 12px;
-  padding: 10px 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
   background: var(--bg-secondary);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
 }
 .bte-label {
   display: block;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   color: var(--text-muted);
-  margin-bottom: 6px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
 }
 .bte-summary-input {
   width: 100%;
@@ -323,44 +375,53 @@ async function onSave() {
   border: none;
   background: transparent;
   font-family: var(--font-body);
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.6;
   color: var(--text-primary);
   resize: vertical;
   outline: none;
+}
+.bte-summary-input::placeholder {
+  color: var(--text-muted);
 }
 .bte-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 14px;
 }
 .bte-btn {
   border: none;
   border-radius: var(--radius-sm);
-  padding: 6px 16px;
+  padding: 7px 16px;
   font-size: 12px;
   font-family: var(--font-body);
+  font-weight: 500;
   cursor: pointer;
+  transition: all var(--transition-fast);
 }
 .bte-btn-primary {
   background: var(--accent-primary);
-  color: white;
+  color: var(--bg-primary);
+  font-weight: 600;
 }
 .bte-btn-primary:hover:not(:disabled) {
   background: var(--accent-secondary);
+  box-shadow: 0 8px 24px rgba(230, 162, 60, 0.24);
 }
 .bte-btn-primary:disabled {
-  background: var(--text-muted);
+  background: rgba(239, 231, 215, 0.08);
+  color: var(--text-muted);
   cursor: not-allowed;
 }
 .bte-btn-secondary {
-  background: transparent;
+  background: var(--bg-secondary);
   color: var(--text-secondary);
   border: 1px solid var(--border-accent);
 }
 .bte-btn-secondary:hover {
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
+  border-color: var(--accent-crimson);
+  color: var(--accent-crimson);
+  background: var(--crimson-fill);
 }
 </style>

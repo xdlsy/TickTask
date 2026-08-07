@@ -2,6 +2,7 @@
   <div class="analytics-page">
     <div class="page-header">
       <div class="header-left">
+        <span class="eyebrow">Analytics</span>
         <h1>数据分析</h1>
         <p class="page-subtitle">追踪你的专注轨迹</p>
       </div>
@@ -543,64 +544,98 @@ onMounted(() => {
 
 <style scoped>
 .analytics-page {
-  padding: 0;
   max-width: 1200px;
   margin: 0 auto;
   position: relative;
 }
 
+/* ── 编辑式 eyebrow + Fraunces 标题 ── */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  margin-bottom: 16px;
+}
+
+.eyebrow::before {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: var(--accent-primary);
+  opacity: 0.6;
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 36px;
-  padding-bottom: 24px;
+  align-items: flex-end;
+  margin-bottom: 44px;
+  padding-bottom: 26px;
   border-bottom: 1px solid var(--border-color);
+  position: relative;
 }
 
 .page-header::after {
   content: '';
   position: absolute;
-  bottom: 0;
+  bottom: -1px;
   left: 0;
-  right: 0;
+  width: 120px;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(196, 103, 61, 0.15), transparent);
+  background: var(--accent-primary);
+  opacity: 0.5;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
 }
 
 .header-left h1 {
-  font-size: 30px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144;
+  font-size: 46px;
+  font-weight: 380;
   color: var(--text-primary);
-  margin: 0 0 6px 0;
-  letter-spacing: -0.5px;
+  margin: 0 0 12px 0;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
 }
 
 .page-subtitle {
-  font-size: 15px;
-  color: var(--text-secondary);
+  font-size: 14.5px;
+  color: var(--text-muted);
   margin: 0;
+  font-weight: 400;
+  max-width: 460px;
 }
 
 .time-filter {
   display: flex;
-  gap: 8px;
-  background: var(--bg-elevated);
-  padding: 6px;
-  border-radius: 14px;
+  gap: 4px;
+  background: var(--bg-secondary);
+  padding: 5px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
 }
 
 .filter-btn {
-  padding: 10px 22px;
+  padding: 9px 20px;
   border: none;
   background: transparent;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
-  transition: all var(--transition-normal);
+  transition: color var(--transition-fast), background var(--transition-fast);
 }
 
 .filter-btn:hover {
@@ -609,164 +644,197 @@ onMounted(() => {
 
 .filter-btn.active {
   background: var(--gradient-primary);
-  color: #fff;
-  box-shadow: 0 4px 16px rgba(196, 103, 61, 0.2);
+  color: var(--bg-primary);
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(230, 162, 60, 0.22);
 }
 
-/* 概览卡片 */
+/* 概览 KPI 卡片 */
 .overview-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-  margin-bottom: 36px;
+  gap: 14px;
+  margin-bottom: 44px;
 }
 
 .overview-card {
-  background: var(--bg-card);
-  border-radius: 20px;
-  padding: 28px;
+  position: relative;
+  background: var(--gradient-card);
+  border-radius: var(--radius-xl);
+  padding: 24px 22px;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
   border: 1px solid var(--border-color);
-  transition: all var(--transition-normal);
+  overflow: hidden;
+  transition: transform var(--transition-slow), border-color var(--transition-slow), box-shadow var(--transition-slow);
+}
+
+.overview-card::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), transparent 60%);
+  opacity: 0;
+  transition: opacity var(--transition-slow);
 }
 
 .overview-card:hover {
-  transform: translateY(-6px);
-  border-color: rgba(196, 103, 61, 0.2);
-  box-shadow: 0 16px 48px rgba(60, 30, 10, 0.1);
+  transform: translateY(-3px);
+  border-color: var(--border-accent);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.overview-card:hover::after {
+  opacity: 1;
+}
+
+.card-content {
+  display: flex;
+  flex-direction: column;
 }
 
 .card-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  position: relative;
-}
-
-.card-icon::after {
-  content: '';
-  position: absolute;
-  inset: -2px;
-  border-radius: 14px;
-  background: inherit;
-  filter: blur(12px);
-  opacity: 0.4;
-  z-index: -1;
 }
 
 .card-icon svg {
-  width: 24px;
-  height: 24px;
-  position: relative;
-  z-index: 1;
+  width: 18px;
+  height: 18px;
 }
 
 .card-icon.pomodoro {
-  background: linear-gradient(135deg, #C4554D, #D4786D);
-  color: #fff;
-  box-shadow: 0 0 24px rgba(196, 85, 77, 0.25);
+  background: var(--crimson-fill);
+  color: var(--accent-crimson);
 }
 
 .card-icon.time {
-  background: linear-gradient(135deg, #C4973D, #D4AD5E);
-  color: #fff;
-  box-shadow: 0 0 24px rgba(196, 149, 61, 0.25);
+  background: var(--gold-fill);
+  color: var(--accent-gold);
 }
 
 .card-icon.completed {
-  background: linear-gradient(135deg, #6B8B6F, #8BA88E);
-  color: #fff;
-  box-shadow: 0 0 24px rgba(107, 139, 111, 0.25);
+  background: var(--sage-fill);
+  color: var(--accent-sage);
 }
 
 .card-icon.created {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  color: #fff;
-  box-shadow: 0 0 24px rgba(196, 103, 61, 0.2);
+  background: var(--accent-fill);
+  color: var(--accent-primary);
 }
 
 .card-value {
-  font-size: 32px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144;
+  font-size: 40px;
+  font-weight: 360;
   color: var(--text-primary);
-  font-family: var(--font-mono);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-feature-settings: 'tnum';
 }
 
 .card-label {
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 /* 主内容区域 */
 .analytics-content {
   display: grid;
   grid-template-columns: 1fr 340px;
-  gap: 28px;
+  gap: 18px;
 }
 
 .right-column {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 .card {
-  background: var(--bg-card);
-  border-radius: 20px;
-  padding: 28px;
+  background: var(--gradient-card);
+  border-radius: var(--radius-xl);
+  padding: 26px;
   border: 1px solid var(--border-color);
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-normal);
 }
 
 .card:hover {
-  border-color: rgba(196, 103, 61, 0.12);
-  box-shadow: 0 8px 32px rgba(60, 30, 10, 0.06);
+  border-color: var(--border-accent);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 22px;
+  gap: 12px;
 }
 
 .card-header h3 {
-  font-size: 18px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
+  font-size: 19px;
+  font-weight: 420;
   color: var(--text-primary);
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .trend-summary {
-  font-size: 13px;
-  color: var(--text-secondary);
-  background: rgba(196, 103, 61, 0.05);
-  padding: 6px 12px;
-  border-radius: 12px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--accent-primary);
+  background: var(--accent-fill);
+  padding: 5px 11px;
+  border-radius: 999px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-/* 趋势图表 */
+/* 趋势图表 — 柱状图,琥珀主序列 */
 .trend-card {
   min-height: 320px;
 }
 
 .chart-container {
   height: 240px;
-  padding: 20px 0;
+  padding: 20px 0 0;
+  position: relative;
+}
+
+/* 极淡的基线,呼应数据纸的克制 */
+.chart-container::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 38px;
+  height: 1px;
+  background: var(--border-color);
 }
 
 .chart-bars {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  height: 100%;
+  height: calc(100% - 28px);
   gap: 8px;
 }
 
@@ -780,18 +848,18 @@ onMounted(() => {
 
 .chart-bar {
   width: 100%;
-  max-width: 32px;
-  background: var(--gradient-primary);
-  border-radius: 6px 6px 0 0;
-  transition: all 0.3s ease;
+  max-width: 30px;
+  background: linear-gradient(180deg, var(--accent-secondary), var(--accent-primary));
+  border-radius: 5px 5px 0 0;
+  transition: filter var(--transition-fast), box-shadow var(--transition-fast);
   position: relative;
   cursor: pointer;
   min-height: 4px;
 }
 
 .chart-bar:hover {
-  filter: brightness(1.2);
-  box-shadow: 0 0 16px rgba(196, 103, 61, 0.25);
+  filter: brightness(1.12);
+  box-shadow: 0 0 18px rgba(230, 162, 60, 0.30);
 }
 
 .chart-bar:hover .bar-tooltip {
@@ -808,14 +876,16 @@ onMounted(() => {
   color: var(--text-primary);
   padding: 6px 10px;
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
   opacity: 0;
   visibility: hidden;
-  transition: all 0.2s ease;
-  border: 1px solid var(--border-color);
-  box-shadow: 0 4px 12px rgba(60, 30, 10, 0.1);
+  transition: opacity var(--transition-fast), visibility var(--transition-fast);
+  border: 1px solid var(--border-accent);
+  box-shadow: var(--shadow-pop);
+  pointer-events: none;
 }
 
 .bar-tooltip::after {
@@ -829,13 +899,15 @@ onMounted(() => {
 }
 
 .chart-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 12px;
   height: 16px;
+  letter-spacing: 0.04em;
 }
 
-/* 象限分布 */
+/* 象限分布 — 4 色象限盘 */
 .quadrant-stats {
   display: flex;
   flex-direction: column;
@@ -849,16 +921,16 @@ onMounted(() => {
 }
 
 .quadrant-indicator {
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
   flex-shrink: 0;
 }
 
-.quadrant-indicator.quadrant-1 { background: linear-gradient(135deg, #C4554D, #D4786D); box-shadow: 0 0 8px rgba(196, 85, 77, 0.25); }
-.quadrant-indicator.quadrant-2 { background: linear-gradient(135deg, #C4973D, #D4AD5E); box-shadow: 0 0 8px rgba(196, 149, 61, 0.25); }
-.quadrant-indicator.quadrant-3 { background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); box-shadow: 0 0 8px rgba(196, 103, 61, 0.2); }
-.quadrant-indicator.quadrant-4 { background: linear-gradient(135deg, var(--text-muted), var(--text-secondary)); }
+.quadrant-indicator.quadrant-1 { background: var(--accent-crimson); box-shadow: 0 0 8px rgba(216, 111, 84, 0.30); }
+.quadrant-indicator.quadrant-2 { background: var(--accent-primary); box-shadow: 0 0 8px rgba(230, 162, 60, 0.25); }
+.quadrant-indicator.quadrant-3 { background: var(--accent-sky); box-shadow: 0 0 8px rgba(127, 168, 192, 0.25); }
+.quadrant-indicator.quadrant-4 { background: var(--text-muted); }
 
 .quadrant-name {
   font-size: 13px;
@@ -869,23 +941,23 @@ onMounted(() => {
 
 .quadrant-bar-wrapper {
   flex: 1;
-  height: 8px;
-  background: var(--bg-elevated);
-  border-radius: 4px;
+  height: 6px;
+  background: rgba(239, 231, 215, 0.06);
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .quadrant-bar {
   height: 100%;
-  background: var(--gradient-primary);
-  border-radius: 4px;
-  transition: width 0.3s ease;
-  box-shadow: 0 0 8px rgba(196, 103, 61, 0.2);
+  background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));
+  border-radius: 3px;
+  transition: width var(--transition-normal);
 }
 
 .quadrant-stat .count {
-  font-weight: 600;
-  font-size: 14px;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 13px;
   color: var(--text-primary);
   width: 28px;
   text-align: right;
@@ -903,26 +975,29 @@ onMounted(() => {
 }
 
 .completion-rate {
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
+  font-weight: 480;
   color: var(--accent-sage);
-  font-size: 15px;
-  text-shadow: 0 0 8px rgba(107, 139, 111, 0.25);
+  font-size: 22px;
+  letter-spacing: -0.02em;
 }
 
-/* 任务投入列表 */
+/* 任务投入列表 / 空状态 */
 .empty-state {
   text-align: center;
   padding: 32px 24px;
-  background: rgba(196, 103, 61, 0.02);
+  background: rgba(239, 231, 215, 0.02);
   border-radius: var(--radius-md);
   border: 1px dashed var(--border-color);
 }
 
 .empty-icon {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 16px;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
   color: var(--text-muted);
+  opacity: 0.4;
 }
 
 .empty-icon svg {
@@ -933,17 +1008,18 @@ onMounted(() => {
 .empty-state p {
   margin: 0 0 4px 0;
   color: var(--text-secondary);
+  font-size: 13.5px;
 }
 
 .empty-state .hint {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--text-muted);
 }
 
 .task-stats-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 2px;
   max-height: 300px;
   overflow-y: auto;
 }
@@ -962,12 +1038,13 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+  gap: 8px;
 }
 
 .task-stat-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 450;
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -975,16 +1052,20 @@ onMounted(() => {
 }
 
 .task-stat-count {
-  font-size: 12px;
-  color: var(--text-secondary);
-  background: rgba(196, 103, 61, 0.05);
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--accent-primary);
+  background: var(--accent-fill);
+  padding: 3px 9px;
+  border-radius: 999px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .task-stat-time {
-  height: 6px;
-  background: var(--bg-elevated);
+  height: 5px;
+  background: rgba(239, 231, 215, 0.06);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 8px;
@@ -993,76 +1074,91 @@ onMounted(() => {
 .time-bar {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #C4554D, #C4673D);
+  background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));
   border-radius: 3px;
-  transition: width 0.3s ease;
-  box-shadow: 0 0 8px rgba(196, 85, 77, 0.25);
+  transition: width var(--transition-normal);
 }
 
 .task-stat-duration {
-  font-size: 13px;
-  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
   text-align: right;
   font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
-/* AI 洞察 */
+/* AI 每日洞察 */
 .ai-insights-card {
-  border-color: rgba(196, 103, 61, 0.15);
+  border-color: var(--border-accent);
+}
+
+.ai-insights-card:hover {
+  border-color: rgba(230, 162, 60, 0.24);
 }
 
 .insight-btn {
-  padding: 6px 16px;
-  border: 1px solid rgba(196, 103, 61, 0.3);
-  background: rgba(196, 103, 61, 0.06);
+  padding: 7px 16px;
+  border: 1px solid rgba(230, 162, 60, 0.28);
+  background: var(--accent-fill);
   color: var(--accent-primary);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   font-weight: 500;
-  font-family: var(--font-body);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   transition: all var(--transition-normal);
 }
 
 .insight-btn:hover:not(:disabled) {
-  background: rgba(196, 103, 61, 0.12);
-  border-color: rgba(196, 103, 61, 0.5);
+  background: rgba(230, 162, 60, 0.20);
+  border-color: var(--accent-primary);
+  color: var(--accent-secondary);
 }
 
 .insight-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  opacity: 0.5;
+  cursor: progress;
 }
 
 .insights-content {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .score-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  background: rgba(196, 103, 61, 0.04);
+  padding: 14px 18px;
+  background: var(--accent-fill);
+  border: 1px solid rgba(230, 162, 60, 0.18);
   border-radius: var(--radius-md);
 }
 
 .score-label {
-  font-size: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--text-secondary);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .score-value {
-  font-size: 28px;
-  font-weight: 700;
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144;
+  font-size: 34px;
+  font-weight: 380;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
-.score-high { color: var(--accent-sage); text-shadow: 0 0 12px rgba(107, 139, 111, 0.3); }
-.score-mid { color: var(--accent-gold); text-shadow: 0 0 12px rgba(196, 149, 61, 0.3); }
-.score-low { color: var(--accent-crimson); text-shadow: 0 0 12px rgba(196, 85, 77, 0.3); }
+.score-high { color: var(--accent-sage); }
+.score-mid { color: var(--accent-gold); }
+.score-low { color: var(--accent-crimson); }
 
 .insight-block {
   display: flex;
@@ -1071,9 +1167,12 @@ onMounted(() => {
 }
 
 .insight-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--accent-primary);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .insight-text {
@@ -1094,15 +1193,22 @@ onMounted(() => {
   margin-bottom: 2px;
 }
 
-.insight-motivation {
-  font-size: 14px;
-  font-weight: 500;
+.insight-list li::marker {
   color: var(--accent-primary);
-  text-align: center;
-  padding: 12px;
-  background: rgba(196, 103, 61, 0.04);
-  border-radius: var(--radius-md);
+}
+
+.insight-motivation {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
+  font-size: 15px;
+  font-weight: 420;
   font-style: italic;
+  color: var(--accent-secondary);
+  text-align: center;
+  padding: 14px;
+  background: var(--accent-fill);
+  border-radius: var(--radius-md);
+  letter-spacing: -0.01em;
 }
 
 .insights-empty {
@@ -1137,14 +1243,14 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
-  .analytics-page {
-    padding: 20px;
-  }
-
   .page-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
+    gap: 18px;
+  }
+
+  .header-left h1 {
+    font-size: 36px;
   }
 
   .overview-cards {
@@ -1156,36 +1262,43 @@ onMounted(() => {
   }
 }
 
-/* Pomodoro statistics */
+/* Pomodoro 统计 / 排行榜 */
 .pomodoro-period-select {
   display: flex;
-  gap: 4px;
-  background: rgba(0, 0, 0, 0.03);
+  gap: 3px;
+  background: var(--bg-secondary);
   padding: 3px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
 }
 
 .period-btn {
   padding: 4px 12px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
+  font-family: var(--font-body);
   font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
+}
+
+.period-btn:hover {
+  color: var(--text-primary);
 }
 
 .period-btn.active {
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--bg-primary);
+  font-weight: 600;
 }
 
 .ranking-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 11px;
 }
 
 .ranking-item {
@@ -1195,8 +1308,9 @@ onMounted(() => {
 }
 
 .ranking-index {
-  font-size: 13px;
-  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-muted);
   width: 20px;
   text-align: center;
@@ -1205,8 +1319,8 @@ onMounted(() => {
 
 .ranking-title {
   font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-weight: 450;
+  color: var(--text-secondary);
   width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1216,26 +1330,28 @@ onMounted(() => {
 
 .ranking-bar-wrapper {
   flex: 1;
-  height: 8px;
-  background: #e8e4df;
-  border-radius: 4px;
+  height: 6px;
+  background: rgba(239, 231, 215, 0.06);
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .ranking-bar {
   height: 100%;
-  background: #B8452C;
-  border-radius: 4px;
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, var(--accent-secondary), var(--accent-primary));
+  border-radius: 3px;
+  transition: width var(--transition-normal);
 }
 
 .ranking-count {
-  font-size: 12px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
   color: var(--text-primary);
   width: 60px;
   text-align: right;
   flex-shrink: 0;
+  letter-spacing: 0.02em;
 }
 
 .empty-state.compact {
@@ -1243,37 +1359,41 @@ onMounted(() => {
 }
 
 .empty-state.compact p {
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
-/* Trend comparison */
+/* 计划 vs 实际 — 双序列柱状对比 */
 .trend-legend {
   display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 18px;
+  margin-bottom: 18px;
   justify-content: center;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   color: var(--text-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .legend-dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 2px;
 }
 
 .legend-dot.planned {
-  background: #e8e4df;
+  background: rgba(239, 231, 215, 0.16);
+  border: 1px solid var(--border-accent);
 }
 
 .legend-dot.actual {
-  background: #B8452C;
+  background: var(--accent-primary);
 }
 
 .trend-bars {
@@ -1303,43 +1423,53 @@ onMounted(() => {
   flex: 1;
   border-radius: 3px 3px 0 0;
   min-height: 2px;
-  transition: height 0.3s ease;
+  transition: height var(--transition-normal), filter var(--transition-fast), background var(--transition-fast);
   cursor: pointer;
 }
 
 .trend-bar.planned {
-  background: #e8e4df;
+  background: rgba(239, 231, 215, 0.12);
+}
+
+.trend-bar.planned:hover {
+  background: rgba(239, 231, 215, 0.20);
 }
 
 .trend-bar.actual {
-  background: #B8452C;
+  background: linear-gradient(180deg, var(--accent-secondary), var(--accent-primary));
+}
+
+.trend-bar.actual:hover {
+  filter: brightness(1.12);
 }
 
 .trend-label {
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
   color: var(--text-muted);
-  margin-top: 6px;
+  margin-top: 7px;
   white-space: nowrap;
+  letter-spacing: 0.04em;
 }
 
-/* Completion rings */
+/* 完成率圆环 — 三段语义色 */
 .completion-rings {
   display: flex;
   justify-content: space-around;
-  padding: 16px 0;
+  padding: 12px 0 4px;
 }
 
 .ring-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .ring-container {
   position: relative;
-  width: 80px;
-  height: 80px;
+  width: 84px;
+  height: 84px;
 }
 
 .ring-svg {
@@ -1350,7 +1480,7 @@ onMounted(() => {
 
 .ring-bg {
   fill: none;
-  stroke: #e8e4df;
+  stroke: rgba(239, 231, 215, 0.08);
   stroke-width: 3;
 }
 
@@ -1362,15 +1492,15 @@ onMounted(() => {
 }
 
 .ring-fill.on-time {
-  stroke: #6B8B6F;
+  stroke: var(--accent-sage);
 }
 
 .ring-fill.exceeded {
-  stroke: #C4973D;
+  stroke: var(--accent-gold);
 }
 
 .ring-fill.incomplete {
-  stroke: #B8452C;
+  stroke: var(--accent-crimson);
 }
 
 .ring-value {
@@ -1378,15 +1508,20 @@ onMounted(() => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  font-size: 16px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
+  font-size: 20px;
+  font-weight: 440;
   color: var(--text-primary);
-  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
 }
 
 .ring-label {
-  font-size: 12px;
-  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
   font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 </style>

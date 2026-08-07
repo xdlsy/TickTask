@@ -1,59 +1,61 @@
 <template>
   <div class="dashboard">
     <div class="page-header">
+      <span class="eyebrow">Overview</span>
       <h1>仪表盘</h1>
-      <p class="page-subtitle">欢迎回来，今天也要高效工作</p>
+      <p class="page-subtitle">欢迎回来，今天也要高效工作 — 保持节奏，把重要的事先做完。</p>
     </div>
 
     <div class="stats-cards">
       <div class="stat-card">
-        <div class="stat-icon pomodoro">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M12 6v6l4 2"/>
-          </svg>
+        <div class="stat-top">
+          <div class="stat-icon pomodoro">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+          </div>
         </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ todayPomodoros }}</div>
-          <div class="stat-label">今日番茄</div>
-        </div>
+        <div class="stat-value">{{ todayPomodoros }}</div>
+        <div class="stat-label">今日番茄</div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon focus">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
-          </svg>
+        <div class="stat-top">
+          <div class="stat-icon focus">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="4"/>
+              <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+            </svg>
+          </div>
         </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ formatDuration(focusTime) }}</div>
-          <div class="stat-label">专注时长</div>
-        </div>
+        <div class="stat-value" v-html="formatDurationHtml(focusTime)"></div>
+        <div class="stat-label">专注时长</div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon completed">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-            <polyline points="22 4 12 14.01 9 11.01"/>
-          </svg>
+        <div class="stat-top">
+          <div class="stat-icon completed">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
         </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ completedTasks }}</div>
-          <div class="stat-label">完成任务</div>
-        </div>
+        <div class="stat-value">{{ completedTasks }}</div>
+        <div class="stat-label">完成任务</div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon pending">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
+        <div class="stat-top">
+          <div class="stat-icon pending">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
         </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ pendingTasks }}</div>
-          <div class="stat-label">待办任务</div>
-        </div>
+        <div class="stat-value">{{ pendingTasks }}</div>
+        <div class="stat-label">待办任务</div>
       </div>
     </div>
 
@@ -62,10 +64,10 @@
         <div class="card recent-tasks-card">
           <div class="card-header">
             <h3>最近任务</h3>
-            <el-button text type="primary" @click="$router.push('/tasks')">
+            <button class="header-link" @click="$router.push('/tasks')">
               查看全部
               <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-            </el-button>
+            </button>
           </div>
           <div v-if="recentTasks.length === 0" class="empty-state">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="empty-icon">
@@ -109,13 +111,14 @@
         <div class="card priority-card" v-if="aiStore.configured">
           <div class="card-header">
             <h3>优先级建议</h3>
-            <el-button
-              size="small"
-              :loading="aiStore.loading"
+            <button
+              class="header-link"
+              :disabled="aiStore.loading"
               @click="getPrioritySuggestions"
             >
-              获取建议
-            </el-button>
+              <span v-if="aiStore.loading">分析中</span>
+              <span v-else>AI 建议</span>
+            </button>
           </div>
           <div v-if="priorityTasks.length > 0" class="priority-list">
             <div
@@ -128,7 +131,7 @@
             </div>
           </div>
           <div v-else class="priority-empty">
-            <p>点击"获取建议"查看任务优先级排序</p>
+            <p>点击「AI 建议」查看任务优先级排序</p>
           </div>
         </div>
       </div>
@@ -184,6 +187,13 @@ function formatDuration(seconds: number): string {
   return `${mins}m`
 }
 
+/* 渲染为带弱化单位的 HTML,供大号数字展示用(基于 formatDuration 注入单位 span) */
+function formatDurationHtml(seconds: number): string {
+  return formatDuration(seconds)
+    .replace(/(\d+)h/g, '$1<span class="unit">h</span>')
+    .replace(/(\d+)m/g, '$1<span class="unit">m</span>')
+}
+
 async function startTimer() {
   try {
     await timerStore.createSession(null, 'work')
@@ -233,7 +243,7 @@ onMounted(async () => {
 
 <style scoped>
 .dashboard {
-  max-width: 1100px;
+  max-width: 1120px;
   margin: 0 auto;
 }
 
@@ -243,49 +253,99 @@ onMounted(async () => {
 
 .page-header h1 {
   font-family: var(--font-display);
-  font-size: 32px;
-  font-weight: 600;
+  font-variation-settings: 'opsz' 144;
+  font-size: 46px;
+  font-weight: 380;
   color: var(--text-primary);
-  margin: 0 0 8px 0;
-  letter-spacing: -0.5px;
+  margin: 0 0 12px 0;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+}
+
+.page-header h1 em {
+  font-style: italic;
+  font-weight: 360;
+  color: var(--text-secondary);
 }
 
 .page-subtitle {
-  font-size: 14px;
+  font-size: 14.5px;
   color: var(--text-muted);
   margin: 0;
   font-weight: 400;
+  max-width: 520px;
+}
+
+/* 编辑式 eyebrow:细发丝线 + 等宽小标签,衬在标题之上 */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  margin-bottom: 18px;
+}
+
+.eyebrow::before {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: var(--accent-primary);
+  opacity: 0.6;
 }
 
 /* 统计卡片 */
 .stats-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 14px;
   margin-bottom: 48px;
 }
 
 .stat-card {
-  background: var(--bg-card);
-  border-radius: var(--radius-xl);
-  padding: 24px 20px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
+  position: relative;
+  background: var(--gradient-card);
+  border-radius: var(--radius-lg);
+  padding: 22px 20px 20px;
   border: 1px solid var(--border-color);
-  transition: all var(--transition-normal);
+  overflow: hidden;
+  transition: transform var(--transition-slow), border-color var(--transition-slow), box-shadow var(--transition-slow);
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), transparent 60%);
+  opacity: 0;
+  transition: opacity var(--transition-slow);
 }
 
 .stat-card:hover {
+  transform: translateY(-3px);
   border-color: var(--border-accent);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.stat-card:hover::after {
+  opacity: 1;
+}
+
+.stat-top {
+  margin-bottom: 24px;
 }
 
 .stat-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-md);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -293,63 +353,68 @@ onMounted(async () => {
 }
 
 .stat-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
 }
 
 .stat-icon.pomodoro {
-  background: rgba(184, 69, 44, 0.08);
+  background: var(--accent-fill);
   color: var(--accent-primary);
 }
 
 .stat-icon.focus {
-  background: rgba(184, 149, 77, 0.08);
+  background: var(--gold-fill);
   color: var(--accent-gold);
 }
 
 .stat-icon.completed {
-  background: rgba(107, 139, 111, 0.08);
+  background: var(--sage-fill);
   color: var(--accent-sage);
 }
 
 .stat-icon.pending {
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(239, 231, 215, 0.05);
   color: var(--text-secondary);
 }
 
-.stat-content {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  height: 44px;
+.stat-value {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144;
+  font-size: 48px;
+  font-weight: 360;
+  color: var(--text-primary);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-feature-settings: 'tnum';
 }
 
-.stat-value {
-  font-size: 28px;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1;
-  font-family: var(--font-mono);
-  letter-spacing: -0.5px;
+.stat-value :deep(.unit) {
+  font-size: 18px;
+  color: var(--text-muted);
+  margin-left: 3px;
+  font-weight: 400;
 }
 
 .stat-label {
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   color: var(--text-muted);
-  margin-top: 4px;
-  font-weight: 400;
+  margin-top: 12px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .dashboard-content {
   display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 24px;
+  grid-template-columns: 1fr 320px;
+  gap: 18px;
 }
 
 .main-column {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
 }
 
 .side-column {
@@ -359,9 +424,9 @@ onMounted(async () => {
 }
 
 .card {
-  background: var(--bg-card);
+  background: var(--gradient-card);
   border-radius: var(--radius-xl);
-  padding: 24px;
+  padding: 26px;
   border: 1px solid var(--border-color);
   transition: border-color var(--transition-normal);
 }
@@ -374,15 +439,43 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 
 .card-header h3 {
-  font-size: 15px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
+  font-size: 19px;
+  font-weight: 420;
   color: var(--text-primary);
   margin: 0;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.02em;
+}
+
+.header-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: gap var(--transition-fast), color var(--transition-fast);
+  padding: 0;
+}
+
+.header-link:hover:not(:disabled) {
+  gap: 9px;
+  color: var(--accent-secondary);
+}
+
+.header-link:disabled {
+  opacity: 0.6;
+  cursor: progress;
 }
 
 .empty-state {
@@ -396,7 +489,7 @@ onMounted(async () => {
   height: 48px;
   color: var(--text-muted);
   margin: 0 auto 16px;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .empty-state p {
@@ -408,7 +501,7 @@ onMounted(async () => {
 .task-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .quick-actions-card .quick-actions {
@@ -429,25 +522,16 @@ onMounted(async () => {
   border-radius: var(--radius-md);
   font-weight: 500;
   transition: all var(--transition-normal);
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-accent);
+  color: var(--text-secondary);
   margin-left: 0;
 }
 
 .quick-actions .el-button:hover {
-  background: rgba(0, 0, 0, 0.03);
-  border-color: var(--border-accent);
-}
-
-.quick-actions .el-button--primary {
-  background: var(--accent-primary);
-  border: none;
-  color: #fff;
-}
-
-.quick-actions .el-button--primary:hover {
-  background: var(--accent-secondary);
+  background: var(--bg-card-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .quick-actions .el-button .el-icon {
@@ -461,8 +545,8 @@ onMounted(async () => {
 .priority-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 0;
+  gap: 13px;
+  padding: 12px 0;
   border-bottom: 1px solid var(--border-color);
   transition: padding var(--transition-fast);
 }
@@ -476,30 +560,31 @@ onMounted(async () => {
 }
 
 .priority-rank {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
   font-family: var(--font-mono);
 }
 
 .priority-rank.rank-1 {
-  background: rgba(184, 69, 44, 0.10);
-  color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: var(--bg-primary);
+  box-shadow: 0 0 14px rgba(230, 162, 60, 0.4);
 }
 
 .priority-rank.rank-2 {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--text-secondary);
+  background: var(--accent-fill);
+  color: var(--accent-primary);
 }
 
 .priority-rank.rank-3 {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--bg-elevated);
   color: var(--text-secondary);
 }
 
@@ -512,8 +597,8 @@ onMounted(async () => {
 .priority-title {
   flex: 1;
   font-size: 13px;
-  color: var(--text-primary);
-  font-weight: 500;
+  color: var(--text-secondary);
+  font-weight: 450;
 }
 
 .priority-empty {
@@ -548,6 +633,10 @@ onMounted(async () => {
 
   .side-column {
     flex-direction: column;
+  }
+
+  .page-header h1 {
+    font-size: 36px;
   }
 }
 </style>

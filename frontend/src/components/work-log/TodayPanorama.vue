@@ -65,17 +65,28 @@ async function onDelete(itemId: string) {
 
 <style scoped>
 .today-panorama {
-  background: var(--bg-card, #FFFEFC);
-  border: 1px solid var(--border-color, #e5e5e5);
-  border-radius: 8px;
-  padding: 16px;
+  background: var(--gradient-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
   margin-bottom: 16px;
+  box-shadow: var(--shadow-card);
 }
 .panorama-title {
   font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 12px 0;
+  font-variation-settings: 'opsz' 60;
+  font-size: 18px;
+  font-weight: 420;
+  margin: 0 0 16px 0;
   color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+/* 象限标签:彩色底 + 墨色字,保证暗色下的对比度 */
+.today-panorama :deep(.el-tag) {
+  color: var(--bg-primary) !important;
+  border-color: transparent !important;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 </style>

@@ -1,13 +1,14 @@
 <template>
   <div class="timer-page">
-    <div class="timer-container">
+    <div class="timer-hero">
+      <div class="timer-eyebrow">Deep Focus · 25 min</div>
       <div class="timer-header">
         <h2>番茄时钟</h2>
         <p class="subtitle">专注工作，高效生活</p>
       </div>
 
       <div class="timer-main">
-        <TimerDisplay :size="260" />
+        <TimerDisplay :size="280" />
       </div>
 
       <TimerControls />
@@ -159,34 +160,57 @@ onMounted(() => {
 
 <style scoped>
 .timer-page {
-  max-width: 700px;
+  max-width: 720px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.timer-container {
-  background: var(--bg-card);
+.timer-hero {
+  position: relative;
+  background: var(--gradient-warm);
   border-radius: var(--radius-2xl);
-  padding: 56px 48px;
-  margin-bottom: 32px;
+  padding: 48px 48px 40px;
+  margin-bottom: 18px;
   border: 1px solid var(--border-color);
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+.timer-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(50% 45% at 50% 42%, rgba(230, 162, 60, 0.09), transparent 70%);
+}
+
+.timer-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  margin-bottom: 6px;
 }
 
 .timer-header {
   text-align: center;
-  margin-bottom: 48px;
+  margin-bottom: 36px;
 }
 
 .timer-header h2 {
   font-family: var(--font-display);
+  font-variation-settings: 'opsz' 144;
   font-size: 30px;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--text-primary);
   margin: 0 0 8px 0;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.03em;
 }
 
 .subtitle {
@@ -199,13 +223,15 @@ onMounted(() => {
 .timer-main {
   display: flex;
   justify-content: center;
-  margin-bottom: 40px;
+  margin-bottom: 36px;
+  position: relative;
+  z-index: 1;
 }
 
 .recent-sessions {
-  background: var(--bg-card);
+  background: var(--gradient-card);
   border-radius: var(--radius-xl);
-  padding: 32px;
+  padding: 28px;
   border: 1px solid var(--border-color);
   width: 100%;
 }
@@ -214,27 +240,31 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 .section-header h3 {
-  font-size: 16px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
+  font-size: 18px;
+  font-weight: 420;
   color: var(--text-primary);
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .session-count {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-mono);
+  letter-spacing: 0.04em;
 }
 
 .empty-state {
   text-align: center;
   padding: 48px 24px;
   border-radius: var(--radius-md);
-  border: 1px dashed var(--border-color);
+  border: 1px dashed var(--border-accent);
 }
 
 .empty-icon {
@@ -264,76 +294,80 @@ onMounted(() => {
 .session-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
 .session-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 16px;
-  border-radius: var(--radius-md);
-  transition: background var(--transition-fast);
-  border: 1px solid transparent;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--border-color);
+  transition: padding-left var(--transition-fast);
+}
+
+.session-item:last-child {
+  border-bottom: none;
 }
 
 .session-item:hover {
-  background: rgba(0, 0, 0, 0.02);
-  border-color: var(--border-color);
+  padding-left: 8px;
 }
 
 .session-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 13px;
 }
 
 .session-icon {
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-sm);
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .session-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
 }
 
 .icon-work {
-  background: rgba(184, 69, 44, 0.08);
+  background: var(--accent-fill);
   color: var(--accent-primary);
 }
 
 .icon-short_break {
-  background: rgba(107, 139, 111, 0.08);
+  background: var(--sage-fill);
   color: var(--accent-sage);
 }
 
 .icon-long_break {
-  background: rgba(184, 149, 77, 0.08);
+  background: var(--gold-fill);
   color: var(--accent-gold);
 }
 
 .session-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .session-title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 500;
   color: var(--text-primary);
 }
 
 .session-meta {
   display: flex;
   gap: 8px;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
 }
 
 .session-duration::before {
@@ -342,7 +376,7 @@ onMounted(() => {
 }
 
 .interrupt-reason {
-  color: var(--accent-primary);
+  color: var(--accent-crimson);
   font-size: 11px;
 }
 
@@ -354,37 +388,41 @@ onMounted(() => {
 
 .session-status {
   padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 11px;
+  border-radius: 999px;
+  font-size: 10.5px;
   font-weight: 500;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
 }
 
 .status-completed {
-  background: rgba(107, 139, 111, 0.06);
+  background: var(--sage-fill);
   color: var(--accent-sage);
 }
 
 .status-abandoned {
-  background: rgba(184, 69, 44, 0.06);
-  color: var(--accent-primary);
+  background: var(--crimson-fill);
+  color: var(--accent-crimson);
 }
 
 .status-paused {
-  background: rgba(184, 149, 77, 0.06);
+  background: var(--gold-fill);
   color: var(--accent-gold);
 }
 
 .status-running {
-  background: rgba(184, 69, 44, 0.06);
+  background: var(--accent-fill);
   color: var(--accent-primary);
 }
 
-@media (max-width: 640px) {
-  .timer-page {
-    padding: 20px;
-  }
+.status-pending {
+  background: rgba(239, 231, 215, 0.05);
+  color: var(--text-muted);
+}
 
-  .timer-container {
+@media (max-width: 640px) {
+  .timer-hero {
     padding: 32px 20px;
     border-radius: var(--radius-lg);
   }
@@ -396,15 +434,6 @@ onMounted(() => {
   .recent-sessions {
     padding: 20px;
     border-radius: var(--radius-lg);
-  }
-
-  .session-item {
-    padding: 12px;
-  }
-
-  .session-icon {
-    width: 32px;
-    height: 32px;
   }
 }
 </style>

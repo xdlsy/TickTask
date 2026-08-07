@@ -30,40 +30,49 @@ const taskTitles = computed(() =>
 
 <style scoped>
 .today-context-card {
-  background: var(--bg-card);
+  background: var(--gradient-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 16px 20px;
+  border-radius: var(--radius-lg);
+  padding: 18px 22px;
   margin-bottom: 16px;
+  box-shadow: var(--shadow-card);
 }
 .ctx-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 .ctx-title {
   font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
+  font-variation-settings: 'opsz' 60;
+  font-size: 15px;
+  font-weight: 420;
   color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 .ctx-date {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
+  letter-spacing: 0.08em;
 }
 .ctx-row {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
   color: var(--text-secondary);
-  padding: 4px 0;
+  padding: 5px 0;
 }
 .ctx-label {
   flex: 0 0 80px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--text-muted);
+  padding-top: 2px;
 }
 .ctx-value {
   flex: 1;

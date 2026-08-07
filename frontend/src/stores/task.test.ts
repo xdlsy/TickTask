@@ -66,10 +66,10 @@ describe('Task Store', () => {
   describe('getQuadrantColor', () => {
     it('should return correct color for each quadrant', () => {
       const store = useTaskStore()
-      expect(store.getQuadrantColor(1)).toBe('#ef4444')
-      expect(store.getQuadrantColor(2)).toBe('#f59e0b')
-      expect(store.getQuadrantColor(3)).toBe('#3b82f6')
-      expect(store.getQuadrantColor(4)).toBe('#6b7280')
+      expect(store.getQuadrantColor(1)).toBe('#D86F54')
+      expect(store.getQuadrantColor(2)).toBe('#E6A23C')
+      expect(store.getQuadrantColor(3)).toBe('#7FA8C0')
+      expect(store.getQuadrantColor(4)).toBe('#8A8273')
     })
   })
 

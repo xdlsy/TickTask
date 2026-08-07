@@ -318,8 +318,8 @@ function onSave() {
 }
 
 .ai-recommendation {
-  background: rgba(196, 103, 61, 0.06);
-  border: 1px solid rgba(196, 103, 61, 0.2);
+  background: var(--accent-fill);
+  border: 1px solid rgba(230, 162, 60, 0.22);
   border-radius: var(--radius-md);
   padding: 16px;
   margin-bottom: 18px;
@@ -333,9 +333,12 @@ function onSave() {
 }
 
 .recommendation-header span:first-child {
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-weight: 500;
   color: var(--accent-primary);
-  font-size: 14px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .recommendation-reason {

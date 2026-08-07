@@ -268,7 +268,7 @@ onUnmounted(() => { if (tooltipTimer) clearTimeout(tooltipTimer) })
 .week-view {
   display: flex;
   flex-direction: column;
-  background: var(--bg-card);
+  background: var(--gradient-card);
   border-radius: var(--radius-xl);
   overflow: hidden;
   border: 1px solid var(--border-color);
@@ -331,32 +331,42 @@ onUnmounted(() => { if (tooltipTimer) clearTimeout(tooltipTimer) })
 }
 
 .day-header {
-  padding: 10px 8px;
+  padding: 12px 8px;
   text-align: center;
   flex: 1;
+  border-right: 1px solid var(--border-color);
+}
+
+.day-header:last-child {
+  border-right: none;
 }
 
 .day-column.is-today .day-header {
-  background: rgba(184, 69, 44, 0.06);
+  background: var(--accent-fill);
 }
 
 .day-name {
   display: block;
   font-size: 11px;
-  color: var(--text-secondary);
-  margin-bottom: 2px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  margin-bottom: 3px;
 }
 
 .day-column.is-today .day-name {
   color: var(--accent-primary);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .day-number {
   display: block;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 440;
   color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
 .day-column.is-today .day-number {
@@ -376,18 +386,24 @@ onUnmounted(() => { if (tooltipTimer) clearTimeout(tooltipTimer) })
 }
 
 .hour-slot:hover {
-  background: rgba(0, 0, 0, 0.02);
+  background: rgba(239, 231, 215, 0.03);
 }
 
 .event-block {
   position: absolute;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 3px 6px;
   cursor: pointer;
   overflow: hidden;
-  transition: opacity var(--transition-fast);
-  color: #fff;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  color: var(--text-primary);
   font-size: 11px;
+  box-shadow: var(--shadow-xs);
+}
+
+.event-block:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .event-block:hover {
@@ -422,8 +438,8 @@ onUnmounted(() => { if (tooltipTimer) clearTimeout(tooltipTimer) })
   color: var(--text-primary);
   padding: 10px 14px;
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-pop);
+  border: 1px solid var(--border-accent);
   z-index: 9999;
   pointer-events: none;
   min-width: 150px;

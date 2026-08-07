@@ -1,9 +1,10 @@
 <template>
   <div class="quadrant-view">
     <div class="quadrants-grid">
-      <div v-for="q in ([1,2,3,4] as Quadrant[])" :key="q" class="quadrant" @dragover.prevent @drop="onDrop($event, q)">
+      <div v-for="q in ([1,2,3,4] as Quadrant[])" :key="q" :class="['quadrant', `quad-q${q}`]" @dragover.prevent @drop="onDrop($event, q)">
         <div class="quadrant-header">
           <div class="quadrant-info">
+            <span class="quadrant-qnum">Q{{ q }}</span>
             <span class="quadrant-name">{{ quadrantInfo[q].name }}</span>
             <span class="quadrant-count">{{ tasksByQuadrant[q].length }}</span>
           </div>
@@ -69,9 +70,10 @@ defineExpose({ onAddTask })
 }
 
 .quadrant {
-  background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  padding: 20px;
+  position: relative;
+  background: var(--gradient-card);
+  border-radius: var(--radius-xl);
+  padding: 22px 22px 18px;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border-color);
@@ -80,39 +82,68 @@ defineExpose({ onAddTask })
   overflow: hidden;
 }
 
+.quadrant::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3px;
+  height: 44px;
+  border-radius: 0 3px 3px 0;
+}
+
+.quadrant.q1::before { background: var(--accent-crimson); }
+.quadrant.q2::before { background: var(--accent-primary); }
+.quadrant.q3::before { background: var(--accent-sky); }
+.quadrant.q4::before { background: var(--text-muted); }
+
 .quadrant:hover {
   border-color: var(--border-accent);
 }
 
 .quadrant-header {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--border-color);
 }
 
 .quadrant-info {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
+  gap: 9px;
   margin-bottom: 4px;
 }
 
+.quadrant-qnum {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.quadrant.q1 .quadrant-qnum { color: var(--accent-crimson); }
+.quadrant.q2 .quadrant-qnum { color: var(--accent-primary); }
+.quadrant.q3 .quadrant-qnum { color: var(--accent-sky); }
+
 .quadrant-name {
-  font-weight: 600;
-  font-size: 14px;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 40;
+  font-weight: 440;
+  font-size: 16px;
   color: var(--text-primary);
-  letter-spacing: -0.2px;
+  letter-spacing: -0.02em;
+  flex: 1;
 }
 
 .quadrant-count {
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
   font-weight: 500;
-  font-family: var(--font-mono);
 }
 
 .quadrant-desc {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
 }
 

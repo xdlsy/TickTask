@@ -2,6 +2,7 @@
   <div class="schedule-page">
     <div class="page-header">
       <div class="header-left">
+        <span class="eyebrow">Schedule</span>
         <h1>日程</h1>
         <p class="page-subtitle">规划你的时间</p>
       </div>
@@ -530,24 +531,48 @@ async function loadSchedules() {
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: flex-end;
   margin-bottom: 32px;
   padding-bottom: 24px;
   border-bottom: 1px solid var(--border-color);
   position: relative;
 }
 
+/* 编辑式 eyebrow:细发丝线 + 等宽小标签 */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  margin-bottom: 14px;
+}
+
+.eyebrow::before {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: var(--accent-primary);
+  opacity: 0.6;
+}
+
 .header-left h1 {
   font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 600;
+  font-variation-settings: 'opsz' 144;
+  font-size: 36px;
+  font-weight: 380;
   color: var(--text-primary);
-  margin: 0 0 6px 0;
-  letter-spacing: -0.5px;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 
 .page-subtitle {
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--text-muted);
   margin: 0;
   font-weight: 400;
@@ -561,9 +586,9 @@ async function loadSchedules() {
 
 .view-switch {
   display: flex;
-  background: var(--bg-elevated);
-  border-radius: 14px;
-  padding: 6px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 4px;
   border: 1px solid var(--border-color);
 }
 
@@ -571,31 +596,33 @@ async function loadSchedules() {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 20px;
+  padding: 9px 18px;
   border: none;
   background: transparent;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
-  transition: all var(--transition-normal);
+  transition: all var(--transition-fast);
 }
 
 .view-btn:hover {
   color: var(--text-primary);
+  background: rgba(239, 231, 215, 0.04);
 }
 
 .view-btn.active {
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--bg-primary);
+  font-weight: 600;
 }
 
 .create-btn {
   height: 44px;
-  padding: 0 24px;
+  padding: 0 22px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
@@ -616,51 +643,59 @@ async function loadSchedules() {
 }
 
 .nav-btn {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-normal);
+  transition: all var(--transition-fast);
 }
 
 .nav-btn:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--bg-card-hover);
   border-color: var(--border-accent);
 }
 
 .nav-btn svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   color: var(--text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.nav-btn:hover svg {
+  color: var(--text-primary);
 }
 
 .current-period {
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 440;
+  letter-spacing: -0.02em;
   color: var(--text-primary);
   min-width: 200px;
   text-align: center;
 }
 
 .today-btn {
-  padding: 10px 20px;
+  padding: 9px 18px;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-secondary);
-  transition: all var(--transition-normal);
+  transition: all var(--transition-fast);
 }
 
 .today-btn:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--bg-card-hover);
   border-color: var(--border-accent);
   color: var(--text-primary);
 }
@@ -676,14 +711,15 @@ async function loadSchedules() {
   align-items: center;
   gap: 8px;
   background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
+  border: 1px solid var(--border-accent);
+  color: var(--text-secondary);
   border-radius: var(--radius-md);
 }
 
 .toolbar-actions .el-button:hover {
-  background: rgba(0, 0, 0, 0.03);
-  border-color: var(--border-accent);
+  background: var(--bg-card-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .schedule-content {
@@ -715,7 +751,7 @@ async function loadSchedules() {
   font-weight: 500;
   color: var(--text-primary);
   padding: 10px 14px;
-  background: rgba(107, 139, 111, 0.08);
+  background: var(--sage-fill);
   border-radius: var(--radius-md);
 }
 
@@ -789,10 +825,11 @@ async function loadSchedules() {
 
 .reasoning-header span {
   font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 440;
   color: var(--accent-sage);
-  letter-spacing: -0.2px;
+  letter-spacing: -0.02em;
 }
 
 .reasoning-text {

@@ -1,7 +1,10 @@
 <template>
   <div class="report-detail" v-if="report">
     <div class="rd-header">
-      <h2 class="rd-title">{{ periodLabel[report.type] }} {{ report.period_key }}</h2>
+      <div class="rd-header-left">
+        <span class="rd-eyebrow">Period Report</span>
+        <h2 class="rd-title">{{ periodLabel[report.type] }} <em>{{ report.period_key }}</em></h2>
+      </div>
       <span class="rd-range">{{ report.start_date }} ~ {{ report.end_date }}</span>
     </div>
 
@@ -54,45 +57,87 @@ const summary = computed<ReportSummary>(() => {
 .rd-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
+  align-items: flex-end;
+  gap: 20px;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
   border-bottom: 1px solid var(--border-color);
+}
+.rd-header-left {
+  display: flex;
+  flex-direction: column;
+}
+.rd-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  margin-bottom: 10px;
+}
+.rd-eyebrow::before {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: var(--accent-primary);
+  opacity: 0.6;
 }
 .rd-title {
   font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 600;
+  font-variation-settings: 'opsz' 144;
+  font-size: 34px;
+  font-weight: 380;
   color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+}
+.rd-title em {
+  font-style: italic;
+  font-weight: 360;
+  color: var(--text-secondary);
+  margin-left: 6px;
 }
 .rd-range {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--text-muted);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-bottom: 4px;
 }
 .rd-missing {
-  background: rgba(184, 69, 44, 0.06);
-  color: var(--accent-primary);
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
+  background: var(--crimson-fill);
+  border: 1px solid rgba(216, 111, 84, 0.3);
+  color: var(--accent-crimson);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
   font-size: 12px;
-  margin-bottom: 20px;
-}
-.rd-section {
+  letter-spacing: 0.02em;
   margin-bottom: 24px;
 }
+.rd-section {
+  margin-bottom: 28px;
+}
 .rd-section-title {
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  letter-spacing: 0.2em;
+  margin-bottom: 10px;
 }
 .rd-section-body {
+  font-family: var(--font-body);
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.75;
   color: var(--text-primary);
   white-space: pre-wrap;
 }

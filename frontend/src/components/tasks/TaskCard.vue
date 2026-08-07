@@ -132,11 +132,12 @@ function onRowCheckbox() {
   border-radius: var(--radius-md);
   padding: 14px 16px;
   cursor: pointer;
-  transition: border-color var(--transition-fast);
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .task-card:hover {
   border-color: var(--border-accent);
+  transform: translateY(-1px);
 }
 
 .task-completed {
@@ -156,10 +157,10 @@ function onRowCheckbox() {
 }
 
 .task-title {
-  font-weight: 600;
+  font-weight: 500;
   flex: 1;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.4;
 }
 
@@ -168,19 +169,19 @@ function onRowCheckbox() {
   cursor: pointer;
   transition: all var(--transition-fast);
   padding: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   display: flex;
 }
 
 .more-icon:hover {
   color: var(--text-primary);
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(239, 231, 215, 0.05);
 }
 
 .task-description {
   color: var(--text-secondary);
-  font-size: 13px;
-  margin-top: 10px;
+  font-size: 12.5px;
+  margin-top: 8px;
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -196,20 +197,20 @@ function onRowCheckbox() {
 }
 
 .task-meta .el-tag {
-  --el-tag-bg-color: rgba(0, 0, 0, 0.03);
-  --el-tag-border-color: rgba(0, 0, 0, 0.06);
+  --el-tag-bg-color: rgba(239, 231, 215, 0.04);
+  --el-tag-border-color: var(--border-color);
   --el-tag-text-color: var(--text-secondary);
 }
 
 .task-meta .el-tag--warning {
-  --el-tag-bg-color: rgba(0, 0, 0, 0.03);
-  --el-tag-border-color: rgba(0, 0, 0, 0.06);
-  --el-tag-text-color: var(--text-secondary);
+  --el-tag-bg-color: var(--gold-fill);
+  --el-tag-border-color: rgba(214, 180, 90, 0.22);
+  --el-tag-text-color: var(--accent-gold);
 }
 
 .task-meta .el-tag--success {
-  --el-tag-bg-color: rgba(107, 139, 111, 0.06);
-  --el-tag-border-color: rgba(107, 139, 111, 0.12);
+  --el-tag-bg-color: var(--sage-fill);
+  --el-tag-border-color: rgba(143, 178, 140, 0.22);
   --el-tag-text-color: var(--accent-sage);
 }
 
@@ -252,14 +253,15 @@ function onRowCheckbox() {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 8px;
+  padding: 6px 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), padding-left var(--transition-fast);
 }
 
 .task-row:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(239, 231, 215, 0.04);
+  padding-left: 11px;
 }
 
 .task-row.task-completed {
@@ -272,7 +274,7 @@ function onRowCheckbox() {
 }
 
 .task-row .task-title {
-  font-weight: 500;
+  font-weight: 450;
   font-size: 13px;
   flex: 1;
   overflow: hidden;
@@ -282,10 +284,10 @@ function onRowCheckbox() {
 }
 
 .row-checkbox {
-  width: 14px;
-  height: 14px;
-  border: 1.5px solid var(--border-accent);
-  border-radius: 3px;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -308,32 +310,34 @@ function onRowCheckbox() {
 }
 
 .task-row.task-completed .row-checkbox svg {
-  color: #fff;
+  color: var(--bg-primary);
 }
 
 .row-time {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--text-muted);
-  background: rgba(0, 0, 0, 0.04);
-  padding: 1px 6px;
-  border-radius: 4px;
+  background: rgba(239, 231, 215, 0.05);
+  padding: 1px 7px;
+  border-radius: 999px;
   flex-shrink: 0;
+  font-family: var(--font-mono);
 }
 
 .row-deadline {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--text-muted);
-  background: rgba(0, 0, 0, 0.04);
-  padding: 1px 6px;
-  border-radius: 4px;
+  background: rgba(239, 231, 215, 0.05);
+  padding: 1px 7px;
+  border-radius: 999px;
   flex-shrink: 0;
+  font-family: var(--font-mono);
 }
 
 .row-more {
   color: var(--text-muted);
   cursor: pointer;
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   display: flex;
   flex-shrink: 0;
   transition: all var(--transition-fast);
@@ -341,7 +345,7 @@ function onRowCheckbox() {
 
 .row-more:hover {
   color: var(--text-primary);
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(239, 231, 215, 0.05);
 }
 
 .row-popover-content {
@@ -363,27 +367,28 @@ function onRowCheckbox() {
 }
 
 .popover-tags span {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(239, 231, 215, 0.04);
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 /* Pomodoro progress in row mode */
 .row-pomodoro {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--accent-primary);
-  background: rgba(184, 69, 44, 0.06);
-  padding: 1px 6px;
-  border-radius: 4px;
+  background: var(--accent-fill);
+  padding: 1px 7px;
+  border-radius: 999px;
   flex-shrink: 0;
   white-space: nowrap;
+  font-family: var(--font-mono);
 }
 
 .row-pomodoro-btn {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   background: var(--accent-primary);
-  color: white;
+  color: var(--bg-primary);
   border: none;
   border-radius: 50%;
   display: flex;
@@ -392,20 +397,20 @@ function onRowCheckbox() {
   font-size: 10px;
   cursor: pointer;
   flex-shrink: 0;
-  transition: opacity var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 
 .row-pomodoro-btn:hover {
-  opacity: 0.85;
+  background: var(--accent-secondary);
 }
 
 .row-pomodoro-done {
   color: var(--accent-sage);
-  background: rgba(107, 139, 111, 0.08);
+  background: var(--sage-fill);
 }
 
 .row-pomodoro-na {
   color: var(--text-muted);
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(239, 231, 215, 0.04);
 }
 </style>

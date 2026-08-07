@@ -64,7 +64,7 @@
       <div class="wif-optional">
         <div class="wif-optional-title">补充详情（可选）</div>
         <div class="wif-optional-grid">
-          <div class="wif-field">
+          <div class="wif-field wif-field-content">
             <span class="wif-label">内容</span>
             <el-input
               data-test="content-input"
@@ -74,7 +74,7 @@
               placeholder="一句话描述"
             />
           </div>
-          <div class="wif-field">
+          <div class="wif-field wif-field-problem">
             <span class="wif-label">解决了什么问题</span>
             <el-input
               data-test="problem-solved-input"
@@ -83,7 +83,7 @@
               :rows="2"
             />
           </div>
-          <div class="wif-field">
+          <div class="wif-field wif-field-result">
             <span class="wif-label">已产生的结果</span>
             <el-input
               data-test="result-input"
@@ -92,7 +92,7 @@
               :rows="2"
             />
           </div>
-          <div class="wif-field">
+          <div class="wif-field wif-field-impact">
             <span class="wif-label">对后续的影响</span>
             <el-input
               data-test="impact-input"
@@ -236,20 +236,21 @@ async function onSubmit() {
 
 <style scoped>
 .work-item-form {
-  background: var(--bg-card, #FFFEFC);
-  border: 1px solid var(--border-color, #e5e5e5);
-  border-radius: var(--radius-md);
-  padding: 16px 20px;
+  background: var(--gradient-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 18px 22px;
   margin-bottom: 16px;
+  box-shadow: var(--shadow-card);
 }
 .wif-required {
   display: grid;
   grid-template-columns: 140px 220px 1fr 220px;
   gap: 12px;
   align-items: end;
-  padding-bottom: 14px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--border-color);
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .wif-required :deep(.el-form-item) {
   margin-bottom: 0;
@@ -257,36 +258,55 @@ async function onSubmit() {
 .wif-optional {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
 }
 .wif-optional-title {
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   color: var(--text-muted);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   font-weight: 500;
 }
 .wif-optional-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px 14px;
+  gap: 12px 16px;
 }
 .wif-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 .wif-label {
-  font-size: 11px;
-  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-secondary);
   font-weight: 500;
+  letter-spacing: 0.02em;
 }
+/* 四维维度色点:内容(琥珀) / 问题(青草) / 结果(金) / 影响(天蓝) */
+.wif-label::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.wif-field-content .wif-label::before { background: var(--accent-primary); }
+.wif-field-problem .wif-label::before { background: var(--accent-sage); }
+.wif-field-result .wif-label::before { background: var(--accent-gold); }
+.wif-field-impact .wif-label::before { background: var(--accent-sky); }
+
 .wif-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 </style>

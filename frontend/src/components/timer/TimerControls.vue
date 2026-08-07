@@ -163,11 +163,13 @@ async function abandon() {
 
 .control-main {
   width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .start-btn {
-  width: 100%;
-  height: 54px;
+  min-width: 240px;
+  height: 56px;
   font-size: 15px;
   border-radius: var(--radius-md);
   display: flex;
@@ -178,15 +180,15 @@ async function abandon() {
   border: none;
   font-weight: 600;
   font-family: var(--font-body);
-  color: #fff;
+  color: var(--bg-primary);
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(196, 103, 61, 0.3);
+  box-shadow: 0 10px 30px rgba(230, 162, 60, 0.28);
   transition: all var(--transition-normal);
 }
 
 .start-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(196, 103, 61, 0.4);
+  box-shadow: 0 14px 38px rgba(230, 162, 60, 0.38);
 }
 
 .start-btn .btn-svg {
@@ -196,7 +198,7 @@ async function abandon() {
 
 .btn-duration {
   font-size: 12px;
-  opacity: 0.8;
+  opacity: 0.7;
   margin-left: 4px;
   font-family: var(--font-mono);
 }
@@ -211,11 +213,11 @@ async function abandon() {
 .ctrl-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   padding: 12px 22px;
   border-radius: var(--radius-md);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 500;
   font-family: var(--font-body);
   cursor: pointer;
   border: 1px solid transparent;
@@ -223,48 +225,48 @@ async function abandon() {
 }
 
 .ctrl-btn .btn-svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 
 .pause-btn {
-  background: rgba(196, 149, 61, 0.1);
-  border-color: rgba(196, 149, 61, 0.25);
+  background: var(--gold-fill);
+  border-color: rgba(214, 180, 90, 0.28);
   color: var(--accent-gold);
 }
 
 .pause-btn:hover {
-  background: rgba(196, 149, 61, 0.18);
+  background: rgba(214, 180, 90, 0.2);
 }
 
 .resume-btn {
-  background: rgba(196, 103, 61, 0.1);
-  border-color: rgba(196, 103, 61, 0.25);
+  background: var(--accent-fill);
+  border-color: rgba(230, 162, 60, 0.28);
   color: var(--accent-primary);
 }
 
 .resume-btn:hover {
-  background: rgba(196, 103, 61, 0.18);
+  background: rgba(230, 162, 60, 0.2);
 }
 
 .complete-btn {
-  background: rgba(107, 139, 111, 0.1);
-  border-color: rgba(107, 139, 111, 0.25);
+  background: var(--sage-fill);
+  border-color: rgba(143, 178, 140, 0.28);
   color: var(--accent-sage);
 }
 
 .complete-btn:hover {
-  background: rgba(107, 139, 111, 0.18);
+  background: rgba(143, 178, 140, 0.2);
 }
 
 .abandon-btn {
-  background: rgba(196, 85, 77, 0.06);
-  border-color: rgba(196, 85, 77, 0.2);
+  background: var(--crimson-fill);
+  border-color: rgba(216, 111, 84, 0.24);
   color: var(--accent-crimson);
 }
 
 .abandon-btn:hover {
-  background: rgba(196, 85, 77, 0.12);
+  background: rgba(216, 111, 84, 0.18);
 }
 
 .quick-actions {
@@ -280,7 +282,7 @@ async function abandon() {
   align-items: center;
   gap: 6px;
   padding: 18px 14px;
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -290,28 +292,37 @@ async function abandon() {
 
 .quick-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(60, 30, 10, 0.06);
+  border-color: var(--border-accent);
 }
 
 .quick-btn.short:hover {
-  background: rgba(107, 139, 111, 0.06);
-  border-color: rgba(107, 139, 111, 0.3);
+  background: rgba(143, 178, 140, 0.08);
+  border-color: rgba(143, 178, 140, 0.32);
 }
 
 .quick-btn.long:hover {
-  background: rgba(196, 103, 61, 0.06);
-  border-color: rgba(196, 103, 61, 0.3);
+  background: rgba(214, 180, 90, 0.08);
+  border-color: rgba(214, 180, 90, 0.32);
 }
 
 .quick-svg {
   width: 22px;
   height: 22px;
   color: var(--text-secondary);
+  transition: color var(--transition-normal);
+}
+
+.quick-btn.short:hover .quick-svg {
+  color: var(--accent-sage);
+}
+
+.quick-btn.long:hover .quick-svg {
+  color: var(--accent-gold);
 }
 
 .quick-text {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-primary);
 }
 
@@ -319,6 +330,7 @@ async function abandon() {
   font-size: 11px;
   color: var(--text-muted);
   font-family: var(--font-mono);
+  letter-spacing: 0.04em;
 }
 
 @media (max-width: 480px) {

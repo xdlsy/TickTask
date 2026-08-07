@@ -3,8 +3,9 @@
     <div class="tasks-header">
       <div class="header-left">
         <div class="page-title">
+          <span class="eyebrow">Tasks</span>
           <h1>任务管理</h1>
-          <p class="page-subtitle">管理你的四象限任务</p>
+          <p class="page-subtitle">先做对的事 — 重要不紧急,才是长期价值的所在</p>
         </div>
         <div class="view-switch">
           <button
@@ -117,29 +118,58 @@ function onSaveTask(data: any) {
 .tasks-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  padding: 0 0 32px 0;
+  align-items: flex-end;
+  padding: 0 0 28px 0;
   border-bottom: 1px solid var(--border-color);
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
 
 .header-left {
   display: flex;
+  align-items: flex-end;
+  gap: 36px;
+}
+
+.eyebrow {
+  display: inline-flex;
   align-items: center;
-  gap: 32px;
+  gap: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  margin-bottom: 12px;
+}
+
+.eyebrow::before {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: var(--accent-primary);
+  opacity: 0.6;
 }
 
 .page-title h1 {
   font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 600;
+  font-variation-settings: 'opsz' 144;
+  font-size: 36px;
+  font-weight: 380;
   color: var(--text-primary);
-  margin: 0 0 6px 0;
-  letter-spacing: -0.5px;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.page-title h1 em {
+  font-style: italic;
+  font-weight: 360;
+  color: var(--text-secondary);
 }
 
 .page-subtitle {
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--text-muted);
   margin: 0;
   font-weight: 400;
@@ -147,8 +177,8 @@ function onSaveTask(data: any) {
 
 .view-switch {
   display: flex;
-  background: var(--bg-card);
-  border-radius: 10px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
   padding: 4px;
   border: 1px solid var(--border-color);
 }
@@ -157,10 +187,10 @@ function onSaveTask(data: any) {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 18px;
+  padding: 8px 16px;
   border: none;
   background: transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
@@ -175,19 +205,20 @@ function onSaveTask(data: any) {
 
 .view-btn:hover {
   color: var(--text-primary);
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(239, 231, 215, 0.04);
 }
 
 .view-btn.active {
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--bg-primary);
+  font-weight: 600;
 }
 
 .add-btn {
   height: 44px;
-  padding: 0 24px;
+  padding: 0 22px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   border-radius: var(--radius-md);
 }
 

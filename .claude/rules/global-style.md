@@ -23,10 +23,13 @@ paths: ["**/*.go", "**/*.ts", "**/*.vue"]
 - TypeScript: `strict: true`, `noUnusedLocals`, `noUnusedParameters`
 - No ESLint/Prettier (strict TS compiler acts as baseline check)
 
-## Design System
-- `--bg-primary: #FAF9F6`, `--bg-card: #FFFEFC`, `--accent-primary: #B8452C`
-- Fonts: Playfair Display (display), DM Sans (body), JetBrains Mono (mono)
-- No gradients, no glow shadows, no bounce/scale animations — refined minimalism
+## Design System — "Atelier Noir" (warm-ink editorial dark)
+- `--bg-primary: #14120D` (warm ink), `--bg-card: #1E1B14`, `--accent-primary: #E6A23C` (amber)
+- Status accents: `--accent-sage #8FB28C`, `--accent-gold #D6B45A`, `--accent-crimson #D86F54`, `--accent-sky #7FA8C0`; soft fills via `--*-fill` tokens
+- Fonts: Fraunces (display, opsz), Geist (body), Geist Mono (data/numerals)
+- Amber used sparingly; status colors only for semantics. Ambient warm glow + fine grain overlay in `App.vue`
+- Element Plus dark: `element-plus/theme-chalk/dark/css-vars.css` imported in `main.ts`, `<html class="dark">` in `index.html`, `--el-*` brand overrides in `App.vue :root`
+- Editorial signatures: mono uppercase eyebrow with hairline rule; Fraunces page titles & large numerals; mono pills/tags (`border-radius:999px`)
 
 ## Commits
 - Conventional Commits: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`

@@ -1,6 +1,7 @@
 <template>
   <div class="settings-page">
     <div class="page-header">
+      <span class="eyebrow">Settings</span>
       <h1>设置</h1>
       <p class="page-subtitle">自定义你的工作流程</p>
     </div>
@@ -245,9 +246,6 @@
       </div>
       <div class="card-content">
         <p class="form-tip">导出全部数据为 JSON 备份;或从备份文件导入(支持冲突人工解决)。</p>
-        <div class="data-export-row">
-          <el-checkbox v-model="includeAPIKey" data-test="include-api-key">包含 AI API Key</el-checkbox>
-        </div>
         <div class="card-actions">
           <el-button type="primary" size="large" data-test="export-btn" @click="exportData" :loading="exporting">导出全部数据</el-button>
           <el-button size="large" data-test="import-btn" @click="importVisible = true">导入数据</el-button>
@@ -452,26 +450,21 @@ async function testAIConnection() {
 
 const exporting = ref(false)
 const importVisible = ref(false)
-const includeAPIKey = ref(true)
 
-async function exportData() {
+function exportData() {
+  // 直接走真实端点 URL(而非 blob URL):服务端用 Content-Disposition 决定文件名
+  // (ticktask-backup-<ts>.json),同源 <a> 也会保留后缀。blob URL 会丢弃
+  // Content-Disposition,而部分浏览器(尤其是内嵌 webview)会忽略其 download 属性,
+  // 于是回退成 blob 的 UUID、丢失扩展名。
   exporting.value = true
-  try {
-    const res = await api.exportData(includeAPIKey.value)
-    const url = URL.createObjectURL(res.data)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `ticktask-backup-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    ElMessage.success('导出成功')
-  } catch {
-    ElMessage.error('导出失败')
-  } finally {
-    exporting.value = false
-  }
+  const a = document.createElement('a')
+  a.href = '/api/data/export?include_api_key=true'
+  a.download = ''
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  ElMessage.success('导出成功')
+  setTimeout(() => { exporting.value = false }, 800)
 }
 
 async function onImported() {
@@ -491,20 +484,47 @@ onMounted(() => {
   margin: 0 auto;
 }
 
+/* ── Page header ── */
 .page-header {
-  margin-bottom: 36px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--border-color);
-  text-align: center;
+  margin-bottom: 40px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  margin-bottom: 14px;
+}
+
+.eyebrow::before {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: var(--accent-primary);
+  opacity: 0.6;
 }
 
 .page-header h1 {
   font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 600;
+  font-variation-settings: 'opsz' 144;
+  font-size: 38px;
+  font-weight: 380;
   color: var(--text-primary);
-  margin: 0 0 8px 0;
-  letter-spacing: -0.5px;
+  margin: 0 0 10px 0;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.page-header h1 em {
+  font-style: italic;
+  font-weight: 360;
+  color: var(--text-secondary);
 }
 
 .page-subtitle {
@@ -514,24 +534,21 @@ onMounted(() => {
   font-weight: 400;
 }
 
+/* ── Settings cards ── */
 .settings-card {
-  background: var(--bg-card);
+  background: var(--gradient-card);
   border-radius: var(--radius-xl);
-  margin-bottom: 28px;
+  margin-bottom: 24px;
   border: 1px solid var(--border-color);
   overflow: hidden;
-  transition: border-color var(--transition-normal);
-}
-
-.settings-card:hover {
-  border-color: var(--border-accent);
+  box-shadow: var(--shadow-card);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 28px;
+  padding: 22px 28px;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -539,15 +556,19 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 16px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
+  font-size: 19px;
+  font-weight: 420;
   color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
 .card-icon {
-  width: 20px;
-  height: 20px;
-  color: var(--text-muted);
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 .card-content {
@@ -584,8 +605,10 @@ onMounted(() => {
 }
 
 .unit {
-  font-size: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--text-muted);
+  letter-spacing: 0.06em;
 }
 
 .settings-toggles {
@@ -611,7 +634,7 @@ onMounted(() => {
 }
 
 .toggle-label {
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 500;
   color: var(--text-primary);
 }
@@ -626,10 +649,6 @@ onMounted(() => {
   gap: 14px;
 }
 
-.data-export-row {
-  margin-bottom: 14px;
-}
-
 .ai-preference-section {
   padding: 24px 0;
   border-top: 1px solid var(--border-color);
@@ -638,10 +657,13 @@ onMounted(() => {
 }
 
 .section-label {
-  font-size: 15px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
+  font-size: 16px;
+  font-weight: 440;
   color: var(--text-primary);
   margin-bottom: 20px;
+  letter-spacing: -0.01em;
 }
 
 .setting-item.full-width {
@@ -656,7 +678,7 @@ onMounted(() => {
   display: block;
   font-size: 13px;
   color: var(--text-muted);
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .time-preference-grid {
@@ -683,6 +705,48 @@ onMounted(() => {
   border-radius: var(--radius-md);
 }
 
+/* el-slider — dark (not covered by global App.vue overrides) */
+:deep(.el-slider__runway) {
+  background-color: rgba(239, 231, 215, 0.08);
+  height: 4px;
+  margin: 14px 0;
+}
+
+:deep(.el-slider__bar) {
+  background-color: var(--accent-primary);
+  height: 4px;
+}
+
+:deep(.el-slider__button) {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent-primary);
+  background-color: var(--bg-secondary);
+  box-shadow: 0 0 0 4px rgba(230, 162, 60, 0.10);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+:deep(.el-slider__button:hover),
+:deep(.el-slider__button.hover),
+:deep(.el-slider__button.dragging) {
+  border-color: var(--accent-secondary);
+  box-shadow: 0 0 0 6px rgba(230, 162, 60, 0.14);
+}
+
+:deep(.el-slider__stop) {
+  background-color: var(--text-muted);
+  opacity: 0.5;
+}
+
+:deep(.el-slider__marks-text) {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  margin-top: 10px;
+}
+
+/* ── AI settings form ── */
 .form-item {
   margin-bottom: 24px;
 }
@@ -700,7 +764,7 @@ onMounted(() => {
 }
 
 .form-item .required {
-  color: var(--accent-primary);
+  color: var(--accent-crimson);
   margin-left: 2px;
 }
 
@@ -715,6 +779,7 @@ onMounted(() => {
   margin-top: 8px;
 }
 
+/* ── About card ── */
 .about-card .about-info {
   text-align: center;
   padding: 20px 0;
@@ -731,7 +796,8 @@ onMounted(() => {
 .brand-icon {
   width: 48px;
   height: 48px;
-  background: rgba(184, 69, 44, 0.08);
+  background: var(--accent-fill);
+  border: 1px solid rgba(230, 162, 60, 0.25);
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
@@ -746,10 +812,12 @@ onMounted(() => {
 
 .brand-info h3 {
   font-family: var(--font-display);
-  font-size: 20px;
-  font-weight: 600;
+  font-variation-settings: 'opsz' 60;
+  font-size: 22px;
+  font-weight: 440;
   color: var(--text-primary);
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .brand-info p {
@@ -769,9 +837,11 @@ onMounted(() => {
 }
 
 .version {
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--text-muted);
   margin: 0;
+  letter-spacing: 0.12em;
 }
 
 @media (max-width: 768px) {

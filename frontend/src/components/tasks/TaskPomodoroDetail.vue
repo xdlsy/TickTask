@@ -169,10 +169,13 @@ defineExpose({ open })
 }
 
 .detail-section h4 {
-  font-size: 14px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 40;
+  font-size: 15px;
+  font-weight: 440;
   color: var(--text-primary);
   margin: 0 0 10px 0;
+  letter-spacing: -0.02em;
 }
 
 .detail-meta {
@@ -184,29 +187,33 @@ defineExpose({ open })
 }
 
 .detail-quadrant {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.04);
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(239, 231, 215, 0.05);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
 }
 
 .detail-deadline {
   font-size: 12px;
   color: var(--text-secondary);
+  font-family: var(--font-mono);
 }
 
 .detail-status {
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.04);
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(239, 231, 215, 0.05);
   color: var(--text-secondary);
+  font-family: var(--font-mono);
 }
 
 .detail-status.status-completed {
   color: var(--accent-sage);
-  background: rgba(107, 139, 111, 0.08);
+  background: var(--sage-fill);
 }
 
 .detail-desc {
@@ -224,24 +231,25 @@ defineExpose({ open })
 
 .progress-bar-wrapper {
   flex: 1;
-  height: 8px;
-  background: #e8e4df;
-  border-radius: 4px;
+  height: 7px;
+  background: rgba(239, 231, 215, 0.08);
+  border-radius: 999px;
   overflow: hidden;
 }
 
 .progress-bar {
   height: 100%;
-  background: var(--accent-primary, #B8452C);
-  border-radius: 4px;
+  background: var(--gradient-primary);
+  border-radius: 999px;
   transition: width 0.3s ease;
 }
 
 .progress-text {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
+  font-family: var(--font-mono);
 }
 
 .progress-hint {
@@ -262,37 +270,39 @@ defineExpose({ open })
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 6px;
+  padding: 7px 11px;
+  background: rgba(239, 231, 215, 0.03);
+  border-radius: var(--radius-sm);
   font-size: 13px;
 }
 
 .session-time {
   color: var(--text-primary);
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
 }
 
 .session-duration {
   color: var(--text-secondary);
   font-size: 12px;
+  font-family: var(--font-mono);
 }
 
 .start-pomodoro-btn {
   width: 100%;
   padding: 12px;
-  background: var(--accent-primary, #B8452C);
-  color: #fff;
+  background: var(--gradient-primary);
+  color: var(--bg-primary);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: all var(--transition-fast);
+  font-family: var(--font-body);
 }
 
 .start-pomodoro-btn:hover {
-  opacity: 0.85;
+  box-shadow: 0 8px 24px rgba(230, 162, 60, 0.28);
 }
 
 .detail-footer {
@@ -300,5 +310,6 @@ defineExpose({ open })
   border-top: 1px solid var(--border-color);
   font-size: 13px;
   color: var(--text-secondary);
+  font-family: var(--font-mono);
 }
 </style>

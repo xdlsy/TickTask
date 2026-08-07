@@ -152,7 +152,7 @@ function toggleWrap() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(10, 9, 6, 0.62);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -161,11 +161,11 @@ function toggleWrap() {
   width: 680px;
   max-width: 90vw;
   max-height: 80vh;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  background: #1a1b1e;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.3);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-accent);
+  box-shadow: var(--shadow-pop), 0 0 0 1px rgba(230, 162, 60, 0.06);
   display: flex;
   flex-direction: column;
 }
@@ -175,8 +175,8 @@ function toggleWrap() {
   display: flex;
   align-items: center;
   padding: 10px 14px;
-  background: #2c2d30;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-color);
   user-select: none;
 }
 
@@ -203,29 +203,32 @@ function toggleWrap() {
   gap: 8px;
   font-size: 12px;
   font-family: var(--font-mono);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
 }
 
 .status-badge {
   font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
+  padding: 1px 7px;
+  border-radius: 999px;
   font-weight: 500;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
 }
 
 .status-badge.running {
-  background: rgba(254, 188, 46, 0.15);
-  color: #febc2e;
+  background: var(--gold-fill);
+  color: var(--accent-gold);
 }
 
 .status-badge.done {
-  background: rgba(40, 200, 64, 0.15);
-  color: #28c840;
+  background: var(--sage-fill);
+  color: var(--accent-sage);
 }
 
 .status-badge.error {
-  background: rgba(255, 95, 87, 0.15);
-  color: #ff5f57;
+  background: var(--crimson-fill);
+  color: var(--accent-crimson);
 }
 
 .titlebar-actions {
@@ -236,17 +239,18 @@ function toggleWrap() {
 .titlebar-btn {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-muted);
   cursor: pointer;
   padding: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .titlebar-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.6);
+  background: rgba(239, 231, 215, 0.06);
+  color: var(--text-secondary);
 }
 
 /* Terminal Body */
@@ -257,10 +261,10 @@ function toggleWrap() {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.7;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-primary);
   min-height: 200px;
   max-height: 400px;
-  background: #1a1b1e;
+  background: var(--bg-primary);
 }
 
 .terminal-body::-webkit-scrollbar {
@@ -272,33 +276,33 @@ function toggleWrap() {
 }
 
 .terminal-body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(239, 231, 215, 0.12);
   border-radius: 2px;
 }
 
 .terminal-welcome {
   margin-bottom: 12px;
   padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .welcome-text {
   display: block;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  font-size: 10px;
+  color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
+  letter-spacing: 0.3em;
+  margin-bottom: 5px;
 }
 
 .welcome-cmd {
   display: block;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--accent-primary);
 }
 
 .terminal-waiting {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -307,10 +311,11 @@ function toggleWrap() {
 .terminal-line {
   white-space: pre-wrap;
   word-break: break-all;
+  color: var(--text-secondary);
 }
 
 .terminal-line.stderr {
-  color: #ff5f57;
+  color: var(--accent-crimson);
 }
 
 .line-text {
@@ -320,11 +325,11 @@ function toggleWrap() {
 .terminal-cursor {
   display: flex;
   gap: 8px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--accent-primary);
 }
 
 .cursor-prompt {
-  color: rgba(255, 255, 255, 0.25);
+  color: var(--accent-primary);
 }
 
 .cursor-blink {
@@ -340,38 +345,39 @@ function toggleWrap() {
 .terminal-completion {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-accent);
 }
 
 .terminal-completion.completed .completion-line {
-  color: #28c840;
+  color: var(--accent-sage);
 }
 
 .terminal-completion.error .completion-line {
-  color: #ff5f57;
+  color: var(--accent-crimson);
 }
 
 .completion-line {
   font-size: 12px;
   margin-bottom: 6px;
+  letter-spacing: 0.04em;
 }
 
 .completion-message {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-primary);
   margin-bottom: 4px;
 }
 
 .completion-detail {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-muted);
 }
 
 /* Reasoning */
 .terminal-reasoning {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-accent);
   padding: 10px 16px;
-  background: #222325;
+  background: var(--bg-secondary);
 }
 
 .reasoning-toggle {
@@ -379,13 +385,14 @@ function toggleWrap() {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   cursor: pointer;
   user-select: none;
+  transition: color var(--transition-fast);
 }
 
 .reasoning-toggle:hover {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--accent-primary);
 }
 
 .reasoning-toggle svg {
@@ -399,7 +406,7 @@ function toggleWrap() {
 .reasoning-content {
   margin-top: 8px;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--text-secondary);
   line-height: 1.6;
   max-height: 100px;
   overflow-y: auto;

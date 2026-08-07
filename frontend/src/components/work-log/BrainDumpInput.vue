@@ -44,57 +44,71 @@ function onStructure() {
 
 <style scoped>
 .brain-dump-input {
-  background: var(--bg-card);
+  background: var(--gradient-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 16px 20px;
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
   margin-bottom: 16px;
+  box-shadow: var(--shadow-card);
 }
 .bd-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .bd-title {
   font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
+  font-variation-settings: 'opsz' 60;
+  font-size: 15px;
+  font-weight: 420;
   color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 .bd-btn {
   background: var(--accent-primary);
-  color: white;
+  color: var(--bg-primary);
   border: none;
   border-radius: var(--radius-sm);
-  padding: 6px 14px;
-  font-size: 13px;
-  font-weight: 500;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
 }
 .bd-btn:hover:not(:disabled) {
   background: var(--accent-secondary);
+  box-shadow: 0 8px 24px rgba(230, 162, 60, 0.24);
 }
 .bd-btn:disabled {
-  background: var(--text-muted);
+  background: rgba(239, 231, 215, 0.08);
+  color: var(--text-muted);
   cursor: not-allowed;
 }
 .bd-textarea {
   width: 100%;
   min-height: 120px;
-  padding: 10px 12px;
-  border: 1px solid var(--border-color);
+  padding: 12px 14px;
+  border: 1px solid var(--border-accent);
   border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
+  background: var(--bg-secondary);
   color: var(--text-primary);
   font-family: var(--font-body);
   font-size: 13px;
   line-height: 1.6;
   resize: vertical;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.bd-textarea::placeholder {
+  color: var(--text-muted);
 }
 .bd-textarea:focus {
   outline: none;
   border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(230, 162, 60, 0.12);
+}
+.bd-textarea:disabled {
+  opacity: 0.55;
+  cursor: progress;
 }
 </style>

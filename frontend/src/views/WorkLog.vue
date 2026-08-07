@@ -1,9 +1,14 @@
 <template>
   <div class="work-log-page">
     <div class="page-header">
-      <h1 class="page-title">工作日志</h1>
+      <div class="page-header-left">
+        <span class="eyebrow">Work Log</span>
+        <h1 class="page-title">工作日志</h1>
+      </div>
       <div class="page-actions">
-        <button class="action-btn" @click="goToday">今日</button>
+        <button class="header-link" @click="goToday">
+          <span>今日</span>
+        </button>
         <ReportActions @generate="onGenerateReport" />
       </div>
     </div>
@@ -240,39 +245,91 @@ onMounted(async () => {
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  align-items: flex-end;
+  gap: 24px;
+  margin-bottom: 32px;
 }
+.page-header-left {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 编辑式 eyebrow:细发丝线 + 等宽小标签,衬在标题之上 */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  margin-bottom: 14px;
+}
+.eyebrow::before {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: var(--accent-primary);
+  opacity: 0.6;
+}
+
 .page-title {
   font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 600;
+  font-variation-settings: 'opsz' 144;
+  font-size: 42px;
+  font-weight: 380;
   color: var(--text-primary);
-  letter-spacing: -0.5px;
+  margin: 0;
+  letter-spacing: -0.03em;
+  line-height: 1.04;
 }
-.action-btn {
-  background: transparent;
-  border: 1px solid var(--border-color);
+.page-title em {
+  font-style: italic;
+  font-weight: 360;
   color: var(--text-secondary);
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 13px;
 }
-.action-btn:hover {
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.header-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-accent);
+  cursor: pointer;
+  padding: 7px 14px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+.header-link:hover {
   border-color: var(--accent-primary);
   color: var(--accent-primary);
 }
+
 .page-body {
   flex: 1;
   display: flex;
   border-top: 1px solid var(--border-color);
   margin: 0 -40px -40px -40px;
   padding: 0;
+  min-height: 0;
 }
 .detail-area {
   flex: 1;
-  padding: 24px 32px;
+  padding: 28px 32px;
   overflow-y: auto;
 }
 .report-placeholder {

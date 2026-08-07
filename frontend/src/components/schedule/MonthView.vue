@@ -142,7 +142,7 @@ function getPomodoroText(event: ScheduleEvent): string {
 
 <style scoped>
 .month-view {
-  background: var(--bg-card);
+  background: var(--gradient-card);
   border-radius: var(--radius-xl);
   overflow: hidden;
   border: 1px solid var(--border-color);
@@ -157,9 +157,11 @@ function getPomodoroText(event: ScheduleEvent): string {
 .weekday-cell {
   padding: 12px 8px;
   text-align: center;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
 }
 
 .month-grid {
@@ -181,7 +183,7 @@ function getPomodoroText(event: ScheduleEvent): string {
 }
 
 .day-cell:hover {
-  background: rgba(0, 0, 0, 0.02);
+  background: rgba(239, 231, 215, 0.03);
 }
 
 .day-cell.other-month .day-number {
@@ -190,12 +192,12 @@ function getPomodoroText(event: ScheduleEvent): string {
 }
 
 .day-cell.is-today {
-  background: rgba(184, 69, 44, 0.04);
+  background: var(--accent-fill);
 }
 
 .day-cell.is-today .day-number {
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--bg-primary);
 }
 
 .day-header {
@@ -211,9 +213,12 @@ function getPomodoroText(event: ScheduleEvent): string {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-family: var(--font-display);
+  font-variation-settings: 'opsz' 60;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 440;
   color: var(--text-primary);
+  letter-spacing: -0.02em;
   border-radius: 50%;
 }
 
@@ -236,7 +241,7 @@ function getPomodoroText(event: ScheduleEvent): string {
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 11px;
-  color: #fff;
+  color: var(--text-primary);
   overflow: hidden;
   cursor: pointer;
   transition: opacity var(--transition-fast);

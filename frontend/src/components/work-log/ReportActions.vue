@@ -24,16 +24,21 @@ function onCommand(cmd: WorkReportType) {
 
 <style scoped>
 .action-btn {
-  background: transparent;
-  border: 1px solid var(--border-color);
+  background: var(--bg-card);
+  border: 1px solid var(--border-accent);
   color: var(--text-secondary);
-  padding: 6px 14px;
+  padding: 7px 14px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: all var(--transition-fast);
 }
 .action-btn:hover {
   border-color: var(--accent-primary);
   color: var(--accent-primary);
+  background: var(--accent-fill);
 }
 </style>
