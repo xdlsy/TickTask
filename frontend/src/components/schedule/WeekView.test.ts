@@ -187,7 +187,7 @@ describe('WeekView', () => {
       })
 
       const eventBlock = wrapper.find('.event-block')
-      expect(eventBlock.attributes('style')).toContain('background-color: rgb(239, 68, 68)')
+      expect(eventBlock.attributes('style')).toContain('background-color: #ef4444')
     })
 
     it('番茄钟类型默认橙色', () => {
@@ -201,7 +201,7 @@ describe('WeekView', () => {
       })
 
       const eventBlock = wrapper.find('.event-block')
-      expect(eventBlock.attributes('style')).toContain('background-color: rgb(184, 149, 77)')
+      expect(eventBlock.attributes('style')).toContain('background-color: #B8954D')
     })
 
     it('休息类型默认绿色', () => {
@@ -215,7 +215,7 @@ describe('WeekView', () => {
       })
 
       const eventBlock = wrapper.find('.event-block')
-      expect(eventBlock.attributes('style')).toContain('background-color: rgb(107, 139, 111)')
+      expect(eventBlock.attributes('style')).toContain('background-color: #6B8B6F')
     })
   })
 
