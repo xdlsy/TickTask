@@ -492,3 +492,12 @@ export interface ModuleApplyResult {
 export interface ApplyResult {
   applied: Record<string, ModuleApplyResult>
 }
+
+export interface ClearResult {
+  tasks: number
+  sessions: number
+  schedules: number
+  work_logs: number
+  work_reports: number
+  daily_stats: number
+}
