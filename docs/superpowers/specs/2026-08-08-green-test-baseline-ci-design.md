@@ -40,16 +40,18 @@ Backend tests are already green; this cycle does **not** change backend logic �
 
 | File | rgb (current) | hex (new) | meaning |
 |---|---|---|---|
-| `DayView.test.ts:181` | `rgb(168, 85, 247)` | `#a855f7` | custom color |
-| `DayView.test.ts:195` | `rgb(184, 149, 77)` | `#b8954d` | pomodoro default |
-| `DayView.test.ts:209` | `rgb(184, 69, 44)` | `#b8452c` | task default |
-| `DayView.test.ts:223` | `rgb(107, 139, 111)` | `#6b8b6f` | break default |
-| `MonthView.test.ts:232` | `rgb(139, 92, 246)` | `#8b5cf6` | custom color |
-| `MonthView.test.ts:246` | `rgb(184, 149, 77)` | `#b8954d` | pomodoro default |
-| `MonthView.test.ts:260` | `rgb(107, 139, 111)` | `#6b8b6f` | break default |
-| `WeekView.test.ts:190` | `rgb(239, 68, 68)` | `#ef4444` | custom color |
-| `WeekView.test.ts:204` | `rgb(184, 149, 77)` | `#b8954d` | pomodoro default |
-| `WeekView.test.ts:218` | `rgb(107, 139, 111)` | `#6b8b6f` | break default |
+| `DayView.test.ts:181` | `rgb(168, 85, 247)` | `#a855f7` | custom color (lowercase, from mock) |
+| `DayView.test.ts:195` | `rgb(184, 149, 77)` | `#B8954D` | pomodoro default (UPPERCASE, from component constant) |
+| `DayView.test.ts:209` | `rgb(184, 69, 44)` | `#B8452C` | task default (UPPERCASE) |
+| `DayView.test.ts:223` | `rgb(107, 139, 111)` | `#6B8B6F` | break default (UPPERCASE) |
+| `MonthView.test.ts:232` | `rgb(139, 92, 246)` | `#8b5cf6` | custom color (lowercase, from mock) |
+| `MonthView.test.ts:246` | `rgb(184, 149, 77)` | `#B8954D` | pomodoro default (UPPERCASE) |
+| `MonthView.test.ts:260` | `rgb(107, 139, 111)` | `#6B8B6F` | break default (UPPERCASE) |
+| `WeekView.test.ts:190` | `rgb(239, 68, 68)` | `#ef4444` | custom color (lowercase, from mock) |
+| `WeekView.test.ts:204` | `rgb(184, 149, 77)` | `#B8954D` | pomodoro default (UPPERCASE) |
+| `WeekView.test.ts:218` | `rgb(107, 139, 111)` | `#6B8B6F` | break default (UPPERCASE) |
+
+> **Verified at planning time:** the components define defaults as uppercase hex — `DayView.vue:175-178`, `WeekView.vue:212`, `MonthView.vue:130` all use `task: '#B8452C', pomodoro: '#B8954D', break: '#6B8B6F'`. Custom colors are the lowercase hex the test mocks pass. happy-dom emits each verbatim, so casing must match the source exactly.
 
 > **Implementation note:** the hex values above are derived from the rgb triples and must be cross-checked against the actual default-color constants used by each component (`DayView`/`WeekView` compute `color`; `MonthView` uses `getEventColor(event)`). Locate those constants and assert the literal hex they hold — do not trust the rgb→hex derivation blindly. happy-dom preserves the color string **verbatim** (it does not normalize to `rgb()` and does not change casing), so the assertion must match the **exact** casing the source emits: custom colors use the lowercase hex the test mock passes (e.g. `createMockEvent({ color: '#a855f7' })`); default colors use the literal in the component’s color constant (verify its casing before asserting).
 
