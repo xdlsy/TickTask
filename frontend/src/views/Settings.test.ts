@@ -27,7 +27,6 @@ vi.mock('@/api/client', () => ({
     getSettings: vi.fn(),
     updatePomodoroSettings: vi.fn(),
     updateAISettings: vi.fn(),
-    exportData: vi.fn().mockResolvedValue({ data: new Blob(['{}']) }),
     previewImport: vi.fn(),
     applyImport: vi.fn()
   }
@@ -277,19 +276,23 @@ describe('Settings.vue', () => {
       expect(wrapper.text()).toContain('导入数据')
     })
 
-    it('clicking export calls api.exportData', async () => {
+    it('clicking export triggers a download of /data/export', async () => {
       const { api } = await import('@/api/client')
       ;(api.getSettings as ReturnType<typeof vi.fn>).mockResolvedValue({
         data: { pomodoro: mockPomodoroSettings, ai: mockAISettings }
       })
 
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+
       const wrapper = mount(Settings, { global: { stubs: { ...elStubs, ImportWizard: true } } })
       await new Promise(resolve => setTimeout(resolve, 50))
 
       await wrapper.get('[data-test="export-btn"]').trigger('click')
-      await new Promise(resolve => setTimeout(resolve, 50))
 
-      expect(api.exportData).toHaveBeenCalled()
+      expect(clickSpy).toHaveBeenCalled()
+      const anchors = clickSpy.mock.instances as HTMLAnchorElement[]
+      expect(anchors.some(a => typeof a.href === 'string' && a.href.includes('/data/export'))).toBe(true)
+      clickSpy.mockRestore()
     })
   })
 })

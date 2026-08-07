@@ -316,17 +316,6 @@ describe('Data Import/Export API', () => {
     vi.restoreAllMocks()
   })
 
-  describe('exportData', () => {
-    it('should call GET /data/export with blob responseType', async () => {
-      const mockResponse = { data: new Blob(['{}'], { type: 'application/json' }) }
-      ;(mockAxios.get as ReturnType<typeof vi.fn>).mockResolvedValue(mockResponse)
-
-      await api.exportData()
-
-      expect(mockAxios.get).toHaveBeenCalledWith('/data/export', { params: { include_api_key: true }, responseType: 'blob' })
-    })
-  })
-
   describe('previewImport', () => {
     it('should POST /data/import/preview with FormData + multipart header', async () => {
       const mockResponse = {

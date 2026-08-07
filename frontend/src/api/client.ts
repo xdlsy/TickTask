@@ -108,9 +108,7 @@ export const api = {
   updateWorkLogSummary: (date: string, summary: string) =>
     client.patch<{ ok: boolean }>(`/work-logs/${date}/summary`, { summary } as UpdateSummaryInput),
 
-  // 数据导入导出
-  exportData: (includeKey = true) =>
-    client.get<Blob>('/data/export', { params: { include_api_key: includeKey }, responseType: 'blob' }),
+  // 数据导入导出(导出在 Settings.vue 中直接走 /api/data/export,无需 client 封装)
   previewImport: (file: File) => {
     const form = new FormData()
     form.append('file', file)
