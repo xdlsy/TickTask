@@ -249,7 +249,7 @@
         </div>
 
         <!-- AI 每日洞察 -->
-        <div class="card ai-insights-card" v-if="aiStore.configured">
+        <div class="card ai-insights-card" v-if="agentStore.status.configured">
           <div class="card-header">
             <h3>AI 每日洞察</h3>
             <button class="insight-btn" @click="fetchAIInsights" :disabled="insightsLoading">
@@ -294,10 +294,10 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '@/api/client'
 import { QUADRANT_INFO } from '@/types'
-import { useAIStore } from '@/stores/ai'
+import { useAgentStore } from '@/stores/agent'
 import type { TaskTimeStats, DailySummary, TrendDataPoint, DistributionStats, DailyInsights, PomodoroByTaskItem, PomodoroTrendDay } from '@/types'
 
-const aiStore = useAIStore()
+const agentStore = useAgentStore()
 const quadrantInfo = QUADRANT_INFO
 
 const aiInsights = ref<DailyInsights | null>(null)
@@ -507,20 +507,12 @@ function changeFilter(filter: 'today' | 'week' | 'month') {
 }
 
 async function fetchAIInsights() {
-  if (!aiStore.configured) return
+  if (!agentStore.status.configured) return
   insightsLoading.value = true
   try {
-    const distSummary = Object.entries(distribution.value.quadrant_stats)
-      .map(([q, stats]) => `${quadrantInfo[Number(q) as 1|2|3|4]?.name}: ${stats.total}个`)
-      .join(', ')
-    const result = await aiStore.getDailyInsights({
+    const result = await agentStore.runTool('get_daily_insights', {
       date: formatDate(getDateRange().start),
-      completed_pomodoros: summary.value.completed_pomodoros,
-      total_focus_minutes: Math.floor(summary.value.total_focus_time / 60),
-      completed_tasks: summary.value.completed_tasks,
-      total_interruptions: 0,
-      task_distribution: distSummary
-    })
+    }) as DailyInsights | null
     if (result) {
       aiInsights.value = result
     }

@@ -3,7 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import { nextTick } from 'vue'
 import Schedule from './Schedule.vue'
-import type { ScheduleEvent, RescheduleResult } from '@/types'
+import type { ScheduleEvent } from '@/types'
 
 // --- Mock Stores ---
 
@@ -40,20 +40,6 @@ const mockGeneratedEvents: ScheduleEvent[] = [
   }
 ]
 
-const mockRescheduleResult: RescheduleResult = {
-  adjusted_schedule: [
-    {
-      task_id: 'task-1',
-      title: '缩短的代码审查',
-      start_time: '2026-05-25T10:00:00Z',
-      end_time: '2026-05-25T10:15:00Z',
-      adjustment: 'shortened',
-      reason: '被打断后剩余15分钟'
-    }
-  ],
-  summary: '调整了1个任务的时长'
-}
-
 const mockScheduleStore = {
   events: [] as ScheduleEvent[],
   loading: false,
@@ -86,22 +72,7 @@ const mockScheduleStore = {
   goToToday: vi.fn()
 }
 
-const mockAIStore = {
-  configured: false,
-  loading: false,
-  lastClassification: null,
-  checkStatus: vi.fn(),
-  classifyTask: vi.fn(),
-  classifyTasks: vi.fn(),
-  classifyTaskByText: vi.fn(),
-  generateSchedule: vi.fn(),
-  rescheduleAfterInterrupt: vi.fn().mockResolvedValue(mockRescheduleResult),
-  getPrioritySuggestions: vi.fn(),
-  getDailyInsights: vi.fn()
-}
-
 vi.mock('@/stores/schedule', () => ({ useScheduleStore: () => mockScheduleStore }))
-vi.mock('@/stores/ai', () => ({ useAIStore: () => mockAIStore }))
 vi.mock('@/stores/task', () => ({ useTaskStore: () => ({ tasks: [], tasksByQuadrant: { 1: [], 2: [], 3: [], 4: [] }, fetchTasks: vi.fn().mockResolvedValue(undefined) }) }))
 vi.mock('@/stores/timer', () => ({ useTimerStore: () => ({ currentSession: null, createSession: vi.fn() }) }))
 
@@ -134,8 +105,6 @@ describe('Schedule View', () => {
     mockScheduleStore.currentDate = new Date('2026-05-25T10:00:00Z')
     mockScheduleStore.fetchSchedules.mockResolvedValue(undefined)
     mockScheduleStore.generateSchedule.mockResolvedValue([])
-    mockAIStore.configured = false
-    mockAIStore.loading = false
   })
 
   afterEach(() => {

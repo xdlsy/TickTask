@@ -3,14 +3,13 @@ import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import TaskForm from './TaskForm.vue'
 
-const aiStore = vi.hoisted(() => ({
-  configured: false,
-  classifyTask: vi.fn(),
-  classifyTaskByText: vi.fn()
+const agentStore = vi.hoisted(() => ({
+  status: { configured: false },
+  runTool: vi.fn(),
 }))
 
-vi.mock('@/stores/ai', () => ({
-  useAIStore: () => aiStore
+vi.mock('@/stores/agent', () => ({
+  useAgentStore: () => agentStore
 }))
 
 const elMsg = vi.hoisted(() => ({
@@ -207,7 +206,7 @@ describe('TaskForm', () => {
       expect(elMsg.warning).toHaveBeenCalledWith('请先输入任务标题')
     })
 
-    it('calls aiStore.classifyTaskByText and stores result', async () => {
+    it('calls agentStore.runTool and stores result', async () => {
       const wrapper = mount(TaskForm, {
         props: { visible: true },
         global: { stubs: elStubs }
@@ -215,11 +214,11 @@ describe('TaskForm', () => {
 
       wrapper.vm.formData.title = 'Test'
       const classification = { task_id: '1', important: true, urgent: false, quadrant: 2, reason: 'test' }
-      aiStore.classifyTaskByText = vi.fn().mockResolvedValue(classification)
+      agentStore.runTool = vi.fn().mockResolvedValue(classification)
 
       await wrapper.vm.getAIRecommendation()
 
-      expect(aiStore.classifyTaskByText).toHaveBeenCalledWith('Test', '')
+      expect(agentStore.runTool).toHaveBeenCalledWith('classify_task', { title: 'Test', description: '' })
       expect(wrapper.vm.aiRecommendation).toEqual(classification)
       expect(wrapper.vm.aiClassifying).toBe(false)
     })
@@ -231,7 +230,7 @@ describe('TaskForm', () => {
       })
 
       wrapper.vm.formData.title = 'Test'
-      aiStore.classifyTaskByText = vi.fn().mockRejectedValue(new Error('fail'))
+      agentStore.runTool = vi.fn().mockRejectedValue(new Error('fail'))
 
       await wrapper.vm.getAIRecommendation()
 

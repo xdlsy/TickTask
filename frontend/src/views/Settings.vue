@@ -163,7 +163,7 @@
           </svg>
           <span>AI 智能助手</span>
         </div>
-        <el-tag v-if="aiStore.configured" type="success" size="large" effect="dark">已配置</el-tag>
+        <el-tag v-if="agentStore.status.configured" type="success" size="large" effect="dark">已配置</el-tag>
         <el-tag v-else type="info" size="large">未配置</el-tag>
       </div>
 
@@ -301,11 +301,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/api/client'
-import { useAIStore } from '@/stores/ai'
+import { useAgentStore } from '@/stores/agent'
 import ImportWizard from '@/components/settings/ImportWizard.vue'
 import type { PomodoroSettings, AISettings, ClearResult } from '@/types'
 
-const aiStore = useAIStore()
+const agentStore = useAgentStore()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -425,7 +425,7 @@ async function saveAISettings() {
   saving.value = true
   try {
     await api.updateAISettings(aiSettings.value)
-    await aiStore.checkStatus()
+    await agentStore.checkStatus()
     ElMessage.success('AI 设置已保存')
   } catch (error) {
     ElMessage.error('保存失败')
@@ -443,8 +443,8 @@ async function testAIConnection() {
   testing.value = true
   try {
     await api.updateAISettings(aiSettings.value)
-    await aiStore.checkStatus()
-    if (aiStore.configured) {
+    await agentStore.checkStatus()
+    if (agentStore.status.configured) {
       ElMessage.success('AI 服务连接成功')
     } else {
       ElMessage.error('AI 服务连接失败，请检查配置')
@@ -532,7 +532,7 @@ async function clearAllData() {
 
 async function onImported() {
   await loadSettings()
-  await aiStore.checkStatus()
+  await agentStore.checkStatus()
 }
 
 onMounted(() => {

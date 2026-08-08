@@ -3,15 +3,13 @@ import { mount } from '@vue/test-utils'
 import { setActivePinia, createPinia } from 'pinia'
 import Analytics from './Analytics.vue'
 
-const mockAIStore = {
-  configured: false,
-  loading: false,
-  checkStatus: vi.fn(),
-  getDailyInsights: vi.fn()
+const mockAgentStore = {
+  status: { configured: false },
+  runTool: vi.fn(),
 }
 
-vi.mock('@/stores/ai', () => ({
-  useAIStore: () => mockAIStore
+vi.mock('@/stores/agent', () => ({
+  useAgentStore: () => mockAgentStore
 }))
 
 vi.mock('@/api/client', () => ({
@@ -41,8 +39,7 @@ describe('Analytics.vue', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
-    mockAIStore.configured = false
-    mockAIStore.loading = false
+    mockAgentStore.status.configured = false
   })
 
   afterEach(() => {
@@ -147,7 +144,7 @@ describe('Analytics.vue', () => {
 
   describe('AI insights section', () => {
     it('renders AI insights section when AI is configured', async () => {
-      mockAIStore.configured = true
+      mockAgentStore.status.configured = true
       const { api } = await import('@/api/client')
       ;(api.getAnalyticsSummary as ReturnType<typeof vi.fn>).mockResolvedValue({
         data: { completed_pomodoros: 8, total_focus_time: 7200, completed_tasks: 5, created_tasks: 8 }
@@ -166,7 +163,7 @@ describe('Analytics.vue', () => {
     })
 
     it('does not render AI insights when AI is not configured', async () => {
-      mockAIStore.configured = false
+      mockAgentStore.status.configured = false
       const { api } = await import('@/api/client')
       ;(api.getAnalyticsSummary as ReturnType<typeof vi.fn>).mockResolvedValue({
         data: { completed_pomodoros: 0, total_focus_time: 0, completed_tasks: 0, created_tasks: 0 }

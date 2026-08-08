@@ -64,14 +64,12 @@ import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { DataBoard, Timer, List, Calendar, TrendCharts, Setting, Document, ChatDotRound, WarningFilled } from '@element-plus/icons-vue'
 import { useTimerStore } from '@/stores/timer'
-import { useAIStore } from '@/stores/ai'
 import { useAgentStore } from '@/stores/agent'
 import { wsClient } from '@/utils/websocket'
 import AgentDrawer from '@/components/agent/AgentDrawer.vue'
 
 const route = useRoute()
 const timerStore = useTimerStore()
-const aiStore = useAIStore()
 const agentStore = useAgentStore()
 
 const currentRoute = computed(() => route.name as string)
@@ -97,10 +95,7 @@ const navItems = [
 onMounted(async () => {
   wsClient.connect()
   timerStore.setupWebSocket()
-  await Promise.all([
-    aiStore.checkStatus(),
-    agentStore.checkStatus(),
-  ])
+  await agentStore.checkStatus()
 })
 </script>
 
