@@ -135,6 +135,7 @@ export const api = {
     confirm: (messageId: string, decision: 'approve' | 'reject') =>
       client.post('/agent/confirm', { message_id: messageId, decision }),
     status: () => client.get<AgentStatus>('/agent/status'),
-    test: () => client.post<AgentTestResult>('/agent/test'),
+    test: (settings?: Partial<AISettings>) =>
+      client.post<AgentTestResult>('/agent/test', settings ?? {}),
   },
 }

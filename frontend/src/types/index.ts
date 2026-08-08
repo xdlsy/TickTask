@@ -151,6 +151,10 @@ export interface AISettings {
   api_key: string
   base_url: string
   model: string
+  /** GET only — true if a key is stored (encrypted) server-side. */
+  api_key_set?: boolean
+  /** GET only — masked preview like "sk-ab****wxyz", absent when no key set. */
+  api_key_preview?: string
 }
 
 // 任务时间统计
