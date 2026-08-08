@@ -209,3 +209,39 @@
 - **教训**: el-table 测试模式：`mount() → await nextTick() → await nextTick() → 查行/触发事件`。两次 nextTick 是稳妥做法（第一次让 layout 完成，第二次让 slot content 渲染）。
 - **参考**: commit `d47310f` — TodayPanorama.spec.ts。
 - **适用范围**: 所有用 el-table 的 Vue 组件测试。
+
+---
+
+### [LRN-20260808-021] 凭据类密钥的"业界默认"是凭据不同步、换机器重填
+
+- **分类**: insight
+- **现象**: 讨论 API Key 加固时，初始直觉常常是"加主口令加密 + 同步密钥库"——本任务一开始也被推往这个方向。但 `gh login` / `aws configure` / VS Code GitHub 认证 / 1Password/Bitwarden 浏览器集成等业界惯例都不是这样做的。
+- **根因**: 主口令模式是密码管理器独有的范式（因为密码管理器本身的价值就是跨机同步凭据）。普通工具型应用（CLI、桌面、Web）走的是另一条路：**业务数据同步、凭据不同步**。换机器时让用户重填一次，体验对标 `gh login`，远比"主口令解锁"简单且无门槛。
+- **教训**: 给个人/小团队工具做密钥存储时，默认选择"本地 KEK 文件（如 `.keyvault`、`.config/.../token`、`~/.aws/credentials`），不同步、文件权限 0600"。**不要**预设主口令方案——它是反业界惯例的过度设计。如果用户主动提出"我想同步密钥"，再考虑 OS keychain 或主口令。
+- **参考**:
+  - 设计文档 `docs/superpowers/specs/2026-08-08-api-key-security-design.md`（"决策清单"与"范围边界"两节）
+  - commit `90b5a30` 起 10 次 commit + `11879ec` 修复波
+- **适用范围**: 所有需要本地存储密钥/令牌的桌面/CLI/自托管工具。不适用于多用户 SaaS（那是服务端 KMS/Secrets Manager 的场景）。
+
+<!-- HUMAN_REVIEW -->
+
+---
+
+### [LRN-20260808-022] Raw JSON unmarshal 路径天然屏蔽新增 struct 字段——可作为设计简化点
+
+- **分类**: insight
+- **现象**: 本任务在设计"备份导出永不含密文"时，最初预计需要在 export 路径显式剔除 `api_key_encrypted` 字段。实际查看代码发现 `BackupRepository.ReadAll` 直接 `json.Unmarshal(rawJSON, &model.AISettings)` 绕过了 `SettingRepository`，而 `model.AISettings` struct 没有 `APIKeyEncrypted` 字段，所以密文字段在反序列化时被天然丢弃——`BackupData.Settings.AI` 拿到的永远是空 key。**零代码实现"导出永不含密文"**。
+- **根因**: Go 的 `json.Unmarshal` 默认**忽略目标 struct 不认识的 JSON 字段**。当存在"raw JSON 直读"和"typed repo 读写"两条路径时，raw 路径就成了"按当前 struct shape 截断"的天然过滤器。这不是缺陷，是可利用的设计杠杆。
+- **教训**: 设计 DB JSON shape 时可以**让 struct shape 与 JSON shape 解耦**——struct 只暴露内存中需要的字段，DB 中可以存额外字段（如 `api_key_encrypted`），由 repo 层负责 marshal/unmarshal 的转换。这样：
+  1. 备份/导出等 raw JSON 路径天然不暴露新增的敏感字段
+  2. 调用方拿到的 struct 永远是"已解码"形态，零侵入
+  3. 测试只需断言"struct shape"，raw JSON shape 由 marshal 路径保证
+- **反模式警告**: 若后来有人为 `model.AISettings` 添加 `APIKeyEncrypted` 字段（哪怕只是 `omitempty`），这个天然过滤就会失效。**应在 struct 定义处加注释**说明"DB JSON 可能有额外字段，struct 故意不暴露"。
+- **参考**:
+  - 设计文档 `docs/superpowers/specs/2026-08-08-api-key-security-design.md`（"意外适配：BackupRepository 的 raw JSON 路径"节）
+  - `backend/internal/repository/data_repo.go:48-53`（raw unmarshal）
+  - `backend/internal/model/setting.go:39-44`（struct 定义）
+  - `backend/internal/service/data_service.go:18-26`（export 防御性兜底注释）
+- **适用范围**: 所有 Go 项目中存在 raw JSON 备份/导出路径且 model struct 与 DB JSON shape 不必一一对应的场景。
+
+<!-- HUMAN_REVIEW -->
