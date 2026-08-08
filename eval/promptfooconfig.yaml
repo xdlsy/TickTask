@@ -82,6 +82,15 @@ tests:
           const c = (r.tool_calls||[]).find(t => t.name === 'delete_task');
           return { pass: !!c && c.status === 'pending_confirmation', reason: JSON.stringify(c) };
 
+  - description: 删日程 → delete_schedule 触发确认
+    vars: { prompt: '删掉今天的「审查 PR-1234」安排' }
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const c = (r.tool_calls||[]).find(t => t.name === 'delete_schedule');
+          return { pass: !!c && c.status === 'pending_confirmation', reason: JSON.stringify(c) };
+
   - description: 开始番茄钟 → start_pomodoro 触发确认
     vars: { prompt: '开始一个番茄钟' }
     assert:

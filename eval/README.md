@@ -30,6 +30,14 @@ npx promptfoo view
 
 L2 是打分制（建议通过率 ≥0.9），偶发 miss 不挂 CI。默认 `go test` / `make test` 不触发它。
 
+## 多轮 e2e（写工具后接着聊）
+
+promptfooconfig 每条 case 是**单轮**，覆盖不到「用了写工具（建/改/删/番茄钟）确认后，下一轮是否还能正常答」——这条曾经是真实 bug（多轮工具调用断裂，每用一次写工具后续就卡死）。`multiturn-test.mjs` 守这条：建任务 → `/confirm` approve → 同一会话追问 → 断言答复真的提到该任务。
+
+```bash
+AGENT_BASE_URL=http://localhost:8080 node multiturn-test.mjs
+```
+
 ## 相关
 
 - spec：`docs/superpowers/specs/2026-08-09-agent-e2e-verification-design.md`
