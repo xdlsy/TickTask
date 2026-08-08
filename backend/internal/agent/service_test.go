@@ -91,12 +91,12 @@ type failingOnAssistantRepo struct {
 	appendCalls int
 }
 
-func (f *failingOnAssistantRepo) AppendMessage(convID, role, content string, toolName, toolArgs, toolResult, toolStatus *string) (string, error) {
+func (f *failingOnAssistantRepo) AppendMessage(convID, role, content string, toolName, toolArgs, toolResult, toolStatus, toolCalls, parentID *string) (string, error) {
 	f.appendCalls++
 	if role == "assistant" {
 		return "", errAssistantAppendFailed
 	}
-	return f.AgentRepository.AppendMessage(convID, role, content, toolName, toolArgs, toolResult, toolStatus)
+	return f.AgentRepository.AppendMessage(convID, role, content, toolName, toolArgs, toolResult, toolStatus, toolCalls, parentID)
 }
 
 // errAssistantAppendFailed is the sentinel error returned by failingOnAssistantRepo.

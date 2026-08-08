@@ -15,7 +15,7 @@ type AgentRepository interface {
 	GetConversation(id string) (*model.AgentConversation, error)
 	ListConversations(page, size int) ([]*model.AgentConversation, int, error)
 	DeleteConversation(id string) error
-	AppendMessage(convID, role, content string, toolName, toolArgs, toolResult, toolStatus *string) (string, error)
+	AppendMessage(convID, role, content string, toolName, toolArgs, toolResult, toolStatus, toolCalls, parentID *string) (string, error)
 	LoadRecentMessages(convID string, limit int) ([]*model.AgentMessage, error)
 	ListMessages(convID string) ([]*model.AgentMessage, error)
 	UpdateMessage(id string, status, result *string) error
@@ -76,7 +76,7 @@ func (r *agentRepo) DeleteConversation(id string) error {
 	})
 }
 
-func (r *agentRepo) AppendMessage(convID, role, content string, toolName, toolArgs, toolResult, toolStatus *string) (string, error) {
+func (r *agentRepo) AppendMessage(convID, role, content string, toolName, toolArgs, toolResult, toolStatus, toolCalls, parentID *string) (string, error) {
 	msg := &model.AgentMessage{
 		ID:             newUUID(),
 		ConversationID: convID,
@@ -86,6 +86,8 @@ func (r *agentRepo) AppendMessage(convID, role, content string, toolName, toolAr
 		ToolArgs:       toolArgs,
 		ToolResult:     toolResult,
 		ToolStatus:     toolStatus,
+		ToolCalls:      toolCalls,
+		ParentID:       parentID,
 		CreatedAt:      time.Now(),
 	}
 	if err := r.db.Create(msg).Error; err != nil {

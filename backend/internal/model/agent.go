@@ -19,6 +19,7 @@ type AgentMessage struct {
 	ToolArgs       *string   `gorm:"type:text" json:"tool_args,omitempty"`
 	ToolResult     *string   `gorm:"type:text" json:"tool_result,omitempty"`
 	ToolStatus     *string   `gorm:"size:30" json:"tool_status,omitempty"`
+	ToolCalls      *string   `gorm:"type:text" json:"tool_calls,omitempty"` // JSON []ai.ToolCall for role=assistant turns that requested tools
 	ParentID       *string   `gorm:"type:text" json:"parent_id,omitempty"`
 	CreatedAt      time.Time `gorm:"index" json:"created_at"`
 }

@@ -94,7 +94,7 @@ func (s *agentService) SendMessage(ctx context.Context, convID, text string) err
 	if _, err := s.Repo.GetConversation(convID); err != nil {
 		return err
 	}
-	if _, err := s.Repo.AppendMessage(convID, "user", text, nil, nil, nil, nil); err != nil {
+	if _, err := s.Repo.AppendMessage(convID, "user", text, nil, nil, nil, nil, nil, nil); err != nil {
 		return err
 	}
 	return s.runTurn(ctx, convID, text, 0)
@@ -123,16 +123,24 @@ func (s *agentService) runTurn(ctx context.Context, convID, userText string, too
 			s.broadcastDone(convID, "error")
 			return err
 		}
-		if resp.Content != "" {
-			msgID, err := s.Repo.AppendMessage(convID, "assistant", resp.Content, nil, nil, nil, nil)
+		if resp.Content != "" || len(resp.ToolCalls) > 0 {
+			var toolCallsPtr *string
+			if len(resp.ToolCalls) > 0 {
+				if tcJSON, err := json.Marshal(resp.ToolCalls); err == nil {
+					toolCallsPtr = strPtr(string(tcJSON))
+				}
+			}
+			msgID, err := s.Repo.AppendMessage(convID, "assistant", resp.Content, nil, nil, nil, nil, toolCallsPtr, nil)
 			if err != nil {
 				s.broadcastDone(convID, "error")
 				return err
 			}
-			s.broadcast(convID, websocket.EventAgentMessage, map[string]any{
-				"conversation_id": convID, "message_id": msgID, "delta_text": resp.Content,
-			})
-			trace.AssistantText += resp.Content
+			if resp.Content != "" {
+				s.broadcast(convID, websocket.EventAgentMessage, map[string]any{
+					"conversation_id": convID, "message_id": msgID, "delta_text": resp.Content,
+				})
+				trace.AssistantText += resp.Content
+			}
 		}
 		if len(resp.ToolCalls) == 0 {
 			s.broadcastDone(convID, "stop")
@@ -176,7 +184,7 @@ func (s *agentService) runTurn(ctx context.Context, convID, userText string, too
 				// PermWrite / PermDangerous — require user confirmation
 				preview, _ := tool.Preview(ctx, tc.Args)
 				status := "pending_confirmation"
-				msgID, _ := s.Repo.AppendMessage(convID, "tool_call", "", &tc.Name, strPtr(string(tc.Args)), nil, &status)
+				msgID, _ := s.Repo.AppendMessage(convID, "tool_call", "", &tc.Name, strPtr(string(tc.Args)), nil, &status, nil, nil)
 				s.broadcastTool(convID, msgID, tc.Name, tc.Args, "pending_confirmation", nil, preview, "")
 				ch := make(chan string, 1)
 				s.setPending(msgID, ch)
@@ -394,7 +402,7 @@ func (s *agentService) broadcastTool(convID, msgID, name string, args json.RawMe
 func (s *agentService) appendToolResult(convID string, tc ai.ToolCall, status, resultJSON string) {
 	statusPtr := &status
 	resultPtr := &resultJSON
-	s.Repo.AppendMessage(convID, "tool_result", "", &tc.Name, nil, resultPtr, statusPtr)
+	s.Repo.AppendMessage(convID, "tool_result", "", &tc.Name, nil, resultPtr, statusPtr, nil, strPtr(tc.ID))
 }
 
 func strPtr(s string) *string { return &s }

@@ -41,7 +41,7 @@ func TestAgentRepo_AppendMessage_TitleFromFirstUser(t *testing.T) {
 	repo := NewAgentRepository(db)
 	conv, _ := repo.CreateConversation()
 	longText := "今天有哪些没做完的任务需要顺延到明天并写日报总结"
-	_, err := repo.AppendMessage(conv.ID, "user", longText, nil, nil, nil, nil)
+	_, err := repo.AppendMessage(conv.ID, "user", longText, nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("append: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestAgentRepo_LoadRecentMessages(t *testing.T) {
 	repo := NewAgentRepository(db)
 	conv, _ := repo.CreateConversation()
 	for i := 0; i < 25; i++ {
-		repo.AppendMessage(conv.ID, "user", "msg", nil, nil, nil, nil)
+		repo.AppendMessage(conv.ID, "user", "msg", nil, nil, nil, nil, nil, nil)
 	}
 	msgs, err := repo.LoadRecentMessages(conv.ID, 20)
 	if err != nil {
@@ -75,7 +75,7 @@ func TestAgentRepo_DeleteConversation_Cascade(t *testing.T) {
 	db := setupAgentTestDB(t)
 	repo := NewAgentRepository(db)
 	conv, _ := repo.CreateConversation()
-	repo.AppendMessage(conv.ID, "user", "hi", nil, nil, nil, nil)
+	repo.AppendMessage(conv.ID, "user", "hi", nil, nil, nil, nil, nil, nil)
 	if err := repo.DeleteConversation(conv.ID); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestAgentRepo_UpdateMessageStatus(t *testing.T) {
 	db := setupAgentTestDB(t)
 	repo := NewAgentRepository(db)
 	conv, _ := repo.CreateConversation()
-	msgID, _ := repo.AppendMessage(conv.ID, "tool_call", "", strPtr("list_tasks"), nil, nil, nil)
+	msgID, _ := repo.AppendMessage(conv.ID, "tool_call", "", strPtr("list_tasks"), nil, nil, nil, nil, nil)
 	status := "succeeded"
 	result := `{"tasks":[]}`
 	if err := repo.UpdateMessage(msgID, &status, &result); err != nil {

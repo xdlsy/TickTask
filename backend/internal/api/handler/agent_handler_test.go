@@ -424,7 +424,7 @@ func (m *mockAgentRepo) DeleteConversation(id string) error {
 	return m.deleteErr
 }
 
-func (m *mockAgentRepo) AppendMessage(convID, role, content string, toolName, toolArgs, toolResult, toolStatus *string) (string, error) {
+func (m *mockAgentRepo) AppendMessage(convID, role, content string, toolName, toolArgs, toolResult, toolStatus, toolCalls, parentID *string) (string, error) {
 	return "msg", nil
 }
 
