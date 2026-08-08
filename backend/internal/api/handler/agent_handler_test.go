@@ -280,6 +280,7 @@ type mockAgentSvc struct {
 	lastConfirmDecision string
 	confirmErr          error
 	statusResult        agent.AgentStatus
+	testResult          agent.TestResult
 	mu                  sync.Mutex
 }
 
@@ -317,6 +318,13 @@ func (m *mockAgentSvc) Status() agent.AgentStatus {
 		SupportsFunctionCalling: true,
 		Provider:                "openai",
 	}
+}
+
+func (m *mockAgentSvc) TestConnection(ctx context.Context) agent.TestResult {
+	if m.testResult != (agent.TestResult{}) {
+		return m.testResult
+	}
+	return agent.TestResult{OK: true, Provider: "openai", Model: "gpt-4o-mini", LatencyMs: 1}
 }
 
 // mockAgentRepo implements repository.AgentRepository for handler tests.

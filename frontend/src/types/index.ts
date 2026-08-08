@@ -537,6 +537,15 @@ export interface AgentStatus {
   provider: string
 }
 
+export interface AgentTestResult {
+  ok: boolean
+  provider: string
+  model?: string
+  latency_ms: number
+  status_code?: number
+  error?: string
+}
+
 export interface AgentToolEvent {
   conversation_id: string
   message_id?: string

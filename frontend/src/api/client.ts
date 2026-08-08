@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkItem, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput, CreateQuickEntryInput, UpdateQuickEntryInput, UpdateSummaryInput, ImportPreview, ApplyImportRequest, ApplyResult, ClearResult, AgentConversation, AgentMessage, AgentStatus } from '@/types'
+import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkItem, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput, CreateQuickEntryInput, UpdateQuickEntryInput, UpdateSummaryInput, ImportPreview, ApplyImportRequest, ApplyResult, ClearResult, AgentConversation, AgentMessage, AgentStatus, AgentTestResult } from '@/types'
 
 const client = axios.create({
   baseURL: '/api',
@@ -135,5 +135,6 @@ export const api = {
     confirm: (messageId: string, decision: 'approve' | 'reject') =>
       client.post('/agent/confirm', { message_id: messageId, decision }),
     status: () => client.get<AgentStatus>('/agent/status'),
+    test: () => client.post<AgentTestResult>('/agent/test'),
   },
 }

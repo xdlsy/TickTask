@@ -37,6 +37,7 @@ func (h *agentHandler) Register(rg *gin.RouterGroup) {
 	rg.POST("/run-tool", h.runTool)
 	rg.POST("/confirm", h.confirm)
 	rg.GET("/status", h.status)
+	rg.POST("/test", h.testConnection)
 }
 
 // POST /conversations — create a fresh conversation.
@@ -153,6 +154,13 @@ func (h *agentHandler) confirm(c *gin.Context) {
 // GET /status — runtime capability flags surfaced to the frontend.
 func (h *agentHandler) status(c *gin.Context) {
 	c.JSON(http.StatusOK, h.Svc.Status())
+}
+
+// POST /test — actually pings the configured LLM provider with a minimal
+// ChatCompletion. Distinguishes "settings saved" from "key actually works".
+func (h *agentHandler) testConnection(c *gin.Context) {
+	result := h.Svc.TestConnection(c.Request.Context())
+	c.JSON(http.StatusOK, result)
 }
 
 // atoiDefault parses a decimal integer with a fallback. Negative or unparsable

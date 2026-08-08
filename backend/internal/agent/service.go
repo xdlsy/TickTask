@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ticktask/internal/ai"
+	"ticktask/internal/model"
 	"ticktask/internal/repository"
 	"ticktask/internal/websocket"
 )
@@ -33,6 +34,7 @@ type AgentService interface {
 	Confirm(ctx context.Context, msgID string, decision string) error
 	RunTool(ctx context.Context, name string, args json.RawMessage) (any, error)
 	Status() AgentStatus
+	TestConnection(ctx context.Context) TestResult
 }
 
 // AgentStatus describes runtime capability flags surfaced to the frontend via
@@ -43,6 +45,18 @@ type AgentStatus struct {
 	Configured              bool   `json:"configured"`
 	SupportsFunctionCalling bool   `json:"supports_function_calling"`
 	Provider                string `json:"provider"`
+}
+
+// TestResult is the payload returned by TestConnection / POST /api/agent/test.
+// Unlike Status (which only inspects settings), TestConnection actually sends
+// a minimal LLM round-trip and reports whether the provider accepted the call.
+type TestResult struct {
+	OK         bool   `json:"ok"`
+	Provider   string `json:"provider"`
+	Model      string `json:"model,omitempty"`
+	LatencyMs  int64  `json:"latency_ms"`
+	StatusCode int    `json:"status_code,omitempty"`
+	Error      string `json:"error,omitempty"`
 }
 
 type agentService struct {
@@ -240,6 +254,43 @@ func (s *agentService) Status() AgentStatus {
 		SupportsFunctionCalling: !isCLIProvider(settings.Provider),
 		Provider:                settings.Provider,
 	}
+}
+
+// TestConnection constructs a fresh LLMClient from current settings and sends
+// a minimal ChatCompletion ("hi") with a 10s budget. Unlike Status() this
+// verifies the API key actually works against the configured provider.
+func (s *agentService) TestConnection(ctx context.Context) TestResult {
+	settings := s.readSettings()
+	result := TestResult{Provider: settings.Provider, Model: settings.Model}
+
+	client := s.LLMFactory()
+	if client == nil {
+		result.Error = "AI 未配置 — 请填写 API Key 或切换到 CLI provider"
+		return result
+	}
+
+	t0 := time.Now()
+	callCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if _, err := client.ChatCompletion(callCtx, "hi"); err != nil {
+		result.Error = err.Error()
+		result.LatencyMs = time.Since(t0).Milliseconds()
+		return result
+	}
+	result.LatencyMs = time.Since(t0).Milliseconds()
+	result.OK = true
+	return result
+}
+
+func (s *agentService) readSettings() *model.AISettings {
+	if s.SettingsRepo == nil {
+		return model.DefaultAISettings()
+	}
+	settings, _ := s.SettingsRepo.GetAISettings()
+	if settings == nil {
+		return model.DefaultAISettings()
+	}
+	return settings
 }
 
 // isCLIProvider returns true for providers that shell out to a local CLI

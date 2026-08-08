@@ -435,22 +435,38 @@ async function saveAISettings() {
 }
 
 async function testAIConnection() {
-  if (!aiSettings.value.api_key) {
+  if (!aiSettings.value.api_key && aiSettings.value.provider !== 'claude' && aiSettings.value.provider !== 'cli') {
     ElMessage.warning('请先输入 API Key')
     return
   }
 
   testing.value = true
   try {
+    // 先保存当前编辑中的设置,后端才能用最新 key/model 去发测试请求
     await api.updateAISettings(aiSettings.value)
     await agentStore.checkStatus()
-    if (agentStore.status.configured) {
-      ElMessage.success('AI 服务连接成功')
+
+    const r = await api.agent.test()
+    const result = r.data
+    if (result.ok) {
+      const latency = result.latency_ms ? ` · ${result.latency_ms}ms` : ''
+      const model = result.model ? ` · ${result.model}` : ''
+      ElMessage.success(`${result.provider}${model} 连接成功${latency}`)
     } else {
-      ElMessage.error('AI 服务连接失败，请检查配置')
+      const errMsg = result.error ? `: ${result.error}` : ' — 请检查 API Key、BaseURL、Model 与网络'
+      ElMessage({
+        type: 'error',
+        message: `${result.provider} 连接失败${errMsg}`,
+        duration: 8000,
+      })
     }
-  } catch (error) {
-    ElMessage.error('连接测试失败，请检查 API Key 和网络')
+  } catch (error: any) {
+    const detail = error?.response?.data?.error || error?.message || '未知错误'
+    ElMessage({
+      type: 'error',
+      message: `连接测试请求失败: ${detail}`,
+      duration: 8000,
+    })
   } finally {
     testing.value = false
   }
