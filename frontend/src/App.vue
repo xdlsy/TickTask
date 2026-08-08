@@ -33,6 +33,15 @@
           <span class="focus-dot"></span>专注中
         </span>
         <div class="today-date">{{ todayDate }}</div>
+        <button
+          class="agent-trigger"
+          :class="{ 'not-configured': !agentStore.status.configured }"
+          :title="agentStore.status.configured ? 'AI 助手' : 'AI 助手 · 未配置'"
+          aria-label="打开 AI 助手"
+          @click="agentStore.openDrawer()"
+        >
+          <component :is="agentStore.status.configured ? ChatDotRound : WarningFilled" :size="16" />
+        </button>
       </div>
     </header>
 
@@ -45,20 +54,25 @@
         </router-view>
       </div>
     </main>
+
+    <AgentDrawer />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { DataBoard, Timer, List, Calendar, TrendCharts, Setting, Document } from '@element-plus/icons-vue'
+import { DataBoard, Timer, List, Calendar, TrendCharts, Setting, Document, ChatDotRound, WarningFilled } from '@element-plus/icons-vue'
 import { useTimerStore } from '@/stores/timer'
 import { useAIStore } from '@/stores/ai'
+import { useAgentStore } from '@/stores/agent'
 import { wsClient } from '@/utils/websocket'
+import AgentDrawer from '@/components/agent/AgentDrawer.vue'
 
 const route = useRoute()
 const timerStore = useTimerStore()
 const aiStore = useAIStore()
+const agentStore = useAgentStore()
 
 const currentRoute = computed(() => route.name as string)
 
@@ -83,7 +97,10 @@ const navItems = [
 onMounted(async () => {
   wsClient.connect()
   timerStore.setupWebSocket()
-  await aiStore.checkStatus()
+  await Promise.all([
+    aiStore.checkStatus(),
+    agentStore.checkStatus(),
+  ])
 })
 </script>
 
@@ -412,6 +429,33 @@ body::before {
   color: var(--text-muted);
   font-weight: 400;
   letter-spacing: 0.12em;
+}
+
+/* AI 助手入口 */
+.agent-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.agent-trigger:hover {
+  color: var(--accent-primary);
+  border-color: var(--border-strong);
+  background: var(--bg-card-hover);
+}
+
+.agent-trigger.not-configured {
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 /* ── Main Content ── */
