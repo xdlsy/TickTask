@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"ticktask/internal/model"
+	"ticktask/pkg/logger"
 	"ticktask/pkg/vault"
 
 	"gorm.io/gorm"
@@ -115,9 +116,14 @@ func (r *settingRepository) GetAISettings() (*model.AISettings, error) {
 			plain, err := r.vault.Decrypt(ct, nonce)
 			if err == nil {
 				out.APIKey = plain
+			} else {
+				// Decrypt failure typically means the row was encrypted with a
+				// different .keyvault (e.g. multi-machine sync without copying
+				// the vault). Gracefully degrade to "not configured" but warn
+				// so the user can re-enter the key in Settings instead of
+				// debugging a silent empty key.
+				logger.Logger.Warn("ai api_key decrypt failed — please re-enter API Key in Settings", "err", err)
 			}
-			// On decrypt failure (different vault / corrupt), return empty
-			// key — graceful degrade. Caller (handler) shows "not configured".
 		}
 	}
 	return out, nil
