@@ -1,16 +1,21 @@
-// Runs the comprehensive case suite (cases.mjs) against the live backend via
+// Runs the comprehensive case suite (all-cases.mjs) against the live backend via
 // collect(). Resolves a turn on agent_done OR pending_confirmation (so write/
-// dangerous cases don't wait the 30-min ConfirmationTimeout). Reports per-
-// category and overall pass-rate.
+// dangerous cases don't wait the 30-min ConfirmationTimeout).
+//
+// Case handling:
+//  - cases with `turns` (array) are multi-turn → SKIP (needs a multi-turn runner)
+//  - a check returning [true, "<reason>"] where reason starts with "needs " → SKIP
+//    (placeholder for confirm/timing/fault-injection/llm-judge/DB runners)
+//  - otherwise [true,…] → PASS, [false,…] → FAIL
 import { WebSocket } from 'ws';
-import { buildCases, CATEGORIES } from './cases.mjs';
+import { ALL_CASES, CATEGORIES } from './all-cases.mjs';
 
 const BASE = process.env.AGENT_BASE_URL || 'http://localhost:8080';
 const WS = process.env.AGENT_WS_URL || 'ws://localhost:8080/ws';
 
 function runTurn(prompt, timeoutMs = 60_000) {
   return (async () => {
-    const conv = await fetch(`${BASE}/api/agent/conversations`, { method: 'POST' }).then(r => r.json());
+    const conv = await fetch(`${BASE}/api/agent/conversations`, { method: 'POST' }).then((r) => r.json());
     const id = conv.id;
     return new Promise((resolve) => {
       const tcs = []; let text = ''; let settled = false;
@@ -30,28 +35,52 @@ function runTurn(prompt, timeoutMs = 60_000) {
   })();
 }
 
-const cases = buildCases();
-const byCat = Object.fromEntries(CATEGORIES.map(c => [c, {pass:0, fail:0, fails:[]}]));
-let totalPass = 0;
+const cases = ALL_CASES;
+const byCat = Object.fromEntries(CATEGORIES.map(c => [c, {pass:0, fail:0, skip:0, fails:[]}]));
+let totalPass = 0, totalSkip = 0;
 
 for (let i = 0; i < cases.length; i++) {
-  const { cat, prompt, check } = cases[i];
-  const r = await runTurn(prompt);
-  let pass = false, reason = '';
+  const c = cases[i];
+  const cat = c.cat;
+  const label = c.prompt ? c.prompt.slice(0,26) : (c.turns ? c.turns.join(' / ').slice(0,26) : '?');
+
+  // multi-turn cases: skip
+  if (Array.isArray(c.turns)) {
+    totalSkip++; byCat[cat].skip++;
+    console.log(`${String(i+1).padStart(3)}/${cases.length} [SKIP] (${cat.padEnd(13)}) ${label.padEnd(28)} :: multi-turn`);
+    continue;
+  }
+  // pure-placeholder cases (timing/fault-injection) — can't evaluate, skip the LLM call
+  if (c.note && /needs[- ]?timing|inject /i.test(c.note)) {
+    totalSkip++; byCat[cat].skip++;
+    console.log(`${String(i+1).padStart(3)}/${cases.length} [SKIP] (${cat.padEnd(13)}) ${label.padEnd(28)} :: ${c.note}`);
+    continue;
+  }
+
+  const r = await runTurn(c.prompt);
+  let verdict = 'FAIL', reason = '';
   if (r.error) { reason = `ERROR: ${r.error}`; }
-  else { try { [pass, reason] = check(r); } catch (e) { reason = `check threw: ${e.message}`; } }
-  const tag = pass ? 'PASS' : 'FAIL';
-  if (pass) { totalPass++; byCat[cat].pass++; }
-  else { byCat[cat].fail++; byCat[cat].fails.push(prompt); }
+  else {
+    try { const [pass, why] = c.check(r); reason = String(why ?? '');
+      if (pass && /^needs /i.test(reason)) { verdict = 'SKIP'; }
+      else if (pass) { verdict = 'PASS'; }
+      else { verdict = 'FAIL'; }
+    } catch (e) { reason = `check threw: ${e.message}`; verdict = 'FAIL'; }
+  }
+
   const tn = [...new Set((r.tool_calls||[]).map(t=>t.name))].join(',') || '-';
-  console.log(`${String(i+1).padStart(2)}/${cases.length} [${tag}] (${cat.padEnd(12)}) ${prompt.slice(0,28).padEnd(30)} tools=[${tn}]${reason?' :: '+reason.slice(0,70):''}`);
+  if (verdict === 'PASS') { totalPass++; byCat[cat].pass++; }
+  else if (verdict === 'SKIP') { totalSkip++; byCat[cat].skip++; }
+  else { byCat[cat].fail++; byCat[cat].fails.push(c.prompt); }
+  console.log(`${String(i+1).padStart(3)}/${cases.length} [${verdict}] (${cat.padEnd(13)}) ${label.padEnd(28)} tools=[${tn}]${reason?' :: '+reason.slice(0,60):''}`);
 }
 
 console.log('\n================= by category =================');
 for (const c of CATEGORIES) {
   const s = byCat[c]; const n = s.pass + s.fail;
-  if (n === 0) continue;
-  const rate = ((s.pass / n) * 100).toFixed(0).padStart(3);
-  console.log(`  ${c.padEnd(14)} ${rate}%  (${s.pass}/${n})${s.fail?'  ✗ '+s.fails.map(f=>`"${f.slice(0,16)}"`).join(', '):''}`);
+  if (n + s.skip === 0) continue;
+  const rate = n ? ((s.pass / n) * 100).toFixed(0).padStart(3) : '  -';
+  console.log(`  ${c.padEnd(16)} ${rate}%  (pass ${s.pass}/${n})${s.skip?` skip ${s.skip}`:''}${s.fail?'  ✗ '+s.fails.slice(0,4).map(f=>`"${(f||'').slice(0,16)}"`).join(', '):''}`);
 }
-console.log(`\n=== OVERALL ${totalPass}/${cases.length} (${((totalPass/cases.length)*100).toFixed(0)}%) ===`);
+const ran = cases.length - totalSkip;
+console.log(`\n=== PASS ${totalPass}/${ran} (${ran?((totalPass/ran)*100).toFixed(0):0}% of runnable) | SKIP ${totalSkip}/${cases.length} (need special runners) | TOTAL ${cases.length} ===`);
