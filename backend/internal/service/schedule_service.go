@@ -2,6 +2,7 @@ package service
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"ticktask/internal/ai"
 	"ticktask/internal/model"
 	"ticktask/internal/repository"
 	"ticktask/internal/websocket"
@@ -21,7 +23,7 @@ import (
 type ScheduleService struct {
 	scheduleRepo repository.ScheduleRepository
 	taskRepo     repository.TaskRepository
-	aiService    *AIService
+	llm          ai.LLMClient
 	settingRepo  repository.SettingRepository
 	wsHub        *websocket.Hub
 }
@@ -29,14 +31,14 @@ type ScheduleService struct {
 func NewScheduleService(
 	scheduleRepo repository.ScheduleRepository,
 	taskRepo repository.TaskRepository,
-	aiService *AIService,
+	llm ai.LLMClient,
 	settingRepo repository.SettingRepository,
 	wsHub *websocket.Hub,
 ) *ScheduleService {
 	return &ScheduleService{
 		scheduleRepo: scheduleRepo,
 		taskRepo:     taskRepo,
-		aiService:    aiService,
+		llm:          llm,
 		settingRepo:  settingRepo,
 		wsHub:        wsHub,
 	}
@@ -493,7 +495,7 @@ func (s *ScheduleService) GenerateSchedule(startTime, endTime string) ([]Schedul
 	seenEventKeys := map[string]bool{}
 
 	// ======== Phase 1: AI 生成 ICS ========
-	if s.aiService == nil || !s.aiService.IsConfigured() {
+	if s.llm == nil {
 		broadcastStatus("error", "AI 未配置", "请在设置中配置 AI 服务")
 		return nil, "", fmt.Errorf("AI not configured")
 	}
@@ -673,7 +675,7 @@ func (s *ScheduleService) ReviseSchedule(prompt string) (*ReviseResponse, error)
 	broadcast(fmt.Sprintf("✓ 配置文件已刷新: %d 个任务，%d 个当前日程事件\n", len(candidates), len(currentEvents)), false)
 
 	// 5. Check AI is configured
-	if s.aiService == nil || !s.aiService.IsConfigured() {
+	if s.llm == nil {
 		broadcastStatus("error", "AI 未配置", "请在设置中配置 AI 服务")
 		return nil, fmt.Errorf("AI not configured")
 	}
@@ -977,7 +979,7 @@ type claudeStreamMessage struct {
 }
 
 func runClaudeStreamJSON(prompt string, onOutput OutputCallback) error {
-	ctx, cancel := GetAIServiceWithTimeout(300 * time.Second) // 整周生成需要更长时间
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second) // 整周生成需要更长时间
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "claude", "-p", prompt,

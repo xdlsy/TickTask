@@ -1,10 +1,14 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
+	"ticktask/internal/ai"
 	"ticktask/internal/model"
 	"ticktask/internal/repository"
 )
@@ -119,40 +123,45 @@ func (m *mockWorkLogRepo) UpdateWorkLogSummary(date string, summary string) erro
 	return nil
 }
 
-// ── Mock AI client ──
+// ── Mock LLM client ──
+//
+// WorkLogService 现在直接持有 ai.LLMClient（Task 15 移除 WorkLogAIClient 后）。
+// 这个 mock 把所有 prompt 记录到 lastPrompt，并按 prompt 内容路由到不同的 canned
+// 响应：
+//   - 拆条 prompt（含 WorkLogStructureSystem）→ structureOut / structureErr
+//   - 任意报告 prompt → 固定 ReportSummary JSON
+//
+// 测试通过断言 lastPrompt 的子串来验证：哪些 items / reports 被传给了 LLM。
+// 这取代了原先的 weeklyInput / monthlyInput / halfYearInput / yearlyInput 字段。
 
-type mockAIClient struct {
-	structuredOut      *StructuredWorkLog
-	structuredErr      error
-	weeklyInput        []model.WorkItem
-	monthlyInput       []*model.WorkReport
-	monthlyOrphanInput []model.WorkItem
-	halfYearInput      []*model.WorkReport
-	yearlyInput        []*model.WorkReport
+type mockLLMForWorkLog struct {
+	structureOut *StructuredWorkLog
+	structureErr error
+	lastPrompt   string
+	allPrompts   []string
 }
 
-func (m *mockAIClient) StructureBrainDump(input BrainDumpInput) (*StructuredWorkLog, error) {
-	if m.structuredErr != nil {
-		return nil, m.structuredErr
+func (m *mockLLMForWorkLog) ChatCompletion(ctx context.Context, prompt string) (string, error) {
+	m.lastPrompt = prompt
+	m.allPrompts = append(m.allPrompts, prompt)
+	if strings.HasPrefix(prompt, ai.WorkLogStructureSystem) {
+		if m.structureErr != nil {
+			return "", m.structureErr
+		}
+		if m.structureOut == nil {
+			return "", nil
+		}
+		b, _ := json.Marshal(m.structureOut)
+		return string(b), nil
 	}
-	return m.structuredOut, nil
+	// 报告类 prompt：返回固定 ReportSummary JSON
+	resp := ReportSummary{CoreWork: "cw", MainProgress: "mp", OpenIssues: "oi", NextFocus: "nf"}
+	b, _ := json.Marshal(resp)
+	return string(b), nil
 }
-func (m *mockAIClient) GenerateWeeklyReport(items []model.WorkItem, start, end string) (*ReportSummary, error) {
-	m.weeklyInput = items
-	return &ReportSummary{CoreWork: "cw"}, nil
-}
-func (m *mockAIClient) GenerateMonthlyReport(w []*model.WorkReport, o []model.WorkItem, start, end string) (*ReportSummary, error) {
-	m.monthlyInput = w
-	m.monthlyOrphanInput = o
-	return &ReportSummary{CoreWork: "cw"}, nil
-}
-func (m *mockAIClient) GenerateHalfYearReport(mo []*model.WorkReport, start, end string) (*ReportSummary, error) {
-	m.halfYearInput = mo
-	return &ReportSummary{CoreWork: "cw"}, nil
-}
-func (m *mockAIClient) GenerateYearlyReport(mo []*model.WorkReport, start, end string) (*ReportSummary, error) {
-	m.yearlyInput = mo
-	return &ReportSummary{CoreWork: "cw"}, nil
+
+func (m *mockLLMForWorkLog) ChatWithTools(ctx context.Context, messages []ai.Message, tools []ai.ToolSpec) (ai.ToolResponse, error) {
+	return ai.ToolResponse{}, ai.ErrFunctionCallNotSupported
 }
 
 // ── Mock Task / Session repos (interface-embedded to avoid full impl) ──
@@ -189,15 +198,15 @@ func (m *mockSessionRepoForWorkLog) GetCompletedWorkByDateRange(start, end time.
 
 // ── Service factory ──
 
-func newServiceForTest() (*WorkLogService, *mockWorkLogRepo, *mockAIClient) {
+func newServiceForTest() (*WorkLogService, *mockWorkLogRepo, *mockLLMForWorkLog) {
 	repo := newMockWorkLogRepo()
-	ai := &mockAIClient{}
+	llm := &mockLLMForWorkLog{}
 	svc := &WorkLogService{
 		repo:        repo,
-		aiClient:    ai,
+		llm:         llm,
 		idGenerator: func() string { return "test-id" },
 	}
-	return svc, repo, ai
+	return svc, repo, llm
 }
 
 func newServiceWithTaskSessionForTest(taskRepo repository.TaskRepository, sessionRepo repository.SessionRepository) *WorkLogService {
@@ -205,7 +214,7 @@ func newServiceWithTaskSessionForTest(taskRepo repository.TaskRepository, sessio
 		repo:        newMockWorkLogRepo(),
 		taskRepo:    taskRepo,
 		sessionRepo: sessionRepo,
-		aiClient:    &mockAIClient{},
+		llm:         &mockLLMForWorkLog{},
 		idGenerator: func() string { return "test-id" },
 	}
 }
@@ -278,8 +287,8 @@ func TestUpdateWorkLog_FullReplace(t *testing.T) {
 // ── Tests: StructureBrainDump ──
 
 func TestStructureBrainDump_NilOutput_Fails(t *testing.T) {
-	svc, _, ai := newServiceForTest()
-	ai.structuredOut = nil
+	svc, _, llm := newServiceForTest()
+	llm.structureOut = nil
 	_, err := svc.StructureBrainDump(BrainDumpInput{BrainDump: "x"})
 	if !errors.Is(err, ErrAIStructureFailed) {
 		t.Errorf("err = %v, want ErrAIStructureFailed", err)
@@ -287,8 +296,8 @@ func TestStructureBrainDump_NilOutput_Fails(t *testing.T) {
 }
 
 func TestStructureBrainDump_AIClientErr_Fails(t *testing.T) {
-	svc, _, ai := newServiceForTest()
-	ai.structuredErr = errors.New("upstream timeout")
+	svc, _, llm := newServiceForTest()
+	llm.structureErr = errors.New("upstream timeout")
 	_, err := svc.StructureBrainDump(BrainDumpInput{BrainDump: "x"})
 	if !errors.Is(err, ErrAIStructureFailed) {
 		t.Errorf("err = %v, want ErrAIStructureFailed", err)
@@ -296,8 +305,8 @@ func TestStructureBrainDump_AIClientErr_Fails(t *testing.T) {
 }
 
 func TestStructureBrainDump_FillsPendingForMissingDims(t *testing.T) {
-	svc, _, ai := newServiceForTest()
-	ai.structuredOut = &StructuredWorkLog{
+	svc, _, llm := newServiceForTest()
+	llm.structureOut = &StructuredWorkLog{
 		Items: []StructuredItem{{Content: "c1"}},
 	}
 	out, err := svc.StructureBrainDump(BrainDumpInput{BrainDump: "x"})
@@ -321,8 +330,16 @@ func TestStructureBrainDump_FillsPendingForMissingDims(t *testing.T) {
 
 // ── Tests: GenerateReport ──
 
+// countReportObjects counts how many JSON objects (e.g. WorkItem briefs or
+// WorkReport maps) were embedded in the captured LLM prompt. Each object has a
+// stable top-level key ("title" for items, "period_key" for reports); we count
+// occurrences of that key.
+func countReportObjects(prompt, key string) int {
+	return strings.Count(prompt, `"`+key+`":`)
+}
+
 func TestGenerateReport_Weekly_GathersItems(t *testing.T) {
-	svc, repo, ai := newServiceForTest()
+	svc, repo, llm := newServiceForTest()
 	repo.logs["2026-08-03"] = &model.WorkLog{
 		ID: "wl-1", Date: "2026-08-03",
 		Items: []model.WorkItem{{ID: "wi-1", WorkLogID: "wl-1", Title: "T1"}},
@@ -333,8 +350,11 @@ func TestGenerateReport_Weekly_GathersItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
-	if len(ai.weeklyInput) != 1 || ai.weeklyInput[0].Title != "T1" {
-		t.Errorf("weekly should gather 1 item, got: %+v", ai.weeklyInput)
+	if got := countReportObjects(llm.lastPrompt, "title"); got != 1 {
+		t.Errorf("weekly should gather 1 item, prompt has %d objects; prompt=%s", got, llm.lastPrompt)
+	}
+	if !strings.Contains(llm.lastPrompt, "T1") {
+		t.Errorf("weekly prompt should contain 'T1'; prompt=%s", llm.lastPrompt)
 	}
 	if report.PeriodKey != "2026-W32" {
 		t.Errorf("period_key = %s", report.PeriodKey)
@@ -357,7 +377,7 @@ func TestGenerateReport_AlreadyExists_NoForce(t *testing.T) {
 
 // INVARIANT: monthly 只读 weekly 报告 + 月内孤儿 items，绝不读所有原始 items
 func TestGenerateReport_Monthly_ReadsWeekliesAndOrphans(t *testing.T) {
-	svc, repo, ai := newServiceForTest()
+	svc, repo, llm := newServiceForTest()
 	// 周报：8/3~8/9（覆盖月初前段）
 	repo.reports["weekly:2026-W32"] = &model.WorkReport{
 		ID: "wr-1", Type: model.ReportWeekly, PeriodKey: "2026-W32",
@@ -380,17 +400,23 @@ func TestGenerateReport_Monthly_ReadsWeekliesAndOrphans(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
-	if len(ai.monthlyInput) != 1 {
-		t.Errorf("monthly should read 1 weekly report, got %d", len(ai.monthlyInput))
+	// 月报 prompt 同时含 weekly JSON 数组和 orphan items JSON。Weekly JSON 用
+	// "period_key" 标识；orphan items 用 "title" 标识。
+	if got := countReportObjects(llm.lastPrompt, "period_key"); got != 1 {
+		t.Errorf("monthly should embed 1 weekly report, got %d; prompt=%s", got, llm.lastPrompt)
 	}
-	if len(ai.monthlyOrphanInput) != 1 || ai.monthlyOrphanInput[0].Title != "Orphan" {
-		t.Errorf("monthly orphan input = %+v, want only 'Orphan'", ai.monthlyOrphanInput)
+	// "Covered" 必须不出现，"Orphan" 必须出现
+	if strings.Contains(llm.lastPrompt, "Covered") {
+		t.Errorf("monthly must not include items covered by weeklies; prompt=%s", llm.lastPrompt)
+	}
+	if !strings.Contains(llm.lastPrompt, "Orphan") {
+		t.Errorf("monthly prompt should include orphan item 'Orphan'; prompt=%s", llm.lastPrompt)
 	}
 }
 
 // INVARIANT: halfyear 只读 monthly 报告，绝不读原始 items
 func TestGenerateReport_HalfYear_ReadsOnlyMonthlies(t *testing.T) {
-	svc, repo, ai := newServiceForTest()
+	svc, repo, llm := newServiceForTest()
 	repo.reports["monthly:2026-07"] = &model.WorkReport{
 		ID: "mr-1", Type: model.ReportMonthly, PeriodKey: "2026-07",
 		StartDate: "2026-07-01", EndDate: "2026-07-31",
@@ -406,17 +432,17 @@ func TestGenerateReport_HalfYear_ReadsOnlyMonthlies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
-	if len(ai.halfYearInput) != 1 {
-		t.Errorf("halfyear should read 1 monthly, got %d", len(ai.halfYearInput))
+	if got := countReportObjects(llm.lastPrompt, "period_key"); got != 1 {
+		t.Errorf("halfyear should embed 1 monthly, got %d; prompt=%s", got, llm.lastPrompt)
 	}
-	if len(ai.monthlyOrphanInput) != 0 {
-		t.Errorf("halfyear must not touch orphan items, got %d", len(ai.monthlyOrphanInput))
+	if strings.Contains(llm.lastPrompt, "Should be ignored") {
+		t.Errorf("halfyear must not touch raw items; prompt=%s", llm.lastPrompt)
 	}
 }
 
 // INVARIANT: yearly 只读 monthly 报告，绝不读原始 items 或 weekly 报告
 func TestGenerateReport_Yearly_ReadsOnlyMonthlies(t *testing.T) {
-	svc, repo, ai := newServiceForTest()
+	svc, repo, llm := newServiceForTest()
 	repo.reports["monthly:2026-01"] = &model.WorkReport{
 		ID: "mr-1", Type: model.ReportMonthly, PeriodKey: "2026-01",
 		StartDate: "2026-01-01", EndDate: "2026-01-31",
@@ -431,8 +457,11 @@ func TestGenerateReport_Yearly_ReadsOnlyMonthlies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
-	if len(ai.yearlyInput) != 1 {
-		t.Errorf("yearly should read 1 monthly, got %d", len(ai.yearlyInput))
+	if got := countReportObjects(llm.lastPrompt, "period_key"); got != 1 {
+		t.Errorf("yearly should embed only 1 monthly (must exclude weeklies), got %d; prompt=%s", got, llm.lastPrompt)
+	}
+	if strings.Contains(llm.lastPrompt, "2026-W01") {
+		t.Errorf("yearly must not embed weekly reports; prompt=%s", llm.lastPrompt)
 	}
 }
 

@@ -120,8 +120,8 @@ func (m *mockScheduleRepositoryForService) DeleteAll() (int64, error) {
 func createScheduleService() *service.ScheduleService {
 	scheduleRepo := newMockScheduleRepositoryForService()
 	taskRepo := newMockTaskRepository()
-	aiService := &service.AIService{} // Empty AI service for basic tests
-	return service.NewScheduleService(scheduleRepo, taskRepo, aiService, nil, nil)
+	// llm=nil 表示 AI 未配置；这些测试不依赖 LLM 调用
+	return service.NewScheduleService(scheduleRepo, taskRepo, nil, nil, nil)
 }
 
 // Test GetSchedules - 获取日程列表

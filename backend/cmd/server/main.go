@@ -59,42 +59,39 @@ func main() {
 	timerService := service.NewTimerService(sessionRepo, taskRepo, analyticsRepo, settingRepo, wsHub)
 	analyticsService := service.NewAnalyticsService(analyticsRepo, taskRepo, sessionRepo, settingRepo)
 
-	// 初始化 AI Service
+	// 构造共享的 LLMClient：Schedule / WorkLog / Agent 三处都依赖同一份配置。
+	// 之前这段逻辑散落在 AIService 内部 + main 里的 agentLLM 重复块（Task 14 引入），
+	// Task 15 删除 AIService 后此处成为唯一构造点。
 	aiSettings, err := settingRepo.GetAISettings()
 	if err != nil {
 		aiSettings = nil
 	}
-	aiService := service.NewAIService(aiSettings, taskRepo, scheduleRepo, sessionRepo)
+	var llm ai.LLMClient
+	if aiSettings != nil {
+		switch aiSettings.Provider {
+		case "claude":
+			llm = ai.NewCLIClient()
+		case "anthropic":
+			if aiSettings.APIKey != "" {
+				llm = ai.NewAnthropicClient(aiSettings.APIKey, aiSettings.Model)
+			}
+		default:
+			if aiSettings.APIKey != "" {
+				llm = ai.NewOpenAIClient(aiSettings.APIKey, aiSettings.BaseURL, aiSettings.Model)
+			}
+		}
+	}
 
 	// 初始化 Schedule Service
-	scheduleService := service.NewScheduleService(scheduleRepo, taskRepo, aiService, settingRepo, wsHub)
+	scheduleService := service.NewScheduleService(scheduleRepo, taskRepo, llm, settingRepo, wsHub)
 
-	// 初始化 WorkLog Service（M2: AI client 接真实实现）
+	// 初始化 WorkLog Service
 	workLogRepo := repository.NewWorkLogRepository(db)
-	workLogAIClient := service.NewWorkLogAIClient(aiService)
-	workLogService := service.NewWorkLogService(workLogRepo, taskRepo, sessionRepo, workLogAIClient)
+	workLogService := service.NewWorkLogService(workLogRepo, taskRepo, sessionRepo, llm)
 
 	// 初始化 Data Service（数据导入导出）
 	dataRepo := repository.NewDataRepository(db)
 	dataService := service.NewDataService(dataRepo)
-
-	// 为 Agent 构造独立的 LLMClient（与 AIService 内部构造逻辑一致）。
-	// Task 15 删除 AIService 后会消除这段重复。
-	var agentLLM ai.LLMClient
-	if aiSettings != nil {
-		switch aiSettings.Provider {
-		case "claude":
-			agentLLM = ai.NewCLIClient()
-		case "anthropic":
-			if aiSettings.APIKey != "" {
-				agentLLM = ai.NewAnthropicClient(aiSettings.APIKey, aiSettings.Model)
-			}
-		default:
-			if aiSettings.APIKey != "" {
-				agentLLM = ai.NewOpenAIClient(aiSettings.APIKey, aiSettings.BaseURL, aiSettings.Model)
-			}
-		}
-	}
 
 	// 初始化 Agent Service
 	agentRepo := repository.NewAgentRepository(db)
@@ -105,18 +102,18 @@ func main() {
 		Schedule:  scheduleService,
 		Analytics: analyticsService,
 		WorkLog:   workLogService,
-		LLM:       agentLLM,
+		LLM:       llm,
 	})
 	agentSvc := agent.NewAgentService(agent.AgentDeps{
 		Repo:     agentRepo,
-		LLM:      agentLLM,
+		LLM:      llm,
 		Registry: registry,
 		Hub:      wsHub,
 		System:   agent.DefaultSystemPrompt,
 	})
 
 	// 设置路由
-	router := api.SetupRouter(cfg, taskService, timerService, aiService, analyticsService, scheduleService, workLogService, wsHub, settingRepo, dataService, agentSvc, agentRepo)
+	router := api.SetupRouter(cfg, taskService, timerService, analyticsService, scheduleService, workLogService, wsHub, settingRepo, dataService, agentSvc, agentRepo)
 
 	// 启动服务器
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
