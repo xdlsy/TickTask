@@ -112,9 +112,10 @@ func NewOpenAIClient(apiKey, baseURL, model string) LLMClient {
 
 // AnthropicClient Anthropic Claude 客户端
 type AnthropicClient struct {
-	client *http.Client
-	apiKey string
-	model  string
+	client  *http.Client
+	apiKey  string
+	baseURL string
+	model   string
 }
 
 type AnthropicRequest struct {
@@ -163,14 +164,18 @@ func (c *CLIClient) ChatCompletion(ctx context.Context, prompt string) (string, 
 	return strings.TrimSpace(stdout.String()), nil
 }
 
-func NewAnthropicClient(apiKey, model string) LLMClient {
+func NewAnthropicClient(apiKey, baseURL, model string) LLMClient {
+	if baseURL == "" {
+		baseURL = "https://api.anthropic.com"
+	}
 	if model == "" {
 		model = "claude-sonnet-4-6"
 	}
 	return &AnthropicClient{
-		client: &http.Client{},
-		apiKey: apiKey,
-		model:  model,
+		client:  &http.Client{},
+		apiKey:  apiKey,
+		baseURL: baseURL,
+		model:   model,
 	}
 }
 
@@ -192,7 +197,7 @@ func (c *AnthropicClient) ChatCompletion(ctx context.Context, prompt string) (st
 		return "", err
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewBuffer(reqBody))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/v1/messages", bytes.NewBuffer(reqBody))
 	if err != nil {
 		return "", err
 	}
@@ -393,10 +398,180 @@ func (c *OpenAIClient) ChatWithTools(ctx context.Context, messages []Message, to
 	return ToolResponse{}, lastErr
 }
 
-// ChatWithTools on AnthropicClient is unsupported pending the dedicated
-// implementation (planned in a later task). Returns ErrFunctionCallNotSupported.
+// ChatWithTools on AnthropicClient maps the unified OpenAI-style request to
+// the Anthropic Messages API and back. Mapping notes:
+//
+//   - System message is extracted from the message list and sent as the
+//     top-level `system` field (Anthropic separates system from the
+//     conversational `messages` array).
+//   - Tool definitions are translated to Anthropic's `tools[]` shape, where
+//     each tool has `name`, `description`, and `input_schema` (mirroring the
+//     OpenAI FunctionSpec.Parameters schema object).
+//   - Response content blocks are flattened: `text` blocks concatenate into
+//     Content, `tool_use` blocks become ToolCall entries with their `input`
+//     re-serialized as the Args JSON. `stop_reason="tool_use"` maps to the
+//     OpenAI-style `"tool_calls"` finish reason.
+//
+// Retries mirror OpenAIClient: up to 3 attempts with exponential backoff on
+// transient network errors or HTTP 5xx.
 func (c *AnthropicClient) ChatWithTools(ctx context.Context, messages []Message, tools []ToolSpec) (ToolResponse, error) {
-	return ToolResponse{}, ErrFunctionCallNotSupported
+	system, userMsgs := splitSystemMessage(messages)
+
+	body := map[string]any{
+		"model":       c.model,
+		"max_tokens":  1024,
+		"messages":    userMsgs,
+		"system":      system,
+	}
+	if len(tools) > 0 {
+		body["tools"] = convertToolsToAnthropic(tools)
+		body["tool_choice"] = map[string]string{"type": "auto"}
+	}
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return ToolResponse{}, fmt.Errorf("marshal request: %w", err)
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/v1/messages", bytes.NewReader(jsonBody))
+		if err != nil {
+			return ToolResponse{}, fmt.Errorf("build request: %w", err)
+		}
+		req.Header.Set("x-api-key", c.apiKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := c.client.Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt < 2 {
+				time.Sleep(time.Duration(1<<attempt) * time.Second)
+			}
+			continue
+		}
+
+		raw, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if readErr != nil {
+			lastErr = readErr
+			if attempt < 2 {
+				time.Sleep(time.Duration(1<<attempt) * time.Second)
+			}
+			continue
+		}
+
+		if resp.StatusCode >= 500 {
+			lastErr = fmt.Errorf("anthropic %d: %s", resp.StatusCode, string(raw))
+			if attempt < 2 {
+				time.Sleep(time.Duration(1<<attempt) * time.Second)
+			}
+			continue
+		}
+		if resp.StatusCode != 200 {
+			return ToolResponse{}, fmt.Errorf("anthropic %d: %s", resp.StatusCode, string(raw))
+		}
+
+		var parsed anthropicMessagesResponse
+		if err := json.Unmarshal(raw, &parsed); err != nil {
+			return ToolResponse{}, fmt.Errorf("decode: %w", err)
+		}
+
+		out := ToolResponse{FinishReason: mapStopReason(parsed.StopReason)}
+		for _, blk := range parsed.Content {
+			switch blk.Type {
+			case "text":
+				out.Content += blk.Text
+			case "tool_use":
+				argsBytes, _ := json.Marshal(blk.Input)
+				out.ToolCalls = append(out.ToolCalls, ToolCall{
+					ID:   blk.ID,
+					Name: blk.Name,
+					Args: argsBytes,
+				})
+			}
+		}
+		return out, nil
+	}
+	if lastErr == nil {
+		lastErr = errors.New("anthropic: exhausted retries")
+	}
+	return ToolResponse{}, lastErr
+}
+
+// splitSystemMessage separates leading system messages from the conversation.
+// Anthropic's Messages API requires the system prompt as a top-level field
+// rather than as an entry in `messages`. The unified Message shape may carry
+// the system prompt as the first message with Role="system"; we pull it out
+// and concatenate any additional system messages by newline.
+func splitSystemMessage(messages []Message) (system string, rest []Message) {
+	var parts []string
+	for _, m := range messages {
+		if m.Role == "system" {
+			if m.Content != "" {
+				parts = append(parts, m.Content)
+			}
+		} else {
+			rest = append(rest, m)
+		}
+	}
+	return strings.Join(parts, "\n\n"), rest
+}
+
+// convertToolsToAnthropic translates the OpenAI-style ToolSpec list into
+// Anthropic's `tools[]` shape, where each entry carries `input_schema`
+// mirroring the OpenAI FunctionSpec.Parameters JSON-schema object.
+func convertToolsToAnthropic(tools []ToolSpec) []map[string]any {
+	out := make([]map[string]any, 0, len(tools))
+	for _, t := range tools {
+		entry := map[string]any{
+			"name":         t.Function.Name,
+			"input_schema": t.Function.Parameters,
+		}
+		if t.Function.Description != "" {
+			entry["description"] = t.Function.Description
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+// mapStopReason converts Anthropic's stop_reason to the OpenAI-style
+// FinishReason vocabulary used by the unified ToolResponse. The agent service
+// only branches on "no tool calls" vs "has tool calls", so the precise token
+// is informational rather than load-bearing.
+func mapStopReason(reason string) string {
+	switch reason {
+	case "tool_use":
+		return "tool_calls"
+	case "end_turn":
+		return "stop"
+	case "max_tokens":
+		return "length"
+	case "stop_sequence":
+		return "stop"
+	default:
+		return reason
+	}
+}
+
+// anthropicMessagesResponse is the parsed shape of the Anthropic Messages API
+// response. Content blocks are polymorphic (text / tool_use / etc.); we model
+// only the fields the agent path consumes and leave others as zero values.
+type anthropicMessagesResponse struct {
+	Content    []anthropicContentBlock `json:"content"`
+	StopReason string                  `json:"stop_reason"`
+}
+
+// anthropicContentBlock models one entry of the Content array. Input is kept
+// as a generic map[string]any and re-serialized to JSON when constructing the
+// unified ToolCall.Args payload.
+type anthropicContentBlock struct {
+	Type  string         `json:"type"`
+	Text  string         `json:"text,omitempty"`
+	ID    string         `json:"id,omitempty"`
+	Name  string         `json:"name,omitempty"`
+	Input map[string]any `json:"input,omitempty"`
 }
 
 // ChatWithTools on CLIClient is permanently unsupported: the CLI provider

@@ -110,7 +110,7 @@ func TestAgentService_NoToolCall(t *testing.T) {
 	repo := newInMemoryRepo(t)
 	svc := NewAgentService(AgentDeps{
 		Repo:     repo,
-		LLM:      llm,
+		LLMFactory: func() ai.LLMClient { return llm },
 		Registry: NewToolRegistry(),
 		Hub:      hub,
 		System:   "you are nice",
@@ -141,7 +141,7 @@ func TestAgentService_NoToolCall_RepoAppendError(t *testing.T) {
 	repo := &failingOnAssistantRepo{AgentRepository: baseRepo}
 	svc := NewAgentService(AgentDeps{
 		Repo:     repo,
-		LLM:      llm,
+		LLMFactory: func() ai.LLMClient { return llm },
 		Registry: NewToolRegistry(),
 		Hub:      hub,
 		System:   "you are nice",
@@ -190,7 +190,7 @@ func TestAgentService_PermReadToolAutoExecutes(t *testing.T) {
 	}}
 	hub := &mockHub{}
 	repo := newInMemoryRepo(t)
-	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	svc := NewAgentService(AgentDeps{Repo: repo, LLMFactory: func() ai.LLMClient { return llm }, Registry: reg, Hub: hub})
 	conv, _ := repo.CreateConversation()
 	if err := svc.SendMessage(context.Background(), conv.ID, "go"); err != nil {
 		t.Fatal(err)
@@ -219,7 +219,7 @@ func TestAgentService_PermWriteTool_Approve(t *testing.T) {
 	llm := &mockLLM{responses: llmResponses}
 	hub := &mockHub{}
 	repo := newInMemoryRepo(t)
-	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	svc := NewAgentService(AgentDeps{Repo: repo, LLMFactory: func() ai.LLMClient { return llm }, Registry: reg, Hub: hub})
 	conv, _ := repo.CreateConversation()
 
 	// Run SendMessage in goroutine; it should block on pending confirmation
@@ -276,7 +276,7 @@ func TestAgentService_PermWriteTool_Reject(t *testing.T) {
 	}}
 	hub := &mockHub{}
 	repo := newInMemoryRepo(t)
-	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	svc := NewAgentService(AgentDeps{Repo: repo, LLMFactory: func() ai.LLMClient { return llm }, Registry: reg, Hub: hub})
 	conv, _ := repo.CreateConversation()
 	done := make(chan error, 1)
 	go func() { done <- svc.SendMessage(context.Background(), conv.ID, "go") }()
@@ -327,7 +327,7 @@ func TestAgentService_PermDangerousTool_SecondConfirm(t *testing.T) {
 	}}
 	hub := &mockHub{}
 	repo := newInMemoryRepo(t)
-	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	svc := NewAgentService(AgentDeps{Repo: repo, LLMFactory: func() ai.LLMClient { return llm }, Registry: reg, Hub: hub})
 	conv, _ := repo.CreateConversation()
 	done := make(chan error, 1)
 	go func() { done <- svc.SendMessage(context.Background(), conv.ID, "go") }()
@@ -415,7 +415,7 @@ func TestAgentService_MaxToolCalls(t *testing.T) {
 	}, MaxToolCallsPerTurn+5)}
 	hub := &mockHub{}
 	repo := newInMemoryRepo(t)
-	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	svc := NewAgentService(AgentDeps{Repo: repo, LLMFactory: func() ai.LLMClient { return llm }, Registry: reg, Hub: hub})
 	conv, _ := repo.CreateConversation()
 	if err := svc.SendMessage(context.Background(), conv.ID, "loop"); err != nil {
 		t.Fatal(err)
@@ -444,7 +444,7 @@ func TestAgentService_SchemaValidationError(t *testing.T) {
 	}}
 	hub := &mockHub{}
 	repo := newInMemoryRepo(t)
-	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	svc := NewAgentService(AgentDeps{Repo: repo, LLMFactory: func() ai.LLMClient { return llm }, Registry: reg, Hub: hub})
 	conv, _ := repo.CreateConversation()
 	if err := svc.SendMessage(context.Background(), conv.ID, "bad args"); err != nil {
 		t.Fatal(err)
@@ -462,5 +462,110 @@ func TestAgentService_SchemaValidationError(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("no schema failure event")
+	}
+}
+
+// fakeSettingsRepo is a minimal SettingRepository stub for Status() tests.
+// It implements only the methods Status() touches; the rest panic so any
+// accidental call surfaces loudly. The interface is small enough that filling
+// in the unused methods with nil/error returns would just be noise.
+type fakeSettingsRepo struct {
+	settings *model.AISettings
+}
+
+func (f *fakeSettingsRepo) Get(string) (*model.Setting, error)              { return nil, repository.ErrNotFound }
+func (f *fakeSettingsRepo) Set(string, string) error                        { return nil }
+func (f *fakeSettingsRepo) GetPomodoroSettings() (*model.PomodoroSettings, error) {
+	return model.DefaultPomodoroSettings(), nil
+}
+func (f *fakeSettingsRepo) UpdatePomodoroSettings(*model.PomodoroSettings) error { return nil }
+func (f *fakeSettingsRepo) GetAISettings() (*model.AISettings, error)           { return f.settings, nil }
+func (f *fakeSettingsRepo) UpdateAISettings(*model.AISettings) error            { return nil }
+
+// TestAgentService_Status verifies the Task 22 real Status() implementation
+// against the four meaningful shape cases:
+//   - nil SettingsRepo → conservative all-false zero (handler still serves)
+//   - openai + key     → Configured + SupportsFunctionCalling
+//   - cli / claude     → Configured but NOT SupportsFunctionCalling
+//   - openai no key    → not Configured, but SupportsFunctionCalling is true
+//     (provider capability is independent of credential presence)
+func TestAgentService_Status(t *testing.T) {
+	llm := &mockLLM{}
+	factory := func() ai.LLMClient { return llm }
+
+	// Case 1: nil SettingsRepo returns zero value.
+	svcNil := NewAgentService(AgentDeps{
+		Repo:        newInMemoryRepo(t),
+		LLMFactory:  factory,
+		Registry:    NewToolRegistry(),
+		Hub:         &mockHub{},
+	}).(*agentService)
+	if got := svcNil.Status(); got.Configured || got.SupportsFunctionCalling || got.Provider != "" {
+		t.Fatalf("nil SettingsRepo = %+v, want zero", got)
+	}
+
+	cases := []struct {
+		name              string
+		settings          *model.AISettings
+		wantConfigured    bool
+		wantSupportsTools bool
+		wantProvider      string
+	}{
+		{
+			name:              "openai with key",
+			settings:          &model.AISettings{Provider: "openai", APIKey: "sk-x"},
+			wantConfigured:    true,
+			wantSupportsTools: true,
+			wantProvider:      "openai",
+		},
+		{
+			name:              "anthropic with key",
+			settings:          &model.AISettings{Provider: "anthropic", APIKey: "sk-x"},
+			wantConfigured:    true,
+			wantSupportsTools: true,
+			wantProvider:      "anthropic",
+		},
+		{
+			name:              "cli provider (subprocess, no tools)",
+			settings:          &model.AISettings{Provider: "cli"},
+			wantConfigured:    true,
+			wantSupportsTools: false,
+			wantProvider:      "cli",
+		},
+		{
+			name:              "claude provider alias (subprocess)",
+			settings:          &model.AISettings{Provider: "claude"},
+			wantConfigured:    true,
+			wantSupportsTools: false,
+			wantProvider:      "claude",
+		},
+		{
+			name:              "openai without key",
+			settings:          &model.AISettings{Provider: "openai", APIKey: ""},
+			wantConfigured:    false,
+			wantSupportsTools: true,
+			wantProvider:      "openai",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := NewAgentService(AgentDeps{
+				Repo:         newInMemoryRepo(t),
+				LLMFactory:   factory,
+				SettingsRepo: &fakeSettingsRepo{settings: tc.settings},
+				Registry:     NewToolRegistry(),
+				Hub:          &mockHub{},
+			}).(*agentService)
+			got := svc.Status()
+			if got.Configured != tc.wantConfigured {
+				t.Errorf("Configured = %v, want %v", got.Configured, tc.wantConfigured)
+			}
+			if got.SupportsFunctionCalling != tc.wantSupportsTools {
+				t.Errorf("SupportsFunctionCalling = %v, want %v", got.SupportsFunctionCalling, tc.wantSupportsTools)
+			}
+			if got.Provider != tc.wantProvider {
+				t.Errorf("Provider = %q, want %q", got.Provider, tc.wantProvider)
+			}
+		})
 	}
 }

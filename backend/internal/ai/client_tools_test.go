@@ -73,6 +73,28 @@ func TestCLIClient_ChatWithTools_Unsupported(t *testing.T) {
 	}
 }
 
+func TestAnthropicClient_ChatWithTools(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Assert request body has Anthropic-style tools
+		resp := `{"content":[{"type":"text","text":"hello"},{"type":"tool_use","id":"tu1","name":"list_tasks","input":{"status":"todo"}}],"stop_reason":"tool_use"}`
+		w.Write([]byte(resp))
+	}))
+	defer srv.Close()
+	// Existing constructor order matches OpenAIClient: (apiKey, baseURL, model)
+	c := NewAnthropicClient("k", srv.URL, "claude-sonnet-4-6")
+	res, err := c.ChatWithTools(context.Background(),
+		[]Message{{Role: "user", Content: "hi"}}, []ToolSpec{{Type: "function", Function: FunctionSpec{Name: "list_tasks"}}})
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if res.Content != "hello" {
+		t.Fatalf("content = %q", res.Content)
+	}
+	if len(res.ToolCalls) != 1 || res.ToolCalls[0].Name != "list_tasks" {
+		t.Fatalf("tool_calls = %+v", res.ToolCalls)
+	}
+}
+
 func TestOpenAIClient_NetworkError_Retries(t *testing.T) {
 	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

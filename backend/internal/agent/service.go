@@ -20,11 +20,12 @@ type HubBroadcaster interface {
 }
 
 type AgentDeps struct {
-	Repo     repository.AgentRepository
-	LLM      ai.LLMClient
-	Registry ToolRegistry
-	Hub      HubBroadcaster
-	System   string
+	Repo        repository.AgentRepository
+	LLMFactory  func() ai.LLMClient
+	SettingsRepo repository.SettingRepository
+	Registry    ToolRegistry
+	Hub         HubBroadcaster
+	System      string
 }
 
 type AgentService interface {
@@ -74,7 +75,7 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 			return err
 		}
 		msgs := buildLLMMessages(s.System, history)
-		resp, err := s.LLM.ChatWithTools(ctx, msgs, s.Registry.ToOpenAITools())
+		resp, err := s.LLMFactory().ChatWithTools(ctx, msgs, s.Registry.ToOpenAITools())
 		if err != nil {
 			s.broadcastDone(convID, "error")
 			return err
@@ -203,16 +204,42 @@ func (s *agentService) RunTool(ctx context.Context, name string, args json.RawMe
 	return t.Execute(ctx, args)
 }
 
-// Status is a hardcoded stub added by Task 13 so the HTTP handler can compile
-// against the AgentService interface. Task 22 replaces this with a real
-// implementation that reads AI settings (configured flag, provider, function
-// calling capability).
+// Status reports live agent capability flags derived from the current AI
+// settings. It is consumed by GET /api/agent/status and powers the frontend's
+// "agent available" indicator.
+//
+//   - Configured: true when an API key (or CLI provider, which needs none) is
+//     present in settings.
+//   - SupportsFunctionCalling: false for the CLI-subprocess providers, which
+//     shell out to `claude`/`gemini` etc. and have no structured tool-call
+//     surface. OpenAI, Anthropic, and "custom" (OpenAI-compatible) all
+//     support tools.
+//   - Provider: echoed back so the frontend can show the active backend.
+//
+// SettingsRepo is optional: if absent (e.g. in unit tests), Status returns a
+// conservative all-false zero value so the handler still compiles and serves.
 func (s *agentService) Status() AgentStatus {
-	return AgentStatus{
-		Configured:              true,
-		SupportsFunctionCalling: true,
-		Provider:                "openai",
+	if s.SettingsRepo == nil {
+		return AgentStatus{}
 	}
+	settings, _ := s.SettingsRepo.GetAISettings()
+	if settings == nil {
+		return AgentStatus{}
+	}
+	return AgentStatus{
+		Configured:              settings.APIKey != "" || isCLIProvider(settings.Provider),
+		SupportsFunctionCalling: !isCLIProvider(settings.Provider),
+		Provider:                settings.Provider,
+	}
+}
+
+// isCLIProvider returns true for providers that shell out to a local CLI
+// subprocess (e.g. `claude`/`gemini`) and therefore cannot participate in the
+// structured tool-calling flow. main.go maps the `"claude"` provider string
+// to CLIClient; the design spec uses the literal `"cli"`. Both are treated as
+// CLI-mode here for forwards compatibility.
+func isCLIProvider(provider string) bool {
+	return provider == "cli" || provider == "claude"
 }
 
 func (s *agentService) broadcast(convID, eventType string, payload map[string]any) {

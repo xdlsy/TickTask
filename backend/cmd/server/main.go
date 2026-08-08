@@ -7,6 +7,7 @@ import (
 	"ticktask/internal/agent/tools"
 	"ticktask/internal/ai"
 	"ticktask/internal/api"
+	"ticktask/internal/model"
 	"ticktask/internal/repository"
 	"ticktask/internal/service"
 	"ticktask/internal/websocket"
@@ -59,27 +60,26 @@ func main() {
 	timerService := service.NewTimerService(sessionRepo, taskRepo, analyticsRepo, settingRepo, wsHub)
 	analyticsService := service.NewAnalyticsService(analyticsRepo, taskRepo, sessionRepo, settingRepo)
 
-	// 构造共享的 LLMClient：Schedule / WorkLog / Agent 三处都依赖同一份配置。
+	// 构造共享的 LLMClient：Schedule / WorkLog 两处服务只调用 ChatCompletion，
+	// 启动期一次性构造即可（用户极少在运行中切换 provider）。
 	// 之前这段逻辑散落在 AIService 内部 + main 里的 agentLLM 重复块（Task 14 引入），
 	// Task 15 删除 AIService 后此处成为唯一构造点。
 	aiSettings, err := settingRepo.GetAISettings()
 	if err != nil {
 		aiSettings = nil
 	}
-	var llm ai.LLMClient
-	if aiSettings != nil {
-		switch aiSettings.Provider {
-		case "claude":
-			llm = ai.NewCLIClient()
-		case "anthropic":
-			if aiSettings.APIKey != "" {
-				llm = ai.NewAnthropicClient(aiSettings.APIKey, aiSettings.Model)
-			}
-		default:
-			if aiSettings.APIKey != "" {
-				llm = ai.NewOpenAIClient(aiSettings.APIKey, aiSettings.BaseURL, aiSettings.Model)
-			}
+	llm := constructLLMClient(aiSettings)
+
+	// llmFactory 在 agent 每一轮调用时按当前 settings 重新构造 LLM 客户端，
+	// 这样用户在 Settings 页切换 provider / 修改 API key 后无需重启即可生效
+	// （Task 22 配置热重载）。当 settings 缺失或 provider 不变时构造函数本身
+	// 是廉价的对象分配，无需缓存。
+	llmFactory := func() ai.LLMClient {
+		current, err := settingRepo.GetAISettings()
+		if err != nil || current == nil {
+			return llm // 回落到启动期构造的客户端
 		}
+		return constructLLMClient(current)
 	}
 
 	// 初始化 Schedule Service
@@ -105,11 +105,12 @@ func main() {
 		LLM:       llm,
 	})
 	agentSvc := agent.NewAgentService(agent.AgentDeps{
-		Repo:     agentRepo,
-		LLM:      llm,
-		Registry: registry,
-		Hub:      wsHub,
-		System:   agent.DefaultSystemPrompt,
+		Repo:         agentRepo,
+		LLMFactory:   llmFactory,
+		SettingsRepo: settingRepo,
+		Registry:     registry,
+		Hub:          wsHub,
+		System:       agent.DefaultSystemPrompt,
 	})
 
 	// 设置路由
@@ -126,4 +127,29 @@ func main() {
 func ensureDataDir(path string) error {
 	// 简化处理，确保目录存在
 	return nil
+}
+
+// constructLLMClient 根据 AISettings 构造一个 LLMClient 实例。
+// 提取自启动期的内联 switch：Schedule / WorkLog 仍按启动期配置取一次，
+// agent 服务则通过 llmFactory 每轮重新构造（热重载）。
+// nil settings 返回 nil client，调用方需自行处理（Schedule/WorkLog 仍可
+// 接受 nil 路径，但触发 AI 调用时会返回 "API key not configured" 错误）。
+func constructLLMClient(settings *model.AISettings) ai.LLMClient {
+	if settings == nil {
+		return nil
+	}
+	switch settings.Provider {
+	case "claude", "cli":
+		return ai.NewCLIClient()
+	case "anthropic":
+		if settings.APIKey == "" {
+			return nil
+		}
+		return ai.NewAnthropicClient(settings.APIKey, settings.BaseURL, settings.Model)
+	default: // openai / custom / 兼容 OpenAI 协议
+		if settings.APIKey == "" {
+			return nil
+		}
+		return ai.NewOpenAIClient(settings.APIKey, settings.BaseURL, settings.Model)
+	}
 }
