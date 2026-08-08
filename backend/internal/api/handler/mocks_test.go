@@ -216,6 +216,8 @@ func (m *mockAnalyticsRepository) IncrementCreatedTasks(date time.Time) error {
 type mockSettingRepository struct {
 	pomodoroSettings *model.PomodoroSettings
 	aiSettings       *model.AISettings
+	migrateCalls     int
+	migrateErr       error
 }
 
 func newMockSettingRepository() *mockSettingRepository {
@@ -249,6 +251,11 @@ func (m *mockSettingRepository) GetAISettings() (*model.AISettings, error) {
 func (m *mockSettingRepository) UpdateAISettings(settings *model.AISettings) error {
 	m.aiSettings = settings
 	return nil
+}
+
+func (m *mockSettingRepository) MigrateLegacyAPIKey() error {
+	m.migrateCalls++
+	return m.migrateErr
 }
 
 // mockScheduleRepository implements repository.ScheduleRepository for testing
