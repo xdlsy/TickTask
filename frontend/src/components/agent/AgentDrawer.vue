@@ -26,7 +26,14 @@
       <ToolConfirmDialog v-if="store.pendingConfirm" />
     </template>
     <template #footer>
-      <AgentInput v-if="!showHistory" :disabled="store.isThinking" @send="onSend" />
+      <div v-if="!store.status.configured" class="not-configured-hint">
+        AI 未配置 — 请先到 <router-link to="/settings">设置</router-link> 填写 API Key,或切换 provider 到 CLI 模式
+      </div>
+      <AgentInput
+        v-else-if="!showHistory"
+        :disabled="store.isThinking"
+        @send="onSend"
+      />
     </template>
   </el-drawer>
 </template>
@@ -69,5 +76,18 @@ const onSend = (text: string) => store.sendMessage(text)
 .actions {
   display: flex;
   gap: 4px;
+}
+.not-configured-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  line-height: 1.5;
+}
+.not-configured-hint a {
+  color: var(--accent-primary);
+  text-decoration: underline;
 }
 </style>

@@ -69,13 +69,21 @@ func (s *agentService) SendMessage(ctx context.Context, convID, text string) err
 }
 
 func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int) error {
+	client := s.LLMFactory()
+	if client == nil {
+		s.broadcast(convID, websocket.EventAgentDone, map[string]any{
+			"conversation_id": convID, "finish_reason": "error",
+			"error": "AI 未配置 — 请先在设置中填写 API Key 或切换到 CLI provider",
+		})
+		return fmt.Errorf("AI client not configured")
+	}
 	for toolCount < MaxToolCallsPerTurn {
 		history, err := s.Repo.LoadRecentMessages(convID, MaxContextMessages)
 		if err != nil {
 			return err
 		}
 		msgs := buildLLMMessages(s.System, history)
-		resp, err := s.LLMFactory().ChatWithTools(ctx, msgs, s.Registry.ToOpenAITools())
+		resp, err := client.ChatWithTools(ctx, msgs, s.Registry.ToOpenAITools())
 		if err != nil {
 			s.broadcastDone(convID, "error")
 			return err
