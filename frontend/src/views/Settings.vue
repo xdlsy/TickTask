@@ -182,7 +182,7 @@
           <el-input
             v-model="aiSettings.api_key"
             type="password"
-            placeholder="请输入 API Key"
+            :placeholder="apiKeyPlaceholder"
             show-password
             size="large"
           />
@@ -330,6 +330,17 @@ const aiSettings = ref<AISettings>({
   model: 'gpt-4o-mini'
 })
 
+// Preview 单独存,不参与 form 数据 — form 中 api_key 永远是 ''(用户输入覆盖)。
+// 后端 GET /settings 不再返回明文/掩码 api_key,只回 api_key_preview 用来显示。
+const aiSettingsPreview = ref<string>('')
+
+const apiKeyPlaceholder = computed(() => {
+  if (aiSettingsPreview.value) {
+    return `已设置 (${aiSettingsPreview.value}),留空保留;输入新值覆盖`
+  }
+  return '请输入 API Key'
+})
+
 const openaiModels = ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo']
 const anthropicModels = ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-opus-latest']
 
@@ -389,7 +400,16 @@ async function loadSettings() {
       }
     }
     if (res.data.ai) {
-      aiSettings.value = res.data.ai
+      // 关键:GET /settings 不再回明文/掩码 api_key(只有 api_key_preview)。
+      // form 永远从 '' 开始 — 用户输入新值覆盖,留空则 saveAISettings 时
+      // 后端按"空 api_key = 保留原 key"语义处理。
+      aiSettings.value = {
+        provider: res.data.ai.provider,
+        api_key: '',
+        base_url: res.data.ai.base_url,
+        model: res.data.ai.model,
+      }
+      aiSettingsPreview.value = res.data.ai.api_key_preview ?? ''
     }
   } catch (error) {
     ElMessage.error('加载设置失败')
@@ -435,18 +455,22 @@ async function saveAISettings() {
 }
 
 async function testAIConnection() {
-  if (!aiSettings.value.api_key && aiSettings.value.provider !== 'claude' && aiSettings.value.provider !== 'cli') {
+  // 兜底:form 中无 key 且后端也没存 key → 没法测,提示用户输入
+  if (!aiSettings.value.api_key && !aiSettingsPreview.value) {
     ElMessage.warning('请先输入 API Key')
     return
   }
 
   testing.value = true
   try {
-    // 先保存当前编辑中的设置,后端才能用最新 key/model 去发测试请求
-    await api.updateAISettings(aiSettings.value)
-    await agentStore.checkStatus()
-
-    const r = await api.agent.test()
+    // 关键改动:不调 updateAISettings — 测试连接应当允许"试探性" key 而不持久化。
+    // 直接把 form 中的临时值传给 /agent/test;api_key 为空时后端从 DB 读已存的。
+    const r = await api.agent.test({
+      provider: aiSettings.value.provider,
+      api_key: aiSettings.value.api_key,
+      base_url: aiSettings.value.base_url,
+      model: aiSettings.value.model,
+    })
     const result = r.data
     if (result.ok) {
       const latency = result.latency_ms ? ` · ${result.latency_ms}ms` : ''
