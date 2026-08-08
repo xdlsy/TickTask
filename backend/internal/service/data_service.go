@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"ticktask/internal/model"
 	"ticktask/internal/repository"
+	"ticktask/pkg/logger"
 	"time"
 )
 
@@ -24,11 +25,16 @@ type DataService interface {
 }
 
 type dataService struct {
-	repo repository.BackupRepository
+	repo        repository.BackupRepository
+	settingRepo repository.SettingRepository
 }
 
-func NewDataService(repo repository.BackupRepository) DataService {
-	return &dataService{repo: repo}
+// NewDataService wires the data service. settingRepo is used to run an
+// immediate api_key migration after ApplyImport so legacy plaintext imports
+// don't sit in the DB waiting for the next server restart. May be nil in
+// tests that don't exercise ApplyImport.
+func NewDataService(repo repository.BackupRepository, settingRepo repository.SettingRepository) DataService {
+	return &dataService{repo: repo, settingRepo: settingRepo}
 }
 
 func (s *dataService) Export(includeAPIKey bool) (*model.BackupEnvelope, error) {
@@ -36,7 +42,13 @@ func (s *dataService) Export(includeAPIKey bool) (*model.BackupEnvelope, error) 
 	if err != nil {
 		return nil, err
 	}
-	if !includeAPIKey && data.Settings.AI != nil {
+	// Defense in depth: includeAPIKey is now a no-op back-compat parameter.
+	// The export NEVER carries the api_key, regardless of what the client
+	// requests (old frontend, hand-crafted URL, etc.). The encrypted blob
+	// never leaks either — dataRepository.ReadAll unmarshals into
+	// model.AISettings which has no api_key_encrypted field, so it's already
+	// absent. We additionally blank APIKey here as belt-and-suspenders.
+	if data.Settings.AI != nil {
 		data.Settings.AI.APIKey = ""
 	}
 	return &model.BackupEnvelope{
@@ -106,6 +118,15 @@ func (s *dataService) ApplyImport(req *model.ApplyImportRequest) (*model.ApplyRe
 	// 4. 单事务执行
 	if err := s.repo.Apply(plan); err != nil {
 		return nil, err
+	}
+
+	// 5. 导入提交后立即迁移 legacy 明文 api_key — 否则导入的明文
+	//    会一直驻留 DB 直到下次重启。失败仅 warn：api_key 处理不是
+	//    导入的核心目的，启动期 migration 会在下次重启时重试。
+	if s.settingRepo != nil {
+		if err := s.settingRepo.MigrateLegacyAPIKey(); err != nil {
+			logger.Logger.Warn("post-import api_key migration", "err", err)
+		}
 	}
 	return result, nil
 }

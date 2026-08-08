@@ -91,7 +91,7 @@ func main() {
 
 	// 初始化 Data Service（数据导入导出）
 	dataRepo := repository.NewDataRepository(db)
-	dataService := service.NewDataService(dataRepo)
+	dataService := service.NewDataService(dataRepo, settingRepo)
 
 	// 初始化 Agent Service
 	agentRepo := repository.NewAgentRepository(db)
