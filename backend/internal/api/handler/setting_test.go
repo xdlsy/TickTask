@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"ticktask/internal/model"
 	"testing"
 )
@@ -71,8 +72,8 @@ func TestSettingHandler_GetSettings_DefaultValues(t *testing.T) {
 	}
 }
 
-// Test: GET /api/settings - API Key 隐藏测试
-func TestSettingHandler_GetSettings_APIKeyHidden(t *testing.T) {
+// Test: GET /api/settings - 不返回 api_key 字段，返回 api_key_set + api_key_preview
+func TestSettingHandler_GetSettings_NoAPIKeyOnlyPreview(t *testing.T) {
 	settingRepo := newMockSettingRepository()
 	settingRepo.UpdateAISettings(&model.AISettings{
 		Provider: "openai",
@@ -87,52 +88,49 @@ func TestSettingHandler_GetSettings_APIKeyHidden(t *testing.T) {
 
 	req, _ := http.NewRequest("GET", "/api/settings", nil)
 	w := httptest.NewRecorder()
-
 	router.ServeHTTP(w, req)
 
 	var response map[string]interface{}
 	json.Unmarshal(w.Body.Bytes(), &response)
-
 	ai := response["ai"].(map[string]interface{})
-	apiKey := ai["api_key"].(string)
 
-	// API key should be masked
-	if apiKey == "sk-1234567890abcdefghijklmnop" {
-		t.Error("API key should be masked")
+	if _, ok := ai["api_key"]; ok {
+		t.Error("response must NOT include api_key field")
 	}
-	if len(apiKey) < 8 {
-		t.Error("masked API key should have some characters")
+	if ai["api_key_set"] != true {
+		t.Errorf("api_key_set = %v, want true", ai["api_key_set"])
+	}
+	preview, _ := ai["api_key_preview"].(string)
+	if !strings.Contains(preview, "****") {
+		t.Errorf("api_key_preview should contain mask: got %q", preview)
+	}
+	if !strings.HasPrefix(preview, "sk-1") {
+		t.Errorf("api_key_preview should show first 4 chars: got %q", preview)
+	}
+	if !strings.HasSuffix(preview, "mnop") {
+		t.Errorf("api_key_preview should show last 4 chars: got %q", preview)
 	}
 }
 
-// Test: GET /api/settings - 短 API Key 隐藏测试
-func TestSettingHandler_GetSettings_ShortAPIKeyHidden(t *testing.T) {
+func TestSettingHandler_GetSettings_NoKeyConfigured(t *testing.T) {
 	settingRepo := newMockSettingRepository()
-	settingRepo.UpdateAISettings(&model.AISettings{
-		Provider: "openai",
-		APIKey:   "short",
-		BaseURL:  "https://api.openai.com/v1",
-		Model:    "gpt-4o-mini",
-	})
-
 	handler := NewSettingHandler(settingRepo)
 	router := setupTestRouter()
 	router.GET("/api/settings", handler.GetSettings)
 
 	req, _ := http.NewRequest("GET", "/api/settings", nil)
 	w := httptest.NewRecorder()
-
 	router.ServeHTTP(w, req)
 
 	var response map[string]interface{}
 	json.Unmarshal(w.Body.Bytes(), &response)
-
 	ai := response["ai"].(map[string]interface{})
-	apiKey := ai["api_key"].(string)
 
-	// Short API key should be completely masked
-	if apiKey != "****" {
-		t.Errorf("expected short API key to be '****', got %s", apiKey)
+	if ai["api_key_set"] != false {
+		t.Errorf("api_key_set = %v, want false", ai["api_key_set"])
+	}
+	if _, ok := ai["api_key_preview"]; ok {
+		t.Errorf("api_key_preview should be absent when no key set: got %q", ai["api_key_preview"])
 	}
 }
 
@@ -370,5 +368,66 @@ func TestSettingHandler_UpdateAISettings_InvalidBody(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected status %d, got %d", http.StatusBadRequest, w.Code)
+	}
+}
+
+// Test: PUT /api/settings/ai - 空 api_key 字段 = 保留原值
+func TestSettingHandler_UpdateAISettings_EmptyAPIKeyPreserves(t *testing.T) {
+	settingRepo := newMockSettingRepository()
+	settingRepo.UpdateAISettings(&model.AISettings{
+		Provider: "openai",
+		APIKey:   "sk-original-key-12345678",
+		BaseURL:  "https://api.openai.com/v1",
+		Model:    "gpt-4o-mini",
+	})
+
+	handler := NewSettingHandler(settingRepo)
+	router := setupTestRouter()
+	router.PUT("/api/settings/ai", handler.UpdateAISettings)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"provider": "openai",
+		"api_key":  "", // 空：保留
+		"base_url": "https://api.openai.com/v1",
+		"model":    "gpt-4o", // 只改 model
+	})
+	req, _ := http.NewRequest("PUT", "/api/settings/ai", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+
+	got, _ := settingRepo.GetAISettings()
+	if got.APIKey != "sk-original-key-12345678" {
+		t.Errorf("api_key overwritten by empty: got %q, want original", got.APIKey)
+	}
+	if got.Model != "gpt-4o" {
+		t.Errorf("model not updated: got %q", got.Model)
+	}
+}
+
+// Test: PUT /api/settings/ai - 含掩码字面量 **** = 拒绝
+func TestSettingHandler_UpdateAISettings_RejectsMaskString(t *testing.T) {
+	settingRepo := newMockSettingRepository()
+	handler := NewSettingHandler(settingRepo)
+	router := setupTestRouter()
+	router.PUT("/api/settings/ai", handler.UpdateAISettings)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"provider": "openai",
+		"api_key":  "sk-ab****wxyz", // 掩码字面量 — bug 复发信号
+		"base_url": "https://api.openai.com/v1",
+		"model":    "gpt-4o",
+	})
+	req, _ := http.NewRequest("PUT", "/api/settings/ai", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400 (mask string rejected); body=%s", w.Code, w.Body.String())
 	}
 }

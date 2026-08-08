@@ -249,6 +249,14 @@ func (m *mockSettingRepository) GetAISettings() (*model.AISettings, error) {
 }
 
 func (m *mockSettingRepository) UpdateAISettings(settings *model.AISettings) error {
+	// Mirror the real repo's "preserve on empty api_key" contract so handler
+	// tests can verify the mask-roundtrip fix end-to-end without a DB.
+	if settings.APIKey == "" && m.aiSettings != nil {
+		preserved := *settings
+		preserved.APIKey = m.aiSettings.APIKey
+		m.aiSettings = &preserved
+		return nil
+	}
 	m.aiSettings = settings
 	return nil
 }
