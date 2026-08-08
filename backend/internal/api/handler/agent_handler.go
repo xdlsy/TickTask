@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"ticktask/internal/agent"
+	"ticktask/internal/model"
 	"ticktask/internal/repository"
 )
 
@@ -156,10 +157,38 @@ func (h *agentHandler) status(c *gin.Context) {
 	c.JSON(http.StatusOK, h.Svc.Status())
 }
 
+// testConnectionInput is the body for POST /api/agent/test.
+// All fields are optional: missing/empty fields fall back to the saved DB
+// settings (handled by the service layer when settings is passed as nil).
+type testConnectionInput struct {
+	Provider string `json:"provider"`
+	APIKey   string `json:"api_key"`
+	BaseURL  string `json:"base_url"`
+	Model    string `json:"model"`
+}
+
 // POST /test — actually pings the configured LLM provider with a minimal
 // ChatCompletion. Distinguishes "settings saved" from "key actually works".
+//
+// With an empty body ({}) or no fields set, the service tests the saved DB
+// settings. With one or more fields set, the service constructs a one-shot
+// client from those values and tests them WITHOUT persisting — the user can
+// try a key before saving it.
 func (h *agentHandler) testConnection(c *gin.Context) {
-	result := h.Svc.TestConnection(c.Request.Context())
+	var in testConnectionInput
+	_ = c.ShouldBindJSON(&in)
+
+	var settings *model.AISettings
+	if in.Provider != "" || in.APIKey != "" || in.BaseURL != "" || in.Model != "" {
+		settings = &model.AISettings{
+			Provider: in.Provider,
+			APIKey:   in.APIKey,
+			BaseURL:  in.BaseURL,
+			Model:    in.Model,
+		}
+	}
+	// settings == nil → service falls back to saved DB settings.
+	result := h.Svc.TestConnection(c.Request.Context(), settings)
 	c.JSON(http.StatusOK, result)
 }
 

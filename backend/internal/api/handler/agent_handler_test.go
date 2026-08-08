@@ -265,6 +265,55 @@ func TestAgentHandler_Status(t *testing.T) {
 	}
 }
 
+func TestAgentHandler_TestConnection_BodyWithTempKey(t *testing.T) {
+	svc := &mockAgentSvc{testResult: agent.TestResult{OK: true, Provider: "openai"}}
+	repo := &mockAgentRepo{}
+	h := NewAgentHandler(svc, repo)
+	r := setupTestRouter()
+	h.Register(r.Group("/api/agent"))
+
+	body, _ := json.Marshal(map[string]string{
+		"provider": "openai",
+		"api_key":  "sk-temp-test-key",
+		"base_url": "https://api.openai.com/v1",
+		"model":    "gpt-4o-mini",
+	})
+	req, _ := http.NewRequest("POST", "/api/agent/test", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+	if svc.lastTestSettings == nil {
+		t.Fatal("TestConnection not called with settings")
+	}
+	if svc.lastTestSettings.APIKey != "sk-temp-test-key" {
+		t.Errorf("temp key not forwarded: got %q", svc.lastTestSettings.APIKey)
+	}
+}
+
+func TestAgentHandler_TestConnection_EmptyBodyFallsBackToDB(t *testing.T) {
+	svc := &mockAgentSvc{testResult: agent.TestResult{OK: true}}
+	repo := &mockAgentRepo{}
+	h := NewAgentHandler(svc, repo)
+	r := setupTestRouter()
+	h.Register(r.Group("/api/agent"))
+
+	req, _ := http.NewRequest("POST", "/api/agent/test", bytes.NewReader([]byte("{}")))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+	if svc.lastTestSettings != nil {
+		t.Errorf("expected nil settings (fallback to DB), got %+v", svc.lastTestSettings)
+	}
+}
+
 // --- Mocks ------------------------------------------------------------------
 
 // mockAgentSvc implements agent.AgentService for handler tests.
@@ -281,6 +330,7 @@ type mockAgentSvc struct {
 	confirmErr          error
 	statusResult        agent.AgentStatus
 	testResult          agent.TestResult
+	lastTestSettings    *model.AISettings
 	mu                  sync.Mutex
 }
 
@@ -320,7 +370,10 @@ func (m *mockAgentSvc) Status() agent.AgentStatus {
 	}
 }
 
-func (m *mockAgentSvc) TestConnection(ctx context.Context) agent.TestResult {
+func (m *mockAgentSvc) TestConnection(ctx context.Context, settings *model.AISettings) agent.TestResult {
+	m.mu.Lock()
+	m.lastTestSettings = settings
+	m.mu.Unlock()
 	if m.testResult != (agent.TestResult{}) {
 		return m.testResult
 	}

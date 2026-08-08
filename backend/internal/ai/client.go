@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"ticktask/internal/model"
 )
 
 // ErrFunctionCallNotSupported indicates the LLM provider does not support
@@ -578,4 +580,33 @@ type anthropicContentBlock struct {
 // surface does not expose structured tool calls. Returns ErrFunctionCallNotSupported.
 func (c CLIClient) ChatWithTools(ctx context.Context, messages []Message, tools []ToolSpec) (ToolResponse, error) {
 	return ToolResponse{}, ErrFunctionCallNotSupported
+}
+
+// NewClientFromSettings constructs the appropriate LLMClient for a given
+// AISettings. Returns nil if the provider needs an API key and none is set,
+// so callers can distinguish "nothing configured" from "configured but
+// rejected" by checking for nil.
+//
+// Extracted from cmd/server/main.go's constructLLMClient so other packages
+// (notably the agent service's TestConnection temp-settings path) can build
+// one-shot clients without import cycles through main. main.go's
+// constructLLMClient now delegates to this function.
+func NewClientFromSettings(settings *model.AISettings) LLMClient {
+	if settings == nil {
+		return nil
+	}
+	switch settings.Provider {
+	case "claude", "cli":
+		return NewCLIClient()
+	case "anthropic":
+		if settings.APIKey == "" {
+			return nil
+		}
+		return NewAnthropicClient(settings.APIKey, settings.BaseURL, settings.Model)
+	default: // openai / custom / OpenAI-compatible
+		if settings.APIKey == "" {
+			return nil
+		}
+		return NewOpenAIClient(settings.APIKey, settings.BaseURL, settings.Model)
+	}
 }

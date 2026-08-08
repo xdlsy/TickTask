@@ -495,6 +495,7 @@ func (f *fakeSettingsRepo) GetPomodoroSettings() (*model.PomodoroSettings, error
 func (f *fakeSettingsRepo) UpdatePomodoroSettings(*model.PomodoroSettings) error { return nil }
 func (f *fakeSettingsRepo) GetAISettings() (*model.AISettings, error)           { return f.settings, nil }
 func (f *fakeSettingsRepo) UpdateAISettings(*model.AISettings) error            { return nil }
+func (f *fakeSettingsRepo) MigrateLegacyAPIKey() error                          { return nil }
 
 // TestAgentService_Status verifies the Task 22 real Status() implementation
 // against the four meaningful shape cases:
@@ -581,5 +582,113 @@ func TestAgentService_Status(t *testing.T) {
 				t.Errorf("Provider = %q, want %q", got.Provider, tc.wantProvider)
 			}
 		})
+	}
+}
+
+// TestAgentService_TestConnection_DBPath exercises the settings==nil branch:
+// the service falls back to its LLMFactory and reads provider/model from the
+// SettingsRepo. With a working mock LLM, OK should be true and the provider
+// echoed from the saved settings.
+func TestAgentService_TestConnection_DBPath(t *testing.T) {
+	llm := &mockLLM{}
+	factoryCalls := 0
+	factory := func() ai.LLMClient {
+		factoryCalls++
+		return llm
+	}
+	savedSettings := &model.AISettings{Provider: "openai", APIKey: "sk-saved", Model: "gpt-4o-mini"}
+	svc := NewAgentService(AgentDeps{
+		Repo:         newInMemoryRepo(t),
+		LLMFactory:   factory,
+		SettingsRepo: &fakeSettingsRepo{settings: savedSettings},
+		Registry:     NewToolRegistry(),
+		Hub:          &mockHub{},
+	}).(*agentService)
+
+	result := svc.TestConnection(context.Background(), nil)
+	if !result.OK {
+		t.Fatalf("OK = false, want true; err=%s", result.Error)
+	}
+	if result.Provider != "openai" {
+		t.Errorf("Provider = %q, want openai (from DB settings)", result.Provider)
+	}
+	if result.Model != "gpt-4o-mini" {
+		t.Errorf("Model = %q, want gpt-4o-mini (from DB settings)", result.Model)
+	}
+	if factoryCalls != 1 {
+		t.Errorf("LLMFactory called %d times, want 1 (DB path uses factory)", factoryCalls)
+	}
+}
+
+// TestAgentService_TestConnection_DBPath_NilClient verifies the nil-client
+// guard on the DB path: when LLMFactory returns nil, TestConnection short-
+// circuits with a descriptive error rather than panicking on a nil dereference.
+func TestAgentService_TestConnection_DBPath_NilClient(t *testing.T) {
+	svc := NewAgentService(AgentDeps{
+		Repo:         newInMemoryRepo(t),
+		LLMFactory:   func() ai.LLMClient { return nil },
+		SettingsRepo: &fakeSettingsRepo{settings: &model.AISettings{Provider: "openai"}},
+		Registry:     NewToolRegistry(),
+		Hub:          &mockHub{},
+	}).(*agentService)
+
+	result := svc.TestConnection(context.Background(), nil)
+	if result.OK {
+		t.Fatal("OK = true, want false")
+	}
+	if result.Error == "" {
+		t.Fatal("Error empty, want descriptive 'AI not configured' message")
+	}
+}
+
+// TestAgentService_TestConnection_WithTempSettings exercises the settings!=nil
+// branch. Two observable contract points:
+//
+//  1. Provider/Model on the returned TestResult come from the temp settings,
+//     NOT from the DB-stored settings (we set them to different values to make
+//     the assertion meaningful).
+//  2. The temp path bypasses LLMFactory entirely — verified by giving the
+//     factory a panic-on-call sentinel and observing that the test does not
+//     panic. When temp settings lack an API key for an HTTP provider,
+//     ai.NewClientFromSettings returns nil, which the service surfaces as the
+//     "AI 未配置" error rather than calling the factory.
+//
+// This is the closest behavioral proxy for "temp key was forwarded, DB key was
+// not used" available without making NewClientFromSettings injectable. The
+// finer-grained assertion that the underlying HTTP client receives the temp
+// api_key lives implicitly in ai.NewClientFromSettings's own contract (which
+// copies settings.APIKey into the concrete client struct).
+func TestAgentService_TestConnection_WithTempSettings(t *testing.T) {
+	// Sentinel factory that panics if invoked: the temp path must NOT call it.
+	// (If the service ignores the temp settings and falls back to LLMFactory,
+	// this test fails loudly instead of silently returning a passing result.)
+	factory := func() ai.LLMClient {
+		t.Fatal("LLMFactory must not be called when temp settings are provided")
+		return nil
+	}
+	// DB-stored settings differ from temp settings on every field, so any
+	// leakage from DB into the result is observable.
+	savedSettings := &model.AISettings{Provider: "anthropic", APIKey: "sk-from-db", Model: "claude-from-db"}
+	svc := NewAgentService(AgentDeps{
+		Repo:         newInMemoryRepo(t),
+		LLMFactory:   factory,
+		SettingsRepo: &fakeSettingsRepo{settings: savedSettings},
+		Registry:     NewToolRegistry(),
+		Hub:          &mockHub{},
+	}).(*agentService)
+
+	// Temp settings with no API key on an HTTP provider: NewClientFromSettings
+	// returns nil → service must surface the "not configured" error WITHOUT
+	// calling LLMFactory.
+	tempSettings := &model.AISettings{Provider: "openai", APIKey: "", Model: "gpt-4o-mini-temp"}
+	result := svc.TestConnection(context.Background(), tempSettings)
+	if result.OK {
+		t.Fatal("OK = true, want false (no API key on openai provider → nil client)")
+	}
+	if result.Provider != "openai" {
+		t.Errorf("Provider = %q, want openai (from temp settings, not DB)", result.Provider)
+	}
+	if result.Model != "gpt-4o-mini-temp" {
+		t.Errorf("Model = %q, want gpt-4o-mini-temp (from temp settings, not DB)", result.Model)
 	}
 }

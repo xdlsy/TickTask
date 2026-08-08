@@ -134,22 +134,10 @@ func ensureDataDir(path string) error {
 // agent 服务则通过 llmFactory 每轮重新构造（热重载）。
 // nil settings 返回 nil client，调用方需自行处理（Schedule/WorkLog 仍可
 // 接受 nil 路径，但触发 AI 调用时会返回 "API key not configured" 错误）。
+//
+// 实现已下沉到 ai.NewClientFromSettings 以便 agent 包（TestConnection 临时
+// 设置路径）能直接复用而不产生 import cycle。此处保留薄包装以最小化对
+// main.go 其他调用点的扰动；Task 6 会进一步清理此处。
 func constructLLMClient(settings *model.AISettings) ai.LLMClient {
-	if settings == nil {
-		return nil
-	}
-	switch settings.Provider {
-	case "claude", "cli":
-		return ai.NewCLIClient()
-	case "anthropic":
-		if settings.APIKey == "" {
-			return nil
-		}
-		return ai.NewAnthropicClient(settings.APIKey, settings.BaseURL, settings.Model)
-	default: // openai / custom / 兼容 OpenAI 协议
-		if settings.APIKey == "" {
-			return nil
-		}
-		return ai.NewOpenAIClient(settings.APIKey, settings.BaseURL, settings.Model)
-	}
+	return ai.NewClientFromSettings(settings)
 }

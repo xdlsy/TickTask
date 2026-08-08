@@ -34,7 +34,7 @@ type AgentService interface {
 	Confirm(ctx context.Context, msgID string, decision string) error
 	RunTool(ctx context.Context, name string, args json.RawMessage) (any, error)
 	Status() AgentStatus
-	TestConnection(ctx context.Context) TestResult
+	TestConnection(ctx context.Context, settings *model.AISettings) TestResult
 }
 
 // AgentStatus describes runtime capability flags surfaced to the frontend via
@@ -256,14 +256,33 @@ func (s *agentService) Status() AgentStatus {
 	}
 }
 
-// TestConnection constructs a fresh LLMClient from current settings and sends
-// a minimal ChatCompletion ("hi") with a 10s budget. Unlike Status() this
-// verifies the API key actually works against the configured provider.
-func (s *agentService) TestConnection(ctx context.Context) TestResult {
-	settings := s.readSettings()
-	result := TestResult{Provider: settings.Provider, Model: settings.Model}
+// TestConnection sends a minimal ChatCompletion to verify the configured LLM
+// provider actually accepts calls. settings controls what to test:
+//   - settings == nil: use the saved DB settings via LLMFactory (test the
+//     currently-configured key)
+//   - settings != nil: construct a one-shot client from these settings via
+//     ai.NewClientFromSettings (test the form values the user just typed,
+//     before saving)
+//
+// In neither branch are settings written back to the DB. The non-nil branch
+// intentionally bypasses LLMFactory so the test reflects exactly what was
+// passed in, not what is currently persisted.
+func (s *agentService) TestConnection(ctx context.Context, settings *model.AISettings) TestResult {
+	var client ai.LLMClient
+	var provider, model string
 
-	client := s.LLMFactory()
+	if settings != nil {
+		client = ai.NewClientFromSettings(settings)
+		provider = settings.Provider
+		model = settings.Model
+	} else {
+		current := s.readSettings()
+		client = s.LLMFactory()
+		provider = current.Provider
+		model = current.Model
+	}
+
+	result := TestResult{Provider: provider, Model: model}
 	if client == nil {
 		result.Error = "AI 未配置 — 请填写 API Key 或切换到 CLI provider"
 		return result
