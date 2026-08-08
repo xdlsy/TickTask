@@ -65,7 +65,10 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 			s.broadcast(convID, websocket.EventAgentMessage, map[string]any{
 				"conversation_id": convID, "delta_text": resp.Content,
 			})
-			s.Repo.AppendMessage(convID, "assistant", resp.Content, nil, nil, nil, nil)
+			if _, err := s.Repo.AppendMessage(convID, "assistant", resp.Content, nil, nil, nil, nil); err != nil {
+				s.broadcastDone(convID, "error")
+				return err
+			}
 		}
 		if len(resp.ToolCalls) == 0 {
 			s.broadcastDone(convID, "stop")
