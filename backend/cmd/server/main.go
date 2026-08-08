@@ -3,17 +3,19 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"ticktask/internal/agent"
 	"ticktask/internal/agent/tools"
 	"ticktask/internal/ai"
 	"ticktask/internal/api"
-	"ticktask/internal/model"
 	"ticktask/internal/repository"
 	"ticktask/internal/service"
 	"ticktask/internal/websocket"
 	"ticktask/pkg/config"
 	"ticktask/pkg/database"
 	"ticktask/pkg/logger"
+	"ticktask/pkg/vault"
 )
 
 func main() {
@@ -33,6 +35,18 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Initialize the .keyvault BEFORE opening the DB: we need the vault ready
+	// to construct the encrypted settingRepo, and the migration runs against
+	// a freshly-opened DB right after seed.
+	vaultPath := filepath.Join(filepath.Dir(cfg.Database.Path), ".keyvault")
+	v, err := vault.New(vaultPath)
+	if err != nil {
+		log.Fatalf("vault load: %v", err)
+	}
+	if err := v.Init(); err != nil {
+		log.Fatalf("vault init: %v", err)
+	}
+
 	// 初始化数据库
 	db, err := database.Init(cfg.Database.Path)
 	if err != nil {
@@ -48,9 +62,29 @@ func main() {
 	// 初始化 Repository
 	taskRepo := repository.NewTaskRepository(db)
 	sessionRepo := repository.NewSessionRepository(db)
-	settingRepo := repository.NewSettingRepository(db)
+	settingRepo := repository.NewSettingRepository(db, v)
 	analyticsRepo := repository.NewAnalyticsRepository(db)
 	scheduleRepo := repository.NewScheduleRepository(db)
+
+	// One-time legacy api_key migration. Idempotent — runs once on first
+	// post-upgrade startup, becomes a no-op afterwards.
+	if err := settingRepo.MigrateLegacyAPIKey(); err != nil {
+		log.Fatalf("legacy api_key migration: %v", err)
+	}
+
+	// Safety net: honor TT_AI_API_KEY one last time. If env is set AND the DB
+	// has no encrypted key yet (fresh install, user just upgraded), persist
+	// the env key into encrypted storage and warn the user to remove the env.
+	if envKey := os.Getenv("TT_AI_API_KEY"); envKey != "" {
+		envAI, _ := settingRepo.GetAISettings()
+		if envAI != nil && envAI.APIKey == "" {
+			logger.Logger.Warn("TT_AI_API_KEY env detected; migrating to encrypted storage. Remove this env var from your shell/scripts.")
+			envAI.APIKey = envKey
+			if err := settingRepo.UpdateAISettings(envAI); err != nil {
+				logger.Logger.Warn("env api_key migration failed", "err", err)
+			}
+		}
+	}
 
 	// 初始化 WebSocket Hub
 	wsHub := websocket.NewHub()
@@ -62,13 +96,12 @@ func main() {
 
 	// 构造共享的 LLMClient：Schedule / WorkLog 两处服务只调用 ChatCompletion，
 	// 启动期一次性构造即可（用户极少在运行中切换 provider）。
-	// 之前这段逻辑散落在 AIService 内部 + main 里的 agentLLM 重复块（Task 14 引入），
-	// Task 15 删除 AIService 后此处成为唯一构造点。
+	// Task 4 把构造逻辑下沉到 ai.NewClientFromSettings，此处直接复用。
 	aiSettings, err := settingRepo.GetAISettings()
 	if err != nil {
 		aiSettings = nil
 	}
-	llm := constructLLMClient(aiSettings)
+	llm := ai.NewClientFromSettings(aiSettings)
 
 	// llmFactory 在 agent 每一轮调用时按当前 settings 重新构造 LLM 客户端，
 	// 这样用户在 Settings 页切换 provider / 修改 API key 后无需重启即可生效
@@ -79,7 +112,7 @@ func main() {
 		if err != nil || current == nil {
 			return llm // 回落到启动期构造的客户端
 		}
-		return constructLLMClient(current)
+		return ai.NewClientFromSettings(current)
 	}
 
 	// 初始化 Schedule Service
@@ -127,17 +160,4 @@ func main() {
 func ensureDataDir(path string) error {
 	// 简化处理，确保目录存在
 	return nil
-}
-
-// constructLLMClient 根据 AISettings 构造一个 LLMClient 实例。
-// 提取自启动期的内联 switch：Schedule / WorkLog 仍按启动期配置取一次，
-// agent 服务则通过 llmFactory 每轮重新构造（热重载）。
-// nil settings 返回 nil client，调用方需自行处理（Schedule/WorkLog 仍可
-// 接受 nil 路径，但触发 AI 调用时会返回 "API key not configured" 错误）。
-//
-// 实现已下沉到 ai.NewClientFromSettings 以便 agent 包（TestConnection 临时
-// 设置路径）能直接复用而不产生 import cycle。此处保留薄包装以最小化对
-// main.go 其他调用点的扰动；Task 6 会进一步清理此处。
-func constructLLMClient(settings *model.AISettings) ai.LLMClient {
-	return ai.NewClientFromSettings(settings)
 }
