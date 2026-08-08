@@ -127,6 +127,21 @@ func TestAgentService_NoToolCall(t *testing.T) {
 	if events[0].Type != "agent_message" {
 		t.Errorf("first event = %q", events[0].Type)
 	}
+	// agent_message payload must include a non-empty message_id alongside
+	// conversation_id and delta_text (spec contract for the WS event).
+	msgPayload, ok := events[0].Payload.(map[string]any)
+	if !ok {
+		t.Fatalf("agent_message payload not map[string]any: %T", events[0].Payload)
+	}
+	if msgID, _ := msgPayload["message_id"].(string); msgID == "" {
+		t.Errorf("agent_message.message_id = %q, want non-empty", msgID)
+	}
+	if got := msgPayload["delta_text"]; got != "hi there" {
+		t.Errorf("agent_message.delta_text = %v, want %q", got, "hi there")
+	}
+	if got := msgPayload["conversation_id"]; got != conv.ID {
+		t.Errorf("agent_message.conversation_id = %v, want %q", got, conv.ID)
+	}
 	if events[1].Type != "agent_done" {
 		t.Errorf("last event = %q", events[1].Type)
 	}
@@ -160,21 +175,20 @@ func TestAgentService_NoToolCall_RepoAppendError(t *testing.T) {
 		t.Fatalf("appendCalls = %d, want 2", repo.appendCalls)
 	}
 
-	// Expect exactly 2 broadcasts: the agent_message (sent before the failed
-	// persistence) and a single agent_done with finish_reason="error".
+	// With persist-first ordering (AppendMessage runs before the
+	// agent_message broadcast), a failed assistant-append short-circuits
+	// BEFORE any agent_message is emitted. The only expected broadcast is a
+	// single agent_done with finish_reason="error".
 	events := hub.snapshot()
-	if len(events) != 2 {
-		t.Fatalf("events = %d, want 2: %+v", len(events), events)
+	if len(events) != 1 {
+		t.Fatalf("events = %d, want 1: %+v", len(events), events)
 	}
-	if events[0].Type != websocket.EventAgentMessage {
-		t.Errorf("first event = %q, want %q", events[0].Type, websocket.EventAgentMessage)
+	if events[0].Type != websocket.EventAgentDone {
+		t.Errorf("only event = %q, want %q", events[0].Type, websocket.EventAgentDone)
 	}
-	if events[1].Type != websocket.EventAgentDone {
-		t.Errorf("last event = %q, want %q", events[1].Type, websocket.EventAgentDone)
-	}
-	payload, ok := events[1].Payload.(map[string]any)
+	payload, ok := events[0].Payload.(map[string]any)
 	if !ok {
-		t.Fatalf("agent_done payload not map[string]any: %T", events[1].Payload)
+		t.Fatalf("agent_done payload not map[string]any: %T", events[0].Payload)
 	}
 	if got := payload["finish_reason"]; got != "error" {
 		t.Errorf("finish_reason = %v, want %q", got, "error")

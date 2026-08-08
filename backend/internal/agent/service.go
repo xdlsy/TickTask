@@ -81,13 +81,14 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 			return err
 		}
 		if resp.Content != "" {
-			s.broadcast(convID, websocket.EventAgentMessage, map[string]any{
-				"conversation_id": convID, "delta_text": resp.Content,
-			})
-			if _, err := s.Repo.AppendMessage(convID, "assistant", resp.Content, nil, nil, nil, nil); err != nil {
+			msgID, err := s.Repo.AppendMessage(convID, "assistant", resp.Content, nil, nil, nil, nil)
+			if err != nil {
 				s.broadcastDone(convID, "error")
 				return err
 			}
+			s.broadcast(convID, websocket.EventAgentMessage, map[string]any{
+				"conversation_id": convID, "message_id": msgID, "delta_text": resp.Content,
+			})
 		}
 		if len(resp.ToolCalls) == 0 {
 			s.broadcastDone(convID, "stop")
