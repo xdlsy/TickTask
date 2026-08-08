@@ -134,7 +134,7 @@ cd frontend && npx vitest                # Watch mode
 - Stores: test initial state, each action (success + error paths), computed
 - Type checking: `npx vue-tsc --noEmit`
 - Coverage: `@vitest/coverage-v8` installed
-- **Known red baseline:** `npx vitest run` reports exactly **11 pre-existing failures** unrelated to features — 10 schedule event-color tests (jsdom keeps `#hex`, tests assert `rgb(...)`) + 1 stale `Settings scheduling_strategy` test. The vitest "Test Files failed" count is also inflated by unhandled Vue warns. Compare against this baseline before attributing any failure to current work.
+- **Test baseline is green:** `npx vitest run` is fully green. The prior 11-failure red baseline (10 schedule event-color tests asserting `rgb(...)` while happy-dom emits hex, plus a stale `Settings scheduling_strategy` test for a removed field) has been fixed — schedule tests now assert hex verbatim, the dead `scheduling_strategy` block was removed, and Playwright `tests/e2e/**` is excluded from the vitest run. CI (`.github/workflows/ci.yml`) runs `go test ./...`, `vue-tsc --noEmit`, and `vitest run` on every push to `main` and on PRs, so a new failure should be attributed to the change that introduced it.
 
 ## Commit & PR Conventions [✓ auto]
 
