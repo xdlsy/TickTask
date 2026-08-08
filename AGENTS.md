@@ -13,6 +13,7 @@ Key features:
 - Recurring tasks with preferred time slots and AI scheduling integration
 - Usage analytics (focus time, completion rates, quadrant distribution)
 - Work log: brain-dump → AI-structured 4-dimensional items → daily logs → layered period reports (weekly/monthly/halfyear/yearly)
+- Data management: JSON backup export/import with per-module conflict resolution (preview → apply with policies), plus clear-all-data (atomic wipe of all user data; `Setting`/config retained)
 
 **Tech stack**: Go 1.21 / Gin 1.10 / GORM 1.25 / SQLite | Vue 3.5 / Pinia 2.2 / Element Plus 2.8 / Vite 5.4 / TypeScript 5.6 (strict)
 
@@ -23,12 +24,12 @@ TickTask/
 ├── backend/                    # Go backend (Gin + GORM + SQLite)
 │   ├── cmd/server/main.go      # Entry point — manual DI wiring
 │   ├── internal/
-│   │   ├── model/              # Domain models: Task, Session, Schedule, Setting, Analytics, WorkLog/WorkItem/WorkReport
-│   │   ├── repository/         # Data access (GORM/SQLite), interface + private struct, 6 repos (incl. work_log_repo) + errors.go
-│   │   ├── service/            # Business logic: Task, Timer, AI, Schedule, Analytics, WorkLog (incl. work_log_calendar)
+│   │   ├── model/              # Domain models: Task, Session, Schedule, Setting, Analytics, WorkLog/WorkItem/WorkReport, Backup (envelope/preview/apply/clear DTOs)
+│   │   ├── repository/         # Data access (GORM/SQLite), interface + private struct, 7 repos (incl. work_log_repo + data_repo/BackupRepository) + errors.go
+│   │   ├── service/            # Business logic: Task, Timer, AI, Schedule, Analytics, WorkLog, Data (incl. work_log_calendar)
 │   │   ├── ai/                 # OpenAI-compatible client + prompt templates (incl. work_log_prompts)
 │   │   ├── api/
-│   │   │   ├── handler/        # Thin HTTP handlers (7), bind JSON -> service -> JSON
+│   │   │   ├── handler/        # Thin HTTP handlers (8), bind JSON -> service -> JSON
 │   │   │   └── middleware/     # CORS middleware
 │   │   └── websocket/          # WebSocket hub for real-time timer broadcasts
 │   ├── pkg/                    # Shared: config (YAML), database (SQLite+seed), logger (slog)
@@ -109,6 +110,7 @@ cd frontend && npx vitest                # Watch mode
 - Stores: `useXxxStore` naming, Composition API `defineStore`
 - API methods: CRUD-prefix (`getTasks`, `createTask`, `updateTask`)
 - CSS: kebab-case classes, design tokens as CSS custom properties in `App.vue`
+- Element Plus dark theme ("Atelier Noir"): dark base imported in `main.ts`, `<html class="dark">` in `index.html`, `--el-*` overrides in `App.vue :root`. Prefer global tokens over per-component theming; use scoped `:deep()` only for components the globals don't cover (e.g. `el-slider`). Never hardcode light colors.
 - TypeScript: `strict: true`, `noUnusedLocals`, `noUnusedParameters`
 - No ESLint/Prettier configured (strict TS compiler acts as baseline check)
 
@@ -116,7 +118,7 @@ cd frontend && npx vitest                # Watch mode
 
 **Backend (Go):**
 - Framework: standard `testing` package (no testify/gomock)
-- Test files co-located: `*_test.go` (10 files across handler/ and service/)
+- Test files co-located: `*_test.go` (21 files across handler/, service/, repository/)
 - Mock repos: manual structs with in-memory `map[string]*Model`, implement full interface
 - Shared mocks: `backend/internal/api/handler/mocks_test.go`
 - Table-driven test patterns for combinatorial logic (e.g., quadrant calculation)
@@ -125,13 +127,14 @@ cd frontend && npx vitest                # Watch mode
 
 **Frontend (Vitest):**
 - Framework: Vitest 2.1 + `@vue/test-utils` + jsdom
-- Test files co-located: `*.test.ts` and `*.spec.ts` (26 files)
+- Test files co-located: `*.test.ts` and `*.spec.ts` (31 files)
 - Pinia isolation: `setActivePinia(createPinia())` in each `beforeEach`
 - Mocking: `vi.mock()` for stores, API client, router, WebSocket, `ElMessage`
 - Components: test rendering, emits, computed properties, method behavior
 - Stores: test initial state, each action (success + error paths), computed
 - Type checking: `npx vue-tsc --noEmit`
 - Coverage: `@vitest/coverage-v8` installed
+- **Known red baseline:** `npx vitest run` reports exactly **11 pre-existing failures** unrelated to features — 10 schedule event-color tests (jsdom keeps `#hex`, tests assert `rgb(...)`) + 1 stale `Settings scheduling_strategy` test. The vitest "Test Files failed" count is also inflated by unhandled Vue warns. Compare against this baseline before attributing any failure to current work.
 
 ## Commit & PR Conventions [✓ auto]
 
@@ -139,7 +142,7 @@ cd frontend && npx vitest                # Watch mode
 ```
 feat: add schedule revision UI (Story 1.2)
 fix: prevent null-events crash when applying schedule revision
-refactor: redesign frontend with refined editorial minimalism aesthetic
+refactor: redesign frontend with "Atelier Noir" dark theme
 docs: add bug fix workflow report for null-events crash
 ```
 Prefixes: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`
@@ -163,12 +166,14 @@ Prefixes: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`
 - SQLite is single-writer; concurrent writes during timer sessions are not stress-tested
 - Frontend stores call the API client directly — no intermediate service layer
 - Topological dependency order must be respected when adding new cross-cutting packages
+- **Growing a Go interface** = update every implementor (the real struct + test mocks, often in another package's `*_test.go`) in the same change, or packages won't compile
+- **GORM migrations are additive only** (`AutoMigrate` in `pkg/database`); no destructive/auto-down migrations. "Clear all data" is an app-level transactional delete, never a schema drop
+- **Frontend is a dark theme** — reuse `App.vue` tokens; never hardcode light colors or hand-theme Element Plus (it inherits global `--el-*` dark overrides; see Coding Style)
+- **Branch topology**: `main` and the `evolve/*` lines have **unrelated histories** (different root commits) — they cannot be cleanly merged; `evolve/*` is the active development line
 
-<!-- HUMAN_REVIEW: 请补充以下内容：
-- 数据库迁移规则（GORM AutoMigrate 的使用限制、是否允许 destructive migration）
+<!-- HUMAN_REVIEW (still open):
 - AI API 调用的 rate limiting 和 error handling 策略
 - 前端 dist/ 的部署流程（是否有 nginx 配置、CDN 策略）
-- Element Plus 组件的自定义覆盖规则（避免全局样式污染）
 - 已知的性能瓶颈（大量任务时的查询性能、WebSocket 消息频率上限）
 -->
 
