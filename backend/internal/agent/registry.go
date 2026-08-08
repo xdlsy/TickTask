@@ -2,6 +2,8 @@ package agent
 
 import (
 	"errors"
+
+	"ticktask/internal/ai"
 )
 
 var (
@@ -13,13 +15,8 @@ type ToolRegistry interface {
 	Register(t Tool)
 	MustRegister(t Tool) // panics on duplicate (used at startup)
 	Lookup(name string) (Tool, error)
-	ToOpenAITools() []OpenAIToolSpec
+	ToOpenAITools() []ai.ToolSpec
 	ListByPermission(p ToolPermission) []Tool
-}
-
-type OpenAIToolSpec struct {
-	Type     string       `json:"type"`
-	Function FunctionSpec `json:"function"`
 }
 
 type toolRegistry struct{ tools map[string]Tool }
@@ -48,17 +45,24 @@ func (r *toolRegistry) Lookup(name string) (Tool, error) {
 	return t, nil
 }
 
-func (r *toolRegistry) ToOpenAITools() []OpenAIToolSpec {
-	specs := make([]OpenAIToolSpec, 0, len(r.tools))
+func (r *toolRegistry) ToOpenAITools() []ai.ToolSpec {
+	specs := make([]ai.ToolSpec, 0, len(r.tools))
 	for _, t := range r.tools {
 		s := t.Schema()
 		// ToolSchema.Name is the canonical tool identifier; ensure OpenAI's
 		// function.name mirrors it so the model can reference the tool.
-		fn := s.Function
-		if fn.Name == "" {
-			fn.Name = s.Name
+		name := s.Function.Name
+		if name == "" {
+			name = s.Name
 		}
-		specs = append(specs, OpenAIToolSpec{Type: "function", Function: fn})
+		specs = append(specs, ai.ToolSpec{
+			Type: "function",
+			Function: ai.FunctionSpec{
+				Name:        name,
+				Description: s.Function.Description,
+				Parameters:  s.Function.Parameters,
+			},
+		})
 	}
 	return specs
 }

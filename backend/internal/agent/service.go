@@ -1,0 +1,106 @@
+package agent
+
+import (
+	"context"
+	"encoding/json"
+
+	"ticktask/internal/ai"
+	"ticktask/internal/repository"
+	"ticktask/internal/websocket"
+)
+
+// HubBroadcaster abstracts the websocket.Hub so the agent service can broadcast
+// events without depending on the concrete Hub type. Mirrors *websocket.Hub's
+// Broadcast(message interface{}) signature.
+type HubBroadcaster interface {
+	Broadcast(message interface{})
+}
+
+type AgentDeps struct {
+	Repo     repository.AgentRepository
+	LLM      ai.LLMClient
+	Registry ToolRegistry
+	Hub      HubBroadcaster
+	System   string
+}
+
+type AgentService interface {
+	SendMessage(ctx context.Context, convID, text string) error
+	Confirm(ctx context.Context, msgID string, decision string) error
+	RunTool(ctx context.Context, name string, args json.RawMessage) (any, error)
+}
+
+type agentService struct{ AgentDeps }
+
+func NewAgentService(d AgentDeps) AgentService {
+	if d.System == "" {
+		d.System = DefaultSystemPrompt
+	}
+	return &agentService{AgentDeps: d}
+}
+
+func (s *agentService) SendMessage(ctx context.Context, convID, text string) error {
+	if _, err := s.Repo.GetConversation(convID); err != nil {
+		return err
+	}
+	if _, err := s.Repo.AppendMessage(convID, "user", text, nil, nil, nil, nil); err != nil {
+		return err
+	}
+	return s.runTurn(ctx, convID, 0)
+}
+
+func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int) error {
+	for toolCount < MaxToolCallsPerTurn {
+		history, err := s.Repo.LoadRecentMessages(convID, MaxContextMessages)
+		if err != nil {
+			return err
+		}
+		msgs := buildLLMMessages(s.System, history)
+		resp, err := s.LLM.ChatWithTools(ctx, msgs, s.Registry.ToOpenAITools())
+		if err != nil {
+			s.broadcastDone(convID, "error")
+			return err
+		}
+		if resp.Content != "" {
+			s.broadcast(convID, websocket.EventAgentMessage, map[string]any{
+				"conversation_id": convID, "delta_text": resp.Content,
+			})
+			s.Repo.AppendMessage(convID, "assistant", resp.Content, nil, nil, nil, nil)
+		}
+		if len(resp.ToolCalls) == 0 {
+			s.broadcastDone(convID, "stop")
+			return nil
+		}
+		// Tool execution handled in Tasks 6-9
+		s.broadcastDone(convID, "stop")
+		return nil
+	}
+	s.broadcastDone(convID, "max_tools")
+	return nil
+}
+
+func (s *agentService) Confirm(ctx context.Context, msgID, decision string) error {
+	return nil // implemented in Task 7
+}
+
+func (s *agentService) RunTool(ctx context.Context, name string, args json.RawMessage) (any, error) {
+	t, err := s.Registry.Lookup(name)
+	if err != nil {
+		return nil, err
+	}
+	return t.Execute(ctx, args)
+}
+
+func (s *agentService) broadcast(convID, eventType string, payload map[string]any) {
+	msg := map[string]any{"type": eventType}
+	for k, v := range payload {
+		msg[k] = v
+	}
+	s.Hub.Broadcast(msg)
+}
+
+func (s *agentService) broadcastDone(convID, reason string) {
+	s.broadcast(convID, websocket.EventAgentDone, map[string]any{
+		"conversation_id": convID, "finish_reason": reason,
+	})
+}
