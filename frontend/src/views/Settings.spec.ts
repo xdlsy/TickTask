@@ -124,3 +124,70 @@ describe('Settings.vue — API Key input', () => {
     )
   })
 })
+
+describe('Settings.vue — vendor presets', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('handleProviderChange fills baseURL + default model for a known vendor', async () => {
+    const { api } = await import('@/api/client')
+    ;(api.getSettings as any).mockResolvedValue(mockSettingsResponse())
+
+    const wrapper = mount(Settings, { global: { stubs: elStubs } })
+    await flushPromises()
+
+    ;(wrapper.vm as any).aiSettings.provider = 'minimax'
+    ;(wrapper.vm as any).handleProviderChange()
+
+    expect((wrapper.vm as any).aiSettings.base_url).toBe('https://api.minimaxi.com/anthropic')
+    expect((wrapper.vm as any).aiSettings.model).toBe('MiniMax-M3')
+    expect((wrapper.vm as any).availableModels).toEqual([
+      'MiniMax-M3',
+      'MiniMax-M2.7',
+      'MiniMax-M2.7-highspeed',
+      'MiniMax-M2.5',
+    ])
+  })
+
+  it('handleProviderChange clears baseURL + model for custom', async () => {
+    const { api } = await import('@/api/client')
+    ;(api.getSettings as any).mockResolvedValue(mockSettingsResponse())
+
+    const wrapper = mount(Settings, { global: { stubs: elStubs } })
+    await flushPromises()
+
+    ;(wrapper.vm as any).aiSettings.provider = 'custom'
+    ;(wrapper.vm as any).handleProviderChange()
+
+    expect((wrapper.vm as any).aiSettings.base_url).toBe('')
+    expect((wrapper.vm as any).aiSettings.model).toBe('')
+    expect((wrapper.vm as any).availableModels).toEqual([])
+  })
+
+  it('renders the vendor presets as provider options', async () => {
+    const { api } = await import('@/api/client')
+    ;(api.getSettings as any).mockResolvedValue(mockSettingsResponse())
+
+    const wrapper = mount(Settings, { global: { stubs: elStubs } })
+    await flushPromises()
+
+    // The el-option stub exposes the id via the <option> value attribute (the
+    // `label` prop is not rendered as slot text by this stub). Vendor ids are
+    // unique to the provider dropdown, so membership is a robust check.
+    const values = wrapper.findAll('option').map((o) => o.attributes('value'))
+    for (const expected of [
+      'openai',
+      'anthropic',
+      'deepseek',
+      'qwen',
+      'zhipu',
+      'moonshot',
+      'minimax',
+      'custom',
+    ]) {
+      expect(values).toContain(expected)
+    }
+  })
+})
