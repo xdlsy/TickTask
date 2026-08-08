@@ -85,6 +85,15 @@ func TestJsonTracer_PerConversationFile(t *testing.T) {
 	}
 }
 
+func TestSelectTracerFromEnv(t *testing.T) {
+	if _, ok := SelectTracerFromEnv(func(string) string { return "" }).(noopTracer); !ok {
+		t.Fatal("empty env should yield noopTracer")
+	}
+	if _, ok := SelectTracerFromEnv(func(string) string { return t.TempDir() }).(*jsonTracer); !ok {
+		t.Fatal("set env should yield *jsonTracer")
+	}
+}
+
 func splitLines(s string) []string {
 	var out []string
 	cur := ""

@@ -81,3 +81,9 @@ func selectTracer(dir string) TraceRecorder {
 	}
 	return &jsonTracer{dir: dir}
 }
+
+// SelectTracerFromEnv reads TICKTASK_TRACE_DIR via the given getter (os.Getenv
+// in main, injectable for tests). Empty -> noop, non-empty -> jsonTracer.
+func SelectTracerFromEnv(getenv func(string) string) TraceRecorder {
+	return selectTracer(getenv("TICKTASK_TRACE_DIR"))
+}

@@ -144,6 +144,7 @@ func main() {
 		Registry:     registry,
 		Hub:          wsHub,
 		System:       agent.DefaultSystemPrompt,
+		Tracer:       agent.SelectTracerFromEnv(os.Getenv),
 	})
 
 	// 设置路由
