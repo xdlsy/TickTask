@@ -37,7 +37,7 @@
           <el-dropdown-menu>
             <el-dropdown-item v-if="task.status !== 'completed'" command="startTimer">开始番茄</el-dropdown-item>
             <el-dropdown-item command="edit">编辑</el-dropdown-item>
-            <el-dropdown-item command="ai-classify" :disabled="aiStore.loading">AI 智能分类</el-dropdown-item>
+            <el-dropdown-item command="ai-classify" :disabled="aiClassifying">AI 智能分类</el-dropdown-item>
             <el-dropdown-item command="complete" v-if="task.status !== 'completed'">完成</el-dropdown-item>
             <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
           </el-dropdown-menu>
@@ -70,7 +70,7 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { TaskResponse, TaskStatus, ClassificationResult } from '@/types'
 import { QUADRANT_INFO } from '@/types'
-import { useAIStore } from '@/stores/ai'
+import { useAgentStore } from '@/stores/agent'
 import { useTaskStore } from '@/stores/task'
 import { useTimerStore } from '@/stores/timer'
 import { useRouter } from 'vue-router'
@@ -78,12 +78,13 @@ import { useRouter } from 'vue-router'
 interface Props { task: TaskResponse; mode?: 'card' | 'row' }
 const props = defineProps<Props>()
 const emit = defineEmits<{ 'drag-start': [event: DragEvent, task: TaskResponse]; 'edit': [task: TaskResponse]; 'complete': [id: string]; 'delete': [id: string]; 'start-pomodoro': [taskId: string]; 'show-detail': [task: TaskResponse] }>()
-const aiStore = useAIStore()
+const agentStore = useAgentStore()
 const taskStore = useTaskStore()
 const timerStore = useTimerStore()
 const router = useRouter()
 const showClassifyResult = ref(false)
 const classifyResult = ref<ClassificationResult | null>(null)
+const aiClassifying = ref(false)
 const statusLabels: Record<TaskStatus, string> = { todo: '待办', in_progress: '进行中', completed: '已完成', cancelled: '已取消' }
 const statusLabel = computed(() => statusLabels[props.task.status])
 
@@ -106,8 +107,14 @@ async function startTimerForTask() {
 }
 
 async function doClassify() {
-  if (!aiStore.configured) { ElMessage.warning('请先在设置中配置 AI API Key'); router.push('/settings'); return }
-  try { const r = await aiStore.classifyTask(props.task.id); if (r) { classifyResult.value = r; showClassifyResult.value = true } } catch { ElMessage.error('AI 分类失败') }
+  if (!agentStore.status.configured) { ElMessage.warning('请先在设置中配置 AI API Key'); router.push('/settings'); return }
+  aiClassifying.value = true
+  try {
+    const r = await agentStore.runTool('classify_task', { task_id: props.task.id }) as ClassificationResult | null
+    if (r) { classifyResult.value = r; showClassifyResult.value = true }
+  } catch { ElMessage.error('AI 分类失败') } finally {
+    aiClassifying.value = false
+  }
 }
 
 async function applyClassification() {

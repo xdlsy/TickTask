@@ -163,7 +163,7 @@
           </svg>
           <span>AI 智能助手</span>
         </div>
-        <el-tag v-if="aiStore.configured" type="success" size="large" effect="dark">已配置</el-tag>
+        <el-tag v-if="agentStore.status.configured" type="success" size="large" effect="dark">已配置</el-tag>
         <el-tag v-else type="info" size="large">未配置</el-tag>
       </div>
 
@@ -182,7 +182,7 @@
           <el-input
             v-model="aiSettings.api_key"
             type="password"
-            placeholder="请输入 API Key"
+            :placeholder="apiKeyPlaceholder"
             show-password
             size="large"
           />
@@ -301,11 +301,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/api/client'
-import { useAIStore } from '@/stores/ai'
+import { useAgentStore } from '@/stores/agent'
 import ImportWizard from '@/components/settings/ImportWizard.vue'
 import type { PomodoroSettings, AISettings, ClearResult } from '@/types'
 
-const aiStore = useAIStore()
+const agentStore = useAgentStore()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -328,6 +328,17 @@ const aiSettings = ref<AISettings>({
   api_key: '',
   base_url: 'https://api.openai.com/v1',
   model: 'gpt-4o-mini'
+})
+
+// Preview 单独存,不参与 form 数据 — form 中 api_key 永远是 ''(用户输入覆盖)。
+// 后端 GET /settings 不再返回明文/掩码 api_key,只回 api_key_preview 用来显示。
+const aiSettingsPreview = ref<string>('')
+
+const apiKeyPlaceholder = computed(() => {
+  if (aiSettingsPreview.value) {
+    return `已设置 (${aiSettingsPreview.value}),留空保留;输入新值覆盖`
+  }
+  return '请输入 API Key'
 })
 
 const openaiModels = ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo']
@@ -389,7 +400,16 @@ async function loadSettings() {
       }
     }
     if (res.data.ai) {
-      aiSettings.value = res.data.ai
+      // 关键:GET /settings 不再回明文/掩码 api_key(只有 api_key_preview)。
+      // form 永远从 '' 开始 — 用户输入新值覆盖,留空则 saveAISettings 时
+      // 后端按"空 api_key = 保留原 key"语义处理。
+      aiSettings.value = {
+        provider: res.data.ai.provider,
+        api_key: '',
+        base_url: res.data.ai.base_url,
+        model: res.data.ai.model,
+      }
+      aiSettingsPreview.value = res.data.ai.api_key_preview ?? ''
     }
   } catch (error) {
     ElMessage.error('加载设置失败')
@@ -425,7 +445,7 @@ async function saveAISettings() {
   saving.value = true
   try {
     await api.updateAISettings(aiSettings.value)
-    await aiStore.checkStatus()
+    await agentStore.checkStatus()
     ElMessage.success('AI 设置已保存')
   } catch (error) {
     ElMessage.error('保存失败')
@@ -435,22 +455,42 @@ async function saveAISettings() {
 }
 
 async function testAIConnection() {
-  if (!aiSettings.value.api_key) {
+  // 兜底:form 中无 key 且后端也没存 key → 没法测,提示用户输入
+  if (!aiSettings.value.api_key && !aiSettingsPreview.value) {
     ElMessage.warning('请先输入 API Key')
     return
   }
 
   testing.value = true
   try {
-    await api.updateAISettings(aiSettings.value)
-    await aiStore.checkStatus()
-    if (aiStore.configured) {
-      ElMessage.success('AI 服务连接成功')
+    // 关键改动:不调 updateAISettings — 测试连接应当允许"试探性" key 而不持久化。
+    // 直接把 form 中的临时值传给 /agent/test;api_key 为空时后端从 DB 读已存的。
+    const r = await api.agent.test({
+      provider: aiSettings.value.provider,
+      api_key: aiSettings.value.api_key,
+      base_url: aiSettings.value.base_url,
+      model: aiSettings.value.model,
+    })
+    const result = r.data
+    if (result.ok) {
+      const latency = result.latency_ms ? ` · ${result.latency_ms}ms` : ''
+      const model = result.model ? ` · ${result.model}` : ''
+      ElMessage.success(`${result.provider}${model} 连接成功${latency}`)
     } else {
-      ElMessage.error('AI 服务连接失败，请检查配置')
+      const errMsg = result.error ? `: ${result.error}` : ' — 请检查 API Key、BaseURL、Model 与网络'
+      ElMessage({
+        type: 'error',
+        message: `${result.provider} 连接失败${errMsg}`,
+        duration: 8000,
+      })
     }
-  } catch (error) {
-    ElMessage.error('连接测试失败，请检查 API Key 和网络')
+  } catch (error: any) {
+    const detail = error?.response?.data?.error || error?.message || '未知错误'
+    ElMessage({
+      type: 'error',
+      message: `连接测试请求失败: ${detail}`,
+      duration: 8000,
+    })
   } finally {
     testing.value = false
   }
@@ -532,7 +572,7 @@ async function clearAllData() {
 
 async function onImported() {
   await loadSettings()
-  await aiStore.checkStatus()
+  await agentStore.checkStatus()
 }
 
 onMounted(() => {

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"ticktask/internal/ai"
 	"ticktask/internal/model"
 	"ticktask/internal/repository"
 	"ticktask/internal/service"
@@ -114,30 +116,26 @@ func (r *handlerTestRepo) UpdateWorkLogSummary(date string, summary string) erro
 	return errors.New("UpdateWorkLogSummary not supported in this mock")
 }
 
-// ── Mock AI client for handler tests ──
+// ── Mock LLM client for handler tests ──
+//
+// WorkLogService 现在直接持有 ai.LLMClient（Task 15 移除 WorkLogAIClient 后）。
+// 这个 mock 实现完整的 LLMClient 接口（ChatCompletion + ChatWithTools），
+// 让 handler 测试可以注入 canned LLM 响应来验证 wire-up。
 
-type handlerMockAIClient struct {
-	structuredOut *service.StructuredWorkLog
-	structuredErr error
+type handlerMockLLM struct {
+	chatOut string
+	chatErr error
 }
 
-func (m *handlerMockAIClient) StructureBrainDump(input service.BrainDumpInput) (*service.StructuredWorkLog, error) {
-	if m.structuredErr != nil {
-		return nil, m.structuredErr
+func (m *handlerMockLLM) ChatCompletion(ctx context.Context, prompt string) (string, error) {
+	if m.chatErr != nil {
+		return "", m.chatErr
 	}
-	return m.structuredOut, nil
+	return m.chatOut, nil
 }
-func (m *handlerMockAIClient) GenerateWeeklyReport(items []model.WorkItem, start, end string) (*service.ReportSummary, error) {
-	return nil, errors.New("not impl")
-}
-func (m *handlerMockAIClient) GenerateMonthlyReport(w []*model.WorkReport, o []model.WorkItem, start, end string) (*service.ReportSummary, error) {
-	return nil, errors.New("not impl")
-}
-func (m *handlerMockAIClient) GenerateHalfYearReport(mo []*model.WorkReport, start, end string) (*service.ReportSummary, error) {
-	return nil, errors.New("not impl")
-}
-func (m *handlerMockAIClient) GenerateYearlyReport(mo []*model.WorkReport, start, end string) (*service.ReportSummary, error) {
-	return nil, errors.New("not impl")
+
+func (m *handlerMockLLM) ChatWithTools(ctx context.Context, messages []ai.Message, tools []ai.ToolSpec) (ai.ToolResponse, error) {
+	return ai.ToolResponse{}, ai.ErrFunctionCallNotSupported
 }
 
 // ── Helpers ──
@@ -157,8 +155,8 @@ func newTestWorkLogRouter(svc *service.WorkLogService) *gin.Engine {
 	return r
 }
 
-func newHandlerService(repo *handlerTestRepo, ai service.WorkLogAIClient) *service.WorkLogService {
-	return service.NewWorkLogService(repo, nil, nil, ai)
+func newHandlerService(repo *handlerTestRepo, llm ai.LLMClient) *service.WorkLogService {
+	return service.NewWorkLogService(repo, nil, nil, llm)
 }
 
 func doJSON(t *testing.T, router *gin.Engine, method, path string, body interface{}) *httptest.ResponseRecorder {
@@ -297,7 +295,7 @@ func TestHandler_UpdateWorkLog_Happy(t *testing.T) {
 
 func TestHandler_Structure_EmptyBody(t *testing.T) {
 	repo := newHandlerTestRepo()
-	router := newTestWorkLogRouter(newHandlerService(repo, &handlerMockAIClient{}))
+	router := newTestWorkLogRouter(newHandlerService(repo, nil))
 
 	w := doJSON(t, router, "POST", "/api/work-logs/structure", map[string]interface{}{
 		"brain_dump": "  ",
@@ -310,11 +308,10 @@ func TestHandler_Structure_EmptyBody(t *testing.T) {
 
 func TestHandler_Structure_Happy(t *testing.T) {
 	repo := newHandlerTestRepo()
-	ai := &handlerMockAIClient{structuredOut: &service.StructuredWorkLog{
-		Items:   []service.StructuredItem{{Content: "c1"}},
-		Summary: "今日小结",
-	}}
-	router := newTestWorkLogRouter(newHandlerService(repo, ai))
+	// 模拟 LLM 返回拆条 JSON：1 个 item + 摘要。
+	llmPayload := `{"items":[{"content":"c1"}],"summary":"今日小结"}`
+	llm := &handlerMockLLM{chatOut: llmPayload}
+	router := newTestWorkLogRouter(newHandlerService(repo, llm))
 
 	w := doJSON(t, router, "POST", "/api/work-logs/structure", map[string]interface{}{
 		"brain_dump": "今天做了 T1",
@@ -330,8 +327,8 @@ func TestHandler_Structure_Happy(t *testing.T) {
 
 func TestHandler_Structure_AIFail_502(t *testing.T) {
 	repo := newHandlerTestRepo()
-	ai := &handlerMockAIClient{structuredErr: errors.New("upstream")}
-	router := newTestWorkLogRouter(newHandlerService(repo, ai))
+	llm := &handlerMockLLM{chatErr: errors.New("upstream")}
+	router := newTestWorkLogRouter(newHandlerService(repo, llm))
 
 	w := doJSON(t, router, "POST", "/api/work-logs/structure", map[string]interface{}{
 		"brain_dump": "x",

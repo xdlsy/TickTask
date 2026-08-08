@@ -6,7 +6,7 @@
 
 | 文件 | 用途 | 条目数 |
 |------|------|--------|
-| [LEARNINGS.md](LEARNINGS.md) | 学习记录：纠正、洞察、知识盲区、最佳实践 | 14 |
+| [LEARNINGS.md](LEARNINGS.md) | 学习记录：纠正、洞察、知识盲区、最佳实践 | 16 |
 | [ERRORS.md](ERRORS.md) | 错误日志：命令失败和集成错误 | 2 |
 | [FEATURE_REQUESTS.md](FEATURE_REQUESTS.md) | 功能请求：待实现的功能需求 | 3 |
 
@@ -24,6 +24,7 @@
 | LRN-20260607-012 | best_practice | backend/internal/ 编译器强制私有 |
 | LRN-20260607-013 | insight | Handler 不是单例 |
 | LRN-20260607-014 | insight | Settings 的 JSON 序列化存储模式 |
+| LRN-20260808-022 | insight | Raw JSON unmarshal 天然屏蔽新增 struct 字段（设计简化点） |
 
 ### 前端（Vue/TS）
 
@@ -40,6 +41,7 @@
 | LRN-20260607-002 | best_practice | Go 代码修改后必须手动重启 |
 | LRN-20260607-003 | best_practice | 后端重启后需刷新前端清空 stale 状态 |
 | LRN-20260607-010 | best_practice | API key 明文存储，绝不提交 git |
+| LRN-20260808-021 | insight | 凭据密钥的业界默认：不同步、换机器重填（不是主口令） |
 
 ## 使用方式
 

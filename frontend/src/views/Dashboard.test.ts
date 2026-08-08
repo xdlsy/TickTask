@@ -63,16 +63,15 @@ const mockTimerStore = {
   createSession: vi.fn()
 }
 
-const mockAIStore = {
-  configured: false,
-  loading: false,
-  generateSchedule: vi.fn(),
-  getPrioritySuggestions: vi.fn()
+const mockAgentStore = {
+  status: { configured: false },
+  openDrawer: vi.fn(),
+  runTool: vi.fn(),
 }
 
 vi.mock('@/stores/task', () => ({ useTaskStore: () => mockTaskStore }))
 vi.mock('@/stores/timer', () => ({ useTimerStore: () => mockTimerStore }))
-vi.mock('@/stores/ai', () => ({ useAIStore: () => mockAIStore }))
+vi.mock('@/stores/agent', () => ({ useAgentStore: () => mockAgentStore }))
 
 vi.mock('element-plus', () => ({
   ElMessage: { success: vi.fn(), error: vi.fn(), warning: vi.fn() }
@@ -101,8 +100,7 @@ describe('Dashboard', () => {
     mockTimerStore.recentSessions = [...mockSessions]
     mockTimerStore.fetchRecentSessions.mockResolvedValue(undefined)
     mockTimerStore.createSession.mockResolvedValue({ planned_duration: 1500 })
-    mockAIStore.configured = false
-    mockAIStore.loading = false
+    mockAgentStore.status.configured = false
   })
 
   afterEach(() => {
@@ -197,7 +195,7 @@ describe('Dashboard', () => {
 
   describe('AI section', () => {
     it('shows priority card when AI is configured', async () => {
-      mockAIStore.configured = true
+      mockAgentStore.status.configured = true
       const wrapper = mount(Dashboard, { global: { stubs: elStubs } })
       await nextTick()
 

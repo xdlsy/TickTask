@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkItem, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput, CreateQuickEntryInput, UpdateQuickEntryInput, UpdateSummaryInput, ImportPreview, ApplyImportRequest, ApplyResult, ClearResult } from '@/types'
+import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkItem, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput, CreateQuickEntryInput, UpdateQuickEntryInput, UpdateSummaryInput, ImportPreview, ApplyImportRequest, ApplyResult, ClearResult, AgentConversation, AgentMessage, AgentStatus, AgentTestResult } from '@/types'
 
 const client = axios.create({
   baseURL: '/api',
@@ -120,4 +120,22 @@ export const api = {
     client.post<ApplyResult>('/data/import/apply', payload),
 
   clearAll: () => client.delete<ClearResult>('/data/all'),
+
+  // Agent 对话
+  agent: {
+    createConversation: () => client.post<AgentConversation>('/agent/conversations'),
+    listConversations: (page = 1, size = 20) =>
+      client.get<{ items: AgentConversation[]; total: number }>('/agent/conversations', { params: { page, size } }),
+    getMessages: (id: string) => client.get<AgentMessage[]>(`/agent/conversations/${id}/messages`),
+    deleteConversation: (id: string) => client.delete(`/agent/conversations/${id}`),
+    chat: (conversationId: string, text: string) =>
+      client.post('/agent/chat', { conversation_id: conversationId, text }),
+    runTool: (tool: string, args: Record<string, unknown>) =>
+      client.post<{ result: unknown }>('/agent/run-tool', { tool, args }),
+    confirm: (messageId: string, decision: 'approve' | 'reject') =>
+      client.post('/agent/confirm', { message_id: messageId, decision }),
+    status: () => client.get<AgentStatus>('/agent/status'),
+    test: (settings?: Partial<AISettings>) =>
+      client.post<AgentTestResult>('/agent/test', settings ?? {}),
+  },
 }

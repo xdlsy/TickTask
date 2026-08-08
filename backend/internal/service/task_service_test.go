@@ -189,6 +189,12 @@ func (m *MockSettingRepository) UpdateAISettings(settings *model.AISettings) err
 	return nil
 }
 
+// MigrateLegacyAPIKey satisfies the Task 2 SettingRepository interface
+// extension. TaskService never invokes it; stubbed for interface conformance.
+func (m *MockSettingRepository) MigrateLegacyAPIKey() error {
+	return nil
+}
+
 // Tests
 
 func TestTaskService_CreateTask(t *testing.T) {

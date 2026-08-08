@@ -108,30 +108,18 @@
           </div>
         </div>
 
-        <div class="card priority-card" v-if="aiStore.configured">
+        <div class="card priority-card" v-if="agentStore.status.configured">
           <div class="card-header">
-            <h3>优先级建议</h3>
+            <h3>AI 助手</h3>
             <button
               class="header-link"
-              :disabled="aiStore.loading"
-              @click="getPrioritySuggestions"
+              @click="openAgent"
             >
-              <span v-if="aiStore.loading">分析中</span>
-              <span v-else>AI 建议</span>
+              打开助手
             </button>
           </div>
-          <div v-if="priorityTasks.length > 0" class="priority-list">
-            <div
-              v-for="(task, index) in priorityTasks"
-              :key="task.id"
-              class="priority-item"
-            >
-              <span class="priority-rank" :class="`rank-${index + 1}`">{{ index + 1 }}</span>
-              <span class="priority-title">{{ task.title }}</span>
-            </div>
-          </div>
-          <div v-else class="priority-empty">
-            <p>点击「AI 建议」查看任务优先级排序</p>
+          <div class="priority-empty">
+            <p>使用顶栏的 AI 助手获取任务优先级建议、智能分类等功能</p>
           </div>
         </div>
       </div>
@@ -147,13 +135,13 @@ import { ArrowRight, Plus, VideoPlay } from '@element-plus/icons-vue'
 import TaskCard from '@/components/tasks/TaskCard.vue'
 import { useTaskStore } from '@/stores/task'
 import { useTimerStore } from '@/stores/timer'
-import { useAIStore } from '@/stores/ai'
+import { useAgentStore } from '@/stores/agent'
 import type { TaskResponse } from '@/types'
 
 const router = useRouter()
 const taskStore = useTaskStore()
 const timerStore = useTimerStore()
-const aiStore = useAIStore()
+const agentStore = useAgentStore()
 
 defineEmits<{
   'edit-task': [task: TaskResponse]
@@ -165,8 +153,6 @@ defineEmits<{
 const todayPomodoros = ref(0)
 const focusTime = ref(0)
 const completedTasks = ref(0)
-
-const priorityTasks = ref<TaskResponse[]>([])
 
 const pendingTasks = computed(() =>
   taskStore.tasks.filter(t => t.status === 'todo').length
@@ -204,19 +190,8 @@ async function startTimer() {
   }
 }
 
-async function getPrioritySuggestions() {
-  try {
-    const result = await aiStore.getPrioritySuggestions()
-    if (result && result.priority_order) {
-      const taskMap = new Map(taskStore.tasks.map(t => [t.id, t]))
-      priorityTasks.value = result.priority_order
-        .map(id => taskMap.get(id))
-        .filter((t): t is TaskResponse => t !== undefined && t.status === 'todo')
-        .slice(0, 5)
-    }
-  } catch (error) {
-    ElMessage.error('获取优先级建议失败')
-  }
+function openAgent() {
+  agentStore.openDrawer()
 }
 
 onMounted(async () => {

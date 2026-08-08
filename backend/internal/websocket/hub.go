@@ -9,6 +9,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// WebSocket event types broadcast to connected clients.
+const (
+	EventAgentMessage = "agent_message"
+	EventAgentTool    = "agent_tool"
+	EventAgentDone    = "agent_done"
+)
+
 type Hub struct {
 	clients map[*Client]bool
 	mu      sync.RWMutex

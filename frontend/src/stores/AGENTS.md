@@ -8,7 +8,7 @@ Stores:
 - `useTaskStore` — task CRUD, dual data representation (flat list + `tasksByQuadrant` grouped dictionary), quadrant helpers
 - `useTimerStore` — Pomodoro session lifecycle, dual REST+WebSocket update path, computed status/progress
 - `useScheduleStore` — calendar events CRUD, view mode switching (day/week/month), date navigation with delta logic
-- `useAiStore` — AI classification/scheduling/prioritization, configuration status check on app mount
+- `useAgentStore` — agent conversation lifecycle, tool execution (`runTool`), AI status check, drawer state; embedded AI buttons (TaskForm/TaskCard/Dashboard/Analytics) call `runTool` and cast the bare result; WS events are dispatched via a self-registered listener in `utils/websocket`
 - `useAppStore` — current view tracking, sidebar toggle, auto-dismissing notification queue
 
 ## Conventions [~ inferred]

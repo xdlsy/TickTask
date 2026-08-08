@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"ticktask/internal/model"
 )
@@ -37,7 +38,7 @@ func newSnapshot() *model.BackupData {
 }
 
 func TestDataService_Export(t *testing.T) {
-	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()})
+	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()}, nil)
 	env, err := svc.Export(true)
 	if err != nil {
 		t.Fatalf("export: %v", err)
@@ -60,7 +61,7 @@ func TestDataService_Export(t *testing.T) {
 }
 
 func TestDataService_Export_Empty(t *testing.T) {
-	svc := NewDataService(&mockBackupRepo{snapshot: &model.BackupData{}})
+	svc := NewDataService(&mockBackupRepo{snapshot: &model.BackupData{}}, nil)
 	env, err := svc.Export(true)
 	if err != nil {
 		t.Fatalf("export empty: %v", err)
@@ -75,17 +76,18 @@ func TestDataService_Export_ExcludesAPIKey(t *testing.T) {
 	snap := newSnapshot()
 	snap.Settings.AI = &model.AISettings{APIKey: "secret"}
 
+	// Task 5: includeAPIKey is now a no-op back-compat param. The export
+	// NEVER carries the api_key regardless of what the client requests.
 	cases := []struct {
-		name       string
-		include    bool
-		wantAPIKey string
+		name    string
+		include bool
 	}{
-		{"include key (default)", true, "secret"},
-		{"exclude key", false, ""},
+		{"include key (legacy, now no-op)", true},
+		{"exclude key", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			svc := NewDataService(&mockBackupRepo{snapshot: snap})
+			svc := NewDataService(&mockBackupRepo{snapshot: snap}, nil)
 			env, err := svc.Export(c.include)
 			if err != nil {
 				t.Fatalf("export: %v", err)
@@ -93,10 +95,102 @@ func TestDataService_Export_ExcludesAPIKey(t *testing.T) {
 			if env.Data.Settings.AI == nil {
 				t.Fatal("AI settings nil")
 			}
-			if env.Data.Settings.AI.APIKey != c.wantAPIKey {
-				t.Errorf("api_key: got %q, want %q", env.Data.Settings.AI.APIKey, c.wantAPIKey)
+			if env.Data.Settings.AI.APIKey != "" {
+				t.Errorf("api_key: got %q, want empty (always stripped)", env.Data.Settings.AI.APIKey)
 			}
 		})
+	}
+}
+
+func TestDataService_Export_AlwaysStripsAPIKey(t *testing.T) {
+	snap := newSnapshot()
+	snap.Settings.AI = &model.AISettings{
+		Provider: "openai", APIKey: "should-never-leave",
+		BaseURL: "https://api.openai.com/v1", Model: "gpt-4o-mini",
+	}
+	svc := NewDataService(&mockBackupRepo{snapshot: snap}, nil)
+
+	cases := []bool{true, false}
+	for _, include := range cases {
+		t.Run(fmt.Sprintf("include=%v", include), func(t *testing.T) {
+			env, err := svc.Export(include)
+			if err != nil {
+				t.Fatalf("export: %v", err)
+			}
+			if env.Data.Settings.AI == nil {
+				t.Fatal("AI nil")
+			}
+			if env.Data.Settings.AI.APIKey != "" {
+				t.Errorf("include=%v: api_key leaked into export: %q", include, env.Data.Settings.AI.APIKey)
+			}
+			// Non-APIKey fields must survive the strip — defense-in-depth must
+			// not silently turn into "drop the whole AI section".
+			if env.Data.Settings.AI.Provider != "openai" {
+				t.Errorf("include=%v: provider dropped: %q", include, env.Data.Settings.AI.Provider)
+			}
+		})
+	}
+}
+
+// mockSettingRepoForData is a minimal SettingRepository mock for data service
+// tests. It records MigrateLegacyAPIKey calls and optionally errors on it;
+// other methods are stubs that return sensible defaults.
+type mockSettingRepoForData struct {
+	migrateCalls int
+	migrateErr   error
+}
+
+func (m *mockSettingRepoForData) Get(string) (*model.Setting, error) { return nil, nil }
+func (m *mockSettingRepoForData) Set(string, string) error           { return nil }
+func (m *mockSettingRepoForData) GetPomodoroSettings() (*model.PomodoroSettings, error) {
+	return model.DefaultPomodoroSettings(), nil
+}
+func (m *mockSettingRepoForData) UpdatePomodoroSettings(*model.PomodoroSettings) error { return nil }
+func (m *mockSettingRepoForData) GetAISettings() (*model.AISettings, error)            { return model.DefaultAISettings(), nil }
+func (m *mockSettingRepoForData) UpdateAISettings(*model.AISettings) error             { return nil }
+func (m *mockSettingRepoForData) MigrateLegacyAPIKey() error {
+	m.migrateCalls++
+	return m.migrateErr
+}
+
+func TestDataService_ApplyImport_TriggersLegacyMigration(t *testing.T) {
+	backupRepo := &mockBackupRepo{snapshot: newSnapshot()}
+	settingRepo := &mockSettingRepoForData{}
+	svc := NewDataService(backupRepo, settingRepo)
+
+	_, err := svc.ApplyImport(&model.ApplyImportRequest{
+		Modules: map[string]model.ModuleApply{
+			"tasks":        {Policy: model.PolicyAddNewOnly},
+			"sessions":     {Policy: model.PolicyAddNewOnly},
+			"schedules":    {Policy: model.PolicyAddNewOnly},
+			"work_reports": {Policy: model.PolicyAddNewOnly},
+			"work_logs":    {Policy: model.PolicyAddNewOnly},
+			"settings":     {Policy: model.PolicyAddNewOnly},
+		},
+		Data: *newSnapshot(),
+	})
+	if err != nil {
+		t.Fatalf("apply import: %v", err)
+	}
+	if settingRepo.migrateCalls != 1 {
+		t.Errorf("expected 1 MigrateLegacyAPIKey call after import, got %d", settingRepo.migrateCalls)
+	}
+}
+
+func TestDataService_ApplyImport_MigrationFailureDoesNotFailImport(t *testing.T) {
+	backupRepo := &mockBackupRepo{snapshot: newSnapshot()}
+	settingRepo := &mockSettingRepoForData{migrateErr: errors.New("vault down")}
+	svc := NewDataService(backupRepo, settingRepo)
+
+	_, err := svc.ApplyImport(&model.ApplyImportRequest{
+		Modules: map[string]model.ModuleApply{"tasks": {Policy: model.PolicyAddNewOnly}},
+		Data:    model.BackupData{},
+	})
+	if err != nil {
+		t.Errorf("import should not fail when migration fails (key is not core to import): %v", err)
+	}
+	if settingRepo.migrateCalls != 1 {
+		t.Errorf("migration should still be attempted: got %d calls", settingRepo.migrateCalls)
 	}
 }
 
@@ -117,7 +211,7 @@ func TestDataService_PreviewImport_Classification(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			svc := NewDataService(&mockBackupRepo{snapshot: cur})
+			svc := NewDataService(&mockBackupRepo{snapshot: cur}, nil)
 			prev, err := svc.PreviewImport(c.file, model.BackupSchemaVersion)
 			if err != nil {
 				t.Fatalf("preview: %v", err)
@@ -134,7 +228,7 @@ func TestDataService_PreviewImport_Classification(t *testing.T) {
 }
 
 func TestDataService_PreviewImport_ConflictFieldDiff(t *testing.T) {
-	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()})
+	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()}, nil)
 	prev, _ := svc.PreviewImport(&model.BackupData{Tasks: []model.Task{{ID: "t1", Title: "changed", Status: model.StatusCompleted}}}, model.BackupSchemaVersion)
 	m := prev.Modules["tasks"]
 	if len(m.Conflicts) != 1 || m.Conflicts[0].ID != "t1" {
@@ -150,7 +244,7 @@ func TestDataService_PreviewImport_ConflictFieldDiff(t *testing.T) {
 }
 
 func TestDataService_PreviewImport_SettingsDiff(t *testing.T) {
-	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()})
+	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()}, nil)
 	filePomo := model.DefaultPomodoroSettings()
 	filePomo.WorkDuration = 1800
 	fileAI := model.DefaultAISettings()
@@ -175,7 +269,7 @@ func TestDataService_PreviewImport_SettingsDiff(t *testing.T) {
 }
 
 func TestDataService_PreviewImport_WorkLogAtomicConflict(t *testing.T) {
-	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()})
+	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()}, nil)
 	file := &model.BackupData{WorkLogs: []model.WorkLog{{ID: "wl1", Date: "2026-08-07", Items: []model.WorkItem{
 		{ID: "wi1", WorkLogID: "wl1", Seq: 1},
 		{ID: "wi2", WorkLogID: "wl1", Seq: 2},
@@ -188,7 +282,7 @@ func TestDataService_PreviewImport_WorkLogAtomicConflict(t *testing.T) {
 }
 
 func TestDataService_PreviewImport_SchemaWarning(t *testing.T) {
-	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()})
+	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()}, nil)
 	same, _ := svc.PreviewImport(newSnapshot(), model.BackupSchemaVersion)
 	if same.SchemaWarning != "" {
 		t.Errorf("same-version should have no warning, got %q", same.SchemaWarning)
@@ -219,7 +313,7 @@ func TestDataService_ApplyImport_Policies(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.policy, func(t *testing.T) {
 			repo := &mockBackupRepo{snapshot: cur}
-			svc := NewDataService(repo)
+			svc := NewDataService(repo, nil)
 			res, err := svc.ApplyImport(&model.ApplyImportRequest{
 				Data:    *file,
 				Modules: map[string]model.ModuleApply{"tasks": {Policy: c.policy}},
@@ -253,7 +347,7 @@ func TestDataService_ApplyImport_ReplaceDeletesOrphans(t *testing.T) {
 	cur := &model.BackupData{Tasks: []model.Task{{ID: "orphan", Title: "o"}}}
 	file := &model.BackupData{Tasks: []model.Task{}} // 文件没有 orphan
 	repo := &mockBackupRepo{snapshot: cur}
-	svc := NewDataService(repo)
+	svc := NewDataService(repo, nil)
 	res, err := svc.ApplyImport(&model.ApplyImportRequest{
 		Data:    *file,
 		Modules: map[string]model.ModuleApply{"tasks": {Policy: model.PolicyReplace}},
@@ -273,7 +367,7 @@ func TestDataService_ApplyImport_OverrideBeatsPolicy(t *testing.T) {
 	cur := newSnapshot()
 	file := &model.BackupData{Tasks: []model.Task{{ID: "t1", Title: "changed"}}}
 	repo := &mockBackupRepo{snapshot: cur}
-	svc := NewDataService(repo)
+	svc := NewDataService(repo, nil)
 	_, err := svc.ApplyImport(&model.ApplyImportRequest{
 		Data: *file,
 		Modules: map[string]model.ModuleApply{"tasks": {
@@ -297,7 +391,7 @@ func TestDataService_ApplyImport_SettingsWritten(t *testing.T) {
 	pomo.WorkDuration = 1800
 	file := &model.BackupData{Settings: model.SettingsBundle{Pomodoro: pomo, AI: model.DefaultAISettings()}}
 	repo := &mockBackupRepo{snapshot: cur}
-	svc := NewDataService(repo)
+	svc := NewDataService(repo, nil)
 	_, err := svc.ApplyImport(&model.ApplyImportRequest{Data: *file, Modules: map[string]model.ModuleApply{}})
 	if err != nil {
 		t.Fatalf("apply: %v", err)
@@ -311,7 +405,7 @@ func TestDataService_ApplyImport_UnknownOverrideIgnored(t *testing.T) {
 	cur := newSnapshot()
 	file := newSnapshot()
 	repo := &mockBackupRepo{snapshot: cur}
-	svc := NewDataService(repo)
+	svc := NewDataService(repo, nil)
 	_, err := svc.ApplyImport(&model.ApplyImportRequest{
 		Data: *file,
 		Modules: map[string]model.ModuleApply{"tasks": {
@@ -325,7 +419,7 @@ func TestDataService_ApplyImport_UnknownOverrideIgnored(t *testing.T) {
 }
 
 func TestDataService_ApplyImport_InvalidPolicy(t *testing.T) {
-	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()})
+	svc := NewDataService(&mockBackupRepo{snapshot: newSnapshot()}, nil)
 	_, err := svc.ApplyImport(&model.ApplyImportRequest{
 		Data:    *newSnapshot(),
 		Modules: map[string]model.ModuleApply{"tasks": {Policy: "bogus"}},
@@ -340,7 +434,7 @@ func TestDataService_ApplyImport_InvalidPolicy(t *testing.T) {
 
 func TestDataService_ClearAll_Passthrough(t *testing.T) {
 	want := &model.ClearResult{Tasks: 3, Sessions: 5, WorkLogs: 1}
-	svc := NewDataService(&mockBackupRepo{clearResult: want})
+	svc := NewDataService(&mockBackupRepo{clearResult: want}, nil)
 	got, err := svc.ClearAll()
 	if err != nil {
 		t.Fatalf("clearall: %v", err)

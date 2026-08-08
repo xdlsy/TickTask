@@ -78,6 +78,9 @@ export type WSMessageType =
   | 'task_updated'
   | 'terminal_output'
   | 'terminal_status'
+  | 'agent_message'
+  | 'agent_tool'
+  | 'agent_done'
   | 'error'
 
 export interface TimerTickMessage {
@@ -112,7 +115,7 @@ export interface TerminalStatusMessage {
   detail?: string
 }
 
-export type WSMessage = TimerTickMessage | SessionStateMessage | TimerCompleteMessage | TerminalOutputMessage | TerminalStatusMessage
+export type WSMessage = TimerTickMessage | SessionStateMessage | TimerCompleteMessage | TerminalOutputMessage | TerminalStatusMessage | AgentWsEvent
 
 // AI 相关类型
 export interface ClassificationResult {
@@ -148,6 +151,10 @@ export interface AISettings {
   api_key: string
   base_url: string
   model: string
+  /** GET only — true if a key is stored (encrypted) server-side. */
+  api_key_set?: boolean
+  /** GET only — masked preview like "sk-ab****wxyz", absent when no key set. */
+  api_key_preview?: string
 }
 
 // 任务时间统计
@@ -501,3 +508,60 @@ export interface ClearResult {
   work_reports: number
   daily_stats: number
 }
+
+// ── Agent ──
+
+export interface AgentConversation {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+  message_count: number
+}
+
+export type AgentMessageRole = 'user' | 'assistant' | 'tool_call' | 'tool_result'
+export type ToolStatus = 'started' | 'pending_confirmation' | 'succeeded' | 'failed' | 'rejected'
+
+export interface AgentMessage {
+  id: string
+  conversation_id: string
+  role: AgentMessageRole
+  content: string
+  tool_name?: string
+  tool_args?: string
+  tool_result?: string
+  tool_status?: ToolStatus
+  parent_id?: string
+  created_at: string
+}
+
+export interface AgentStatus {
+  configured: boolean
+  supports_function_calling: boolean
+  provider: string
+}
+
+export interface AgentTestResult {
+  ok: boolean
+  provider: string
+  model?: string
+  latency_ms: number
+  status_code?: number
+  error?: string
+}
+
+export interface AgentToolEvent {
+  conversation_id: string
+  message_id?: string
+  tool_name: string
+  args: Record<string, unknown>
+  status: ToolStatus
+  preview?: unknown
+  result?: unknown
+  error?: string
+}
+
+export type AgentWsEvent =
+  | { type: 'agent_message'; conversation_id: string; message_id: string; delta_text: string }
+  | ({ type: 'agent_tool' } & AgentToolEvent)
+  | { type: 'agent_done'; conversation_id: string; finish_reason: 'stop' | 'max_tools' | 'error'; total_tokens?: number }

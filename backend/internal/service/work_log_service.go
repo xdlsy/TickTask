@@ -1,13 +1,16 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"ticktask/internal/ai"
 	"ticktask/internal/model"
 	"ticktask/internal/repository"
 )
@@ -128,40 +131,32 @@ var (
 	ErrAIStructureFailed    = errors.New("AI structuring failed")
 )
 
-// ── AI client interface（M1 stub，M2 接真实实现）──
-
-// WorkLogAIClient AI 拆条/汇总客户端接口
-type WorkLogAIClient interface {
-	StructureBrainDump(input BrainDumpInput) (*StructuredWorkLog, error)
-	GenerateWeeklyReport(items []model.WorkItem, start, end string) (*ReportSummary, error)
-	GenerateMonthlyReport(weeklies []*model.WorkReport, orphanItems []model.WorkItem, start, end string) (*ReportSummary, error)
-	GenerateHalfYearReport(monthlies []*model.WorkReport, start, end string) (*ReportSummary, error)
-	GenerateYearlyReport(monthlies []*model.WorkReport, start, end string) (*ReportSummary, error)
-}
-
 // ── Service ──
+
+// aiCallTimeout 单次 AI 调用最长等待（拆条/汇总共用）。
+const aiCallTimeout = 90 * time.Second
 
 // WorkLogService 工作日志业务编排
 type WorkLogService struct {
 	repo        repository.WorkLogRepository
 	taskRepo    repository.TaskRepository
 	sessionRepo repository.SessionRepository
-	aiClient    WorkLogAIClient
+	llm         ai.LLMClient
 	idGenerator func() string
 }
 
-// NewWorkLogService 构造
+// NewWorkLogService 构造。llm 可为 nil（未配置 API key 时）；调用 AI 方法会返回 ErrAIStructureFailed。
 func NewWorkLogService(
 	repo repository.WorkLogRepository,
 	taskRepo repository.TaskRepository,
 	sessionRepo repository.SessionRepository,
-	aiClient WorkLogAIClient,
+	llm ai.LLMClient,
 ) *WorkLogService {
 	return &WorkLogService{
 		repo:        repo,
 		taskRepo:    taskRepo,
 		sessionRepo: sessionRepo,
-		aiClient:    aiClient,
+		llm:         llm,
 		idGenerator: func() string { return uuid.New().String() },
 	}
 }
@@ -227,10 +222,10 @@ func (s *WorkLogService) GetTodayContext(date string) (*TodayContext, error) {
 
 // StructureBrainDump AI 拆条（不落库）
 func (s *WorkLogService) StructureBrainDump(input BrainDumpInput) (*StructuredWorkLog, error) {
-	if s.aiClient == nil {
+	if s.llm == nil {
 		return nil, ErrAIStructureFailed
 	}
-	out, err := s.aiClient.StructureBrainDump(input)
+	out, err := s.structureBrainDump(input)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrAIStructureFailed, err)
 	}
@@ -301,7 +296,7 @@ func (s *WorkLogService) ListWorkLogs(from, to string) ([]*model.WorkLog, error)
 
 // GenerateReport 生成周期报告
 func (s *WorkLogService) GenerateReport(input GenerateReportInput) (*model.WorkReport, error) {
-	if s.aiClient == nil {
+	if s.llm == nil {
 		return nil, ErrAIStructureFailed
 	}
 	moment := time.Now()
@@ -433,7 +428,7 @@ func (s *WorkLogService) generateWeekly(startStr, endStr string) (*ReportSummary
 	for _, l := range logs {
 		items = append(items, l.Items...)
 	}
-	return s.aiClient.GenerateWeeklyReport(items, startStr, endStr)
+	return s.generateWeeklyReport(items, startStr, endStr)
 }
 
 // INVARIANT: monthly 只读 weekly 报告 + 月内不属于完整周的零散 items，不读所有原始 items
@@ -466,7 +461,7 @@ func (s *WorkLogService) generateMonthly(start, end time.Time, startStr, endStr 
 			orphans = append(orphans, l.Items...)
 		}
 	}
-	return s.aiClient.GenerateMonthlyReport(in, orphans, startStr, endStr)
+	return s.generateMonthlyReport(in, orphans, startStr, endStr)
 }
 
 // INVARIANT: halfyear 只读 monthly 报告，绝不读原始 items
@@ -481,7 +476,7 @@ func (s *WorkLogService) generateHalfYear(startStr, endStr string) (*ReportSumma
 			in = append(in, m)
 		}
 	}
-	return s.aiClient.GenerateHalfYearReport(in, startStr, endStr)
+	return s.generateHalfYearReport(in, startStr, endStr)
 }
 
 // INVARIANT: yearly 只读 monthly 报告，绝不读原始 items 或 weekly 报告
@@ -496,7 +491,7 @@ func (s *WorkLogService) generateYearly(startStr, endStr string) (*ReportSummary
 			in = append(in, m)
 		}
 	}
-	return s.aiClient.GenerateYearlyReport(in, startStr, endStr)
+	return s.generateYearlyReport(in, startStr, endStr)
 }
 
 // GetReport 读报告
@@ -684,3 +679,156 @@ func (s *WorkLogService) UpdateSummary(date string, summary string) error {
 
 // 确保 ReportSummary / TodayContext 能 JSON 序列化（避免 unused 警告）
 var _ = json.Marshal
+
+// ── LLM 调用（拆条/汇总）──
+//
+// 以下方法原本属于 workLogAIClient（已删除）。Task 15 移除 AIService 时把这些方法
+// 直接挂到 WorkLogService 上，调用 s.llm.ChatCompletion 而非 c.aiService.CallLLM。
+// CallLLM 内部把 system + "\n\n" + user 拼成一个 prompt；这里通过 callLLM 复现。
+
+// callLLM 拼装 system+user 提示并调用底层 LLM，附带 aiCallTimeout 超时控制。
+// 若 llm 未配置（nil），返回错误（不应直接到此：上层应已通过 s.llm==nil 短路返回）。
+func (s *WorkLogService) callLLM(system, user string) (string, error) {
+	if s.llm == nil {
+		return "", fmt.Errorf("AI service not configured")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), aiCallTimeout)
+	defer cancel()
+	combined := system + "\n\n" + user
+	return s.llm.ChatCompletion(ctx, combined)
+}
+
+// structureBrainDump 拆条
+func (s *WorkLogService) structureBrainDump(input BrainDumpInput) (*StructuredWorkLog, error) {
+	userPrompt := fmt.Sprintf(ai.WorkLogStructureUser, input.BrainDump, formatContextForPrompt(input.Context))
+	raw, err := s.callLLM(ai.WorkLogStructureSystem, userPrompt)
+	if err != nil {
+		return nil, fmt.Errorf("LLM call: %w", err)
+	}
+	cleaned := stripCodeFence(raw)
+	var out StructuredWorkLog
+	if err := json.Unmarshal([]byte(cleaned), &out); err != nil {
+		return nil, fmt.Errorf("parse LLM JSON: %w; raw=%s", err, truncated(raw, 500))
+	}
+	return &out, nil
+}
+
+// generateWeeklyReport 周报
+func (s *WorkLogService) generateWeeklyReport(items []model.WorkItem, start, end string) (*ReportSummary, error) {
+	userPrompt := fmt.Sprintf("本周（%s ~ %s）的工作条目 JSON：\n%s", start, end, itemsToJSON(items))
+	raw, err := s.callLLM(ai.WorkLogWeeklyReportSystem, userPrompt)
+	if err != nil {
+		return nil, err
+	}
+	return parseReportSummary(raw)
+}
+
+// generateMonthlyReport 月报
+func (s *WorkLogService) generateMonthlyReport(weeklies []*model.WorkReport, orphanItems []model.WorkItem, start, end string) (*ReportSummary, error) {
+	userPrompt := fmt.Sprintf("本月（%s ~ %s）的周报 JSON 数组：\n%s\n\n未被周报覆盖的零散 items：\n%s",
+		start, end, reportsToJSON(weeklies), itemsToJSON(orphanItems))
+	raw, err := s.callLLM(ai.WorkLogMonthlyReportSystem, userPrompt)
+	if err != nil {
+		return nil, err
+	}
+	return parseReportSummary(raw)
+}
+
+// generateHalfYearReport 半年报
+func (s *WorkLogService) generateHalfYearReport(monthlies []*model.WorkReport, start, end string) (*ReportSummary, error) {
+	userPrompt := fmt.Sprintf("该半年（%s ~ %s）的月报 JSON 数组：\n%s",
+		start, end, reportsToJSON(monthlies))
+	raw, err := s.callLLM(ai.WorkLogHalfYearReportSystem, userPrompt)
+	if err != nil {
+		return nil, err
+	}
+	return parseReportSummary(raw)
+}
+
+// generateYearlyReport 年报
+func (s *WorkLogService) generateYearlyReport(monthlies []*model.WorkReport, start, end string) (*ReportSummary, error) {
+	userPrompt := fmt.Sprintf("本年（%s ~ %s）的月报 JSON 数组：\n%s",
+		start, end, reportsToJSON(monthlies))
+	raw, err := s.callLLM(ai.WorkLogYearlyReportSystem, userPrompt)
+	if err != nil {
+		return nil, err
+	}
+	return parseReportSummary(raw)
+}
+
+// ── helpers ──
+
+func formatContextForPrompt(ctx TodayContext) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("已完成任务 %d 条：\n", len(ctx.CompletedTasks)))
+	for _, t := range ctx.CompletedTasks {
+		sb.WriteString(fmt.Sprintf("- %s\n", t.Title))
+	}
+	sb.WriteString(fmt.Sprintf("\n番茄钟会话 %d 个，共 %d 分钟。\n",
+		ctx.PomodoroSummary.Count, ctx.PomodoroSummary.TotalMinutes))
+	return sb.String()
+}
+
+func itemsToJSON(items []model.WorkItem) string {
+	type brief struct {
+		Title         string `json:"title"`
+		Content       string `json:"content"`
+		ProblemSolved string `json:"problem_solved"`
+		Result        string `json:"result"`
+		Impact        string `json:"impact"`
+	}
+	out := make([]brief, len(items))
+	for i, it := range items {
+		out[i] = brief{
+			Title:         it.Title,
+			Content:       it.Content,
+			ProblemSolved: it.ProblemSolved,
+			Result:        it.Result,
+			Impact:        it.Impact,
+		}
+	}
+	b, _ := json.Marshal(out)
+	return string(b)
+}
+
+func reportsToJSON(reports []*model.WorkReport) string {
+	out := make([]map[string]string, len(reports))
+	for i, r := range reports {
+		out[i] = map[string]string{
+			"period_key":   r.PeriodKey,
+			"start_date":   r.StartDate,
+			"end_date":     r.EndDate,
+			"summary_json": r.SummaryJSON,
+		}
+	}
+	b, _ := json.Marshal(out)
+	return string(b)
+}
+
+func parseReportSummary(raw string) (*ReportSummary, error) {
+	cleaned := stripCodeFence(raw)
+	var s ReportSummary
+	if err := json.Unmarshal([]byte(cleaned), &s); err != nil {
+		return nil, fmt.Errorf("parse report JSON: %w; raw=%s", err, truncated(raw, 500))
+	}
+	return &s, nil
+}
+
+// stripCodeFence 移除可能的 ```json ... ``` 包裹（LLM 偶尔会包一层 markdown）
+func stripCodeFence(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "```") {
+		if idx := strings.Index(s, "\n"); idx >= 0 {
+			s = s[idx+1:]
+		}
+		s = strings.TrimSuffix(strings.TrimSpace(s), "```")
+	}
+	return strings.TrimSpace(s)
+}
+
+func truncated(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "...(truncated)"
+}

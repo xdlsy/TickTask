@@ -1,6 +1,10 @@
 # ===== Secrets — never commit (copy config.yaml.example -> config.yaml) =====
 backend/configs/config.yaml
 
+# ===== Vault key (per-machine encryption key — never sync, never commit) =====
+backend/data/.keyvault
+*.keyvault
+
 # ===== Dependencies =====
 node_modules/
 

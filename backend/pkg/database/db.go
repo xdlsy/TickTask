@@ -43,6 +43,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.WorkLog{},
 		&model.WorkItem{},
 		&model.WorkReport{},
+		&model.AgentConversation{},
+		&model.AgentMessage{},
 	)
 }
 

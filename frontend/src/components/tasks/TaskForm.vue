@@ -10,7 +10,7 @@
         <div class="title-row">
           <el-input v-model="formData.title" placeholder="输入任务标题" style="flex: 1" />
           <el-button
-            v-if="!task && aiStore.configured"
+            v-if="!task && agentStore.status.configured"
             type="primary"
             link
             :loading="aiClassifying"
@@ -149,7 +149,7 @@ import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { Task, Quadrant, ClassificationResult } from '@/types'
 import { QUADRANT_INFO } from '@/types'
-import { useAIStore } from '@/stores/ai'
+import { useAgentStore } from '@/stores/agent'
 
 interface Props {
   visible: boolean
@@ -163,7 +163,7 @@ const emit = defineEmits<{
   save: [data: any]
 }>()
 
-const aiStore = useAIStore()
+const agentStore = useAgentStore()
 const tagInput = ref('')
 const aiClassifying = ref(false)
 const aiRecommendation = ref<ClassificationResult | null>(null)
@@ -259,10 +259,10 @@ async function getAIRecommendation() {
 
   aiClassifying.value = true
   try {
-    const result = await aiStore.classifyTaskByText(
-      formData.value.title,
-      formData.value.description
-    )
+    const result = await agentStore.runTool('classify_task', {
+      title: formData.value.title,
+      description: formData.value.description,
+    }) as ClassificationResult | null
     if (result) {
       aiRecommendation.value = result
     }

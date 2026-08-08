@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"ticktask/internal/agent"
 	"ticktask/internal/api/handler"
 	"ticktask/internal/api/middleware"
 	"ticktask/internal/repository"
@@ -19,13 +20,14 @@ func SetupRouter(
 	cfg *config.Config,
 	taskService *service.TaskService,
 	timerService *service.TimerService,
-	aiService *service.AIService,
 	analyticsService *service.AnalyticsService,
 	scheduleService *service.ScheduleService,
 	workLogService *service.WorkLogService,
 	wsHub *websocket.Hub,
 	settingRepo repository.SettingRepository,
 	dataService service.DataService,
+	agentSvc agent.AgentService,
+	agentRepo repository.AgentRepository,
 ) *gin.Engine {
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -63,20 +65,6 @@ func SetupRouter(
 			sessions.PATCH("/:id/control", handler.NewTimerHandler(timerService).ControlSession)
 		}
 
-		// AI 智能功能
-		ai := api.Group("/ai")
-		{
-			aiHandler := handler.NewAIHandler(aiService, taskService)
-			ai.GET("/status", aiHandler.GetAIStatus)
-			ai.POST("/classify", aiHandler.ClassifyTask)
-			ai.POST("/classify/batch", aiHandler.ClassifyTasks)
-			ai.POST("/classify-task-text", aiHandler.ClassifyTaskByText)
-			ai.POST("/schedule", aiHandler.GenerateSchedule)
-			ai.POST("/reschedule-after-interrupt", aiHandler.RescheduleAfterInterrupt)
-			ai.GET("/priority", aiHandler.GetPrioritySuggestions)
-			ai.GET("/daily-insights", aiHandler.GetDailyInsights)
-		}
-
 		// 设置
 		settings := api.Group("/settings")
 		{
@@ -103,8 +91,8 @@ func SetupRouter(
 			analytics.GET("/summary", analyticsHandler.GetSummary)
 			analytics.GET("/trend", analyticsHandler.GetTrend)
 			analytics.GET("/distribution", analyticsHandler.GetDistribution)
-				analytics.GET("/pomodoro-by-task", analyticsHandler.GetPomodoroByTask)
-				analytics.GET("/pomodoro-trends", analyticsHandler.GetPomodoroTrends)
+			analytics.GET("/pomodoro-by-task", analyticsHandler.GetPomodoroByTask)
+			analytics.GET("/pomodoro-trends", analyticsHandler.GetPomodoroTrends)
 		}
 
 		// 日程
@@ -112,8 +100,8 @@ func SetupRouter(
 		{
 			scheduleHandler := handler.NewScheduleHandler(scheduleService)
 			schedules.GET("", scheduleHandler.GetSchedules)
-				schedules.POST("/revise", scheduleHandler.ReviseWithAI)
-				schedules.POST("/revise/apply", scheduleHandler.ApplyRevision)
+			schedules.POST("/revise", scheduleHandler.ReviseWithAI)
+			schedules.POST("/revise/apply", scheduleHandler.ApplyRevision)
 			schedules.GET("/:id", scheduleHandler.GetSchedule)
 			schedules.POST("", scheduleHandler.CreateSchedule)
 			schedules.PUT("/:id", scheduleHandler.UpdateSchedule)
@@ -147,6 +135,12 @@ func SetupRouter(
 			workReports.POST("/generate", wrHandler.GenerateReport)
 			workReports.GET("", wrHandler.ListReports)
 			workReports.GET("/:type/:periodKey", wrHandler.GetReport)
+		}
+
+		// Agent
+		agentGroup := api.Group("/agent")
+		{
+			handler.NewAgentHandler(agentSvc, agentRepo).Register(agentGroup)
 		}
 	}
 
