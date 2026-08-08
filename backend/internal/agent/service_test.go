@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"ticktask/internal/ai"
 	"ticktask/internal/model"
@@ -34,8 +36,13 @@ func (m *mockLLM) ChatWithTools(ctx context.Context, msgs []ai.Message, tools []
 	return r, nil
 }
 
-// mockHub records broadcasts
-type mockHub struct{ events []mockEvent }
+// mockHub records broadcasts. It is safe for concurrent use because PermWrite
+// confirmation tests run SendMessage in a goroutine while the main test
+// goroutine inspects events.
+type mockHub struct {
+	mu     sync.Mutex
+	events []mockEvent
+}
 
 type mockEvent struct {
 	Type    string
@@ -45,9 +52,21 @@ type mockEvent struct {
 func (h *mockHub) Broadcast(msg interface{}) {
 	if m, ok := msg.(map[string]any); ok {
 		if t, ok := m["type"].(string); ok {
+			h.mu.Lock()
 			h.events = append(h.events, mockEvent{Type: t, Payload: m})
+			h.mu.Unlock()
 		}
 	}
+}
+
+// snapshot returns a copy of the recorded events under the lock, safe to
+// iterate without racing against concurrent Broadcast calls.
+func (h *mockHub) snapshot() []mockEvent {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]mockEvent, len(h.events))
+	copy(out, h.events)
+	return out
 }
 
 // newInMemoryRepo builds an in-memory SQLite AgentRepository for service tests.
@@ -100,14 +119,15 @@ func TestAgentService_NoToolCall(t *testing.T) {
 		t.Fatalf("send: %v", err)
 	}
 	// Expect: 1 agent_message + 1 agent_done
-	if len(hub.events) != 2 {
-		t.Fatalf("events = %d, want 2: %+v", len(hub.events), hub.events)
+	events := hub.snapshot()
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want 2: %+v", len(events), events)
 	}
-	if hub.events[0].Type != "agent_message" {
-		t.Errorf("first event = %q", hub.events[0].Type)
+	if events[0].Type != "agent_message" {
+		t.Errorf("first event = %q", events[0].Type)
 	}
-	if hub.events[1].Type != "agent_done" {
-		t.Errorf("last event = %q", hub.events[1].Type)
+	if events[1].Type != "agent_done" {
+		t.Errorf("last event = %q", events[1].Type)
 	}
 }
 
@@ -141,18 +161,19 @@ func TestAgentService_NoToolCall_RepoAppendError(t *testing.T) {
 
 	// Expect exactly 2 broadcasts: the agent_message (sent before the failed
 	// persistence) and a single agent_done with finish_reason="error".
-	if len(hub.events) != 2 {
-		t.Fatalf("events = %d, want 2: %+v", len(hub.events), hub.events)
+	events := hub.snapshot()
+	if len(events) != 2 {
+		t.Fatalf("events = %d, want 2: %+v", len(events), events)
 	}
-	if hub.events[0].Type != websocket.EventAgentMessage {
-		t.Errorf("first event = %q, want %q", hub.events[0].Type, websocket.EventAgentMessage)
+	if events[0].Type != websocket.EventAgentMessage {
+		t.Errorf("first event = %q, want %q", events[0].Type, websocket.EventAgentMessage)
 	}
-	if hub.events[1].Type != websocket.EventAgentDone {
-		t.Errorf("last event = %q, want %q", hub.events[1].Type, websocket.EventAgentDone)
+	if events[1].Type != websocket.EventAgentDone {
+		t.Errorf("last event = %q, want %q", events[1].Type, websocket.EventAgentDone)
 	}
-	payload, ok := hub.events[1].Payload.(map[string]any)
+	payload, ok := events[1].Payload.(map[string]any)
 	if !ok {
-		t.Fatalf("agent_done payload not map[string]any: %T", hub.events[1].Payload)
+		t.Fatalf("agent_done payload not map[string]any: %T", events[1].Payload)
 	}
 	if got := payload["finish_reason"]; got != "error" {
 		t.Errorf("finish_reason = %v, want %q", got, "error")
@@ -175,7 +196,7 @@ func TestAgentService_PermReadToolAutoExecutes(t *testing.T) {
 	}
 	// Expect at least: 1 agent_tool(succeeded) + 1 agent_message + 1 agent_done
 	found := false
-	for _, e := range hub.events {
+	for _, e := range hub.snapshot() {
 		if e.Type == "agent_tool" {
 			p := e.Payload.(map[string]any)
 			if p["status"] == "succeeded" && p["tool_name"] == "list_tasks" {
@@ -184,6 +205,114 @@ func TestAgentService_PermReadToolAutoExecutes(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatalf("no succeeded tool event in %+v", hub.events)
+		t.Fatalf("no succeeded tool event in %+v", hub.snapshot())
+	}
+}
+
+func TestAgentService_PermWriteTool_Approve(t *testing.T) {
+	reg := NewToolRegistry()
+	reg.Register(&fakeTool{name: "create_task", perm: PermWrite})
+	var llmResponses = []ai.ToolResponse{
+		{ToolCalls: []ai.ToolCall{{ID: "c1", Name: "create_task", Args: json.RawMessage(`{"title":"x"}`)}}, FinishReason: "tool_calls"},
+	}
+	llm := &mockLLM{responses: llmResponses}
+	hub := &mockHub{}
+	repo := newInMemoryRepo(t)
+	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	conv, _ := repo.CreateConversation()
+
+	// Run SendMessage in goroutine; it should block on pending confirmation
+	done := make(chan error, 1)
+	go func() { done <- svc.SendMessage(context.Background(), conv.ID, "go") }()
+
+	// Wait for pending_confirmation event
+	var msgID string
+	for i := 0; i < 50; i++ {
+		for _, e := range hub.snapshot() {
+			if e.Type == "agent_tool" {
+				p := e.Payload.(map[string]any)
+				if p["status"] == "pending_confirmation" {
+					msgID, _ = p["message_id"].(string)
+				}
+			}
+		}
+		if msgID != "" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if msgID == "" {
+		t.Fatal("no pending_confirmation event")
+	}
+	if err := svc.Confirm(context.Background(), msgID, "approve"); err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("SendMessage never returned")
+	}
+	// Should have a succeeded event
+	found := false
+	for _, e := range hub.snapshot() {
+		if e.Type == "agent_tool" {
+			if p, ok := e.Payload.(map[string]any); ok && p["status"] == "succeeded" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("no succeeded event")
+	}
+}
+
+func TestAgentService_PermWriteTool_Reject(t *testing.T) {
+	reg := NewToolRegistry()
+	reg.Register(&fakeTool{name: "create_task", perm: PermWrite})
+	llm := &mockLLM{responses: []ai.ToolResponse{
+		{ToolCalls: []ai.ToolCall{{ID: "c1", Name: "create_task", Args: json.RawMessage(`{}`)}}, FinishReason: "tool_calls"},
+		{Content: "ok I won't", FinishReason: "stop"},
+	}}
+	hub := &mockHub{}
+	repo := newInMemoryRepo(t)
+	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	conv, _ := repo.CreateConversation()
+	done := make(chan error, 1)
+	go func() { done <- svc.SendMessage(context.Background(), conv.ID, "go") }()
+	var msgID string
+	for i := 0; i < 50; i++ {
+		for _, e := range hub.snapshot() {
+			if e.Type == "agent_tool" {
+				if p, ok := e.Payload.(map[string]any); ok && p["status"] == "pending_confirmation" {
+					msgID, _ = p["message_id"].(string)
+				}
+			}
+		}
+		if msgID != "" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if msgID == "" {
+		t.Fatal("no pending_confirmation event")
+	}
+	if err := svc.Confirm(context.Background(), msgID, "reject"); err != nil {
+		t.Fatalf("confirm: %v", err)
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("never returned")
+	}
+	found := false
+	for _, e := range hub.snapshot() {
+		if e.Type == "agent_tool" {
+			if p, ok := e.Payload.(map[string]any); ok && p["status"] == "rejected" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("no rejected event")
 	}
 }

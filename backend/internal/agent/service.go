@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
+	"time"
 
 	"ticktask/internal/ai"
 	"ticktask/internal/repository"
@@ -31,13 +33,17 @@ type AgentService interface {
 	RunTool(ctx context.Context, name string, args json.RawMessage) (any, error)
 }
 
-type agentService struct{ AgentDeps }
+type agentService struct {
+	AgentDeps
+	pending   map[string]chan string // msgID -> decision channel
+	pendingMu sync.Mutex
+}
 
 func NewAgentService(d AgentDeps) AgentService {
 	if d.System == "" {
 		d.System = DefaultSystemPrompt
 	}
-	return &agentService{AgentDeps: d}
+	return &agentService{AgentDeps: d, pending: make(map[string]chan string)}
 }
 
 func (s *agentService) SendMessage(ctx context.Context, convID, text string) error {
@@ -96,10 +102,39 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 					s.appendToolResult(convID, tc, "succeeded", string(rjson))
 				}
 			} else {
-				// PermWrite / PermDangerous handled in Tasks 7-8
-				s.broadcastTool(convID, "", tc.Name, tc.Args, "started", nil, "")
-				s.broadcastDone(convID, "stop")
-				return nil
+				// PermWrite / PermDangerous — require user confirmation
+				preview, _ := tool.Preview(ctx, tc.Args)
+				status := "pending_confirmation"
+				msgID, _ := s.Repo.AppendMessage(convID, "tool_call", "", &tc.Name, strPtr(string(tc.Args)), nil, &status)
+				s.broadcastTool(convID, msgID, tc.Name, tc.Args, "pending_confirmation", preview, "")
+				ch := make(chan string, 1)
+				s.setPending(msgID, ch)
+				select {
+				case decision := <-ch:
+					if decision != "approve" {
+						s.broadcastTool(convID, msgID, tc.Name, tc.Args, "rejected", nil, "")
+						s.Repo.UpdateMessage(msgID, strPtr("rejected"), strPtr(`{"rejected":true}`))
+						s.clearPending(msgID)
+						continue
+					}
+				case <-time.After(ConfirmationTimeout):
+					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "rejected", nil, "timeout")
+					s.Repo.UpdateMessage(msgID, strPtr("rejected"), strPtr(`{"error":"timeout"}`))
+					s.clearPending(msgID)
+					continue
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+				s.clearPending(msgID)
+				result, err := tool.Execute(ctx, tc.Args)
+				if err != nil {
+					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "failed", nil, err.Error())
+					s.Repo.UpdateMessage(msgID, strPtr("failed"), strPtr(fmt.Sprintf(`{"error":%q}`, err.Error())))
+				} else {
+					rjson, _ := json.Marshal(result)
+					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "succeeded", result, "")
+					s.Repo.UpdateMessage(msgID, strPtr("succeeded"), strPtr(string(rjson)))
+				}
 			}
 		}
 	}
@@ -108,7 +143,35 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 }
 
 func (s *agentService) Confirm(ctx context.Context, msgID, decision string) error {
-	return nil // implemented in Task 7
+	ch, ok := s.getPending(msgID)
+	if !ok {
+		return ErrToolNotFound
+	}
+	select {
+	case ch <- decision:
+		return nil
+	default:
+		return ErrToolNotFound
+	}
+}
+
+func (s *agentService) setPending(msgID string, ch chan string) {
+	s.pendingMu.Lock()
+	s.pending[msgID] = ch
+	s.pendingMu.Unlock()
+}
+
+func (s *agentService) getPending(msgID string) (chan string, bool) {
+	s.pendingMu.Lock()
+	defer s.pendingMu.Unlock()
+	ch, ok := s.pending[msgID]
+	return ch, ok
+}
+
+func (s *agentService) clearPending(msgID string) {
+	s.pendingMu.Lock()
+	delete(s.pending, msgID)
+	s.pendingMu.Unlock()
 }
 
 func (s *agentService) RunTool(ctx context.Context, name string, args json.RawMessage) (any, error) {
@@ -155,3 +218,5 @@ func (s *agentService) appendToolResult(convID string, tc ai.ToolCall, status, r
 	resultPtr := &resultJSON
 	s.Repo.AppendMessage(convID, "tool_result", "", &tc.Name, nil, resultPtr, statusPtr)
 }
+
+func strPtr(s string) *string { return &s }
