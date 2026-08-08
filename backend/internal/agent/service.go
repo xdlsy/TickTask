@@ -27,6 +27,7 @@ type AgentDeps struct {
 	Registry    ToolRegistry
 	Hub         HubBroadcaster
 	System      string
+	Tracer      TraceRecorder
 }
 
 type AgentService interface {
@@ -69,6 +70,9 @@ func NewAgentService(d AgentDeps) AgentService {
 	if d.System == "" {
 		d.System = DefaultSystemPrompt
 	}
+	if d.Tracer == nil {
+		d.Tracer = noopTracer{}
+	}
 	return &agentService{AgentDeps: d, pending: make(map[string]chan string)}
 }
 
@@ -79,10 +83,13 @@ func (s *agentService) SendMessage(ctx context.Context, convID, text string) err
 	if _, err := s.Repo.AppendMessage(convID, "user", text, nil, nil, nil, nil); err != nil {
 		return err
 	}
-	return s.runTurn(ctx, convID, 0)
+	return s.runTurn(ctx, convID, text, 0)
 }
 
-func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int) error {
+func (s *agentService) runTurn(ctx context.Context, convID, userText string, toolCount int) error {
+	trace := TurnTrace{ConversationID: convID, UserText: userText}
+	defer func() { s.Tracer.RecordTurn(convID, trace) }()
+
 	client := s.LLMFactory()
 	if client == nil {
 		s.broadcast(convID, websocket.EventAgentDone, map[string]any{
@@ -111,6 +118,7 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 			s.broadcast(convID, websocket.EventAgentMessage, map[string]any{
 				"conversation_id": convID, "message_id": msgID, "delta_text": resp.Content,
 			})
+			trace.AssistantText += resp.Content
 		}
 		if len(resp.ToolCalls) == 0 {
 			s.broadcastDone(convID, "stop")
@@ -122,6 +130,7 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 			if err != nil {
 				s.broadcastTool(convID, "", tc.Name, tc.Args, "failed", nil, nil, fmt.Sprintf("tool not found: %s", tc.Name))
 				s.appendToolResult(convID, tc, "failed", `{"error":"not found"}`)
+				trace.Steps = append(trace.Steps, traceStep(tc, PermRead, "failed", nil, fmt.Sprintf("tool not found: %s", tc.Name)))
 				continue
 			}
 			// Schema-validate args BEFORE the permission branch: a malformed
@@ -132,6 +141,7 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 			if err := ValidateArgs(tool.Schema().Function.Parameters, tc.Args); err != nil {
 				s.broadcastTool(convID, "", tc.Name, tc.Args, "failed", nil, nil, err.Error())
 				s.appendToolResult(convID, tc, "failed", fmt.Sprintf(`{"schema_error":%q}`, err.Error()))
+				trace.Steps = append(trace.Steps, traceStep(tc, PermRead, "failed", nil, err.Error()))
 				continue
 			}
 			perm := tool.Schema().Permission
@@ -141,10 +151,12 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 				if err != nil {
 					s.broadcastTool(convID, "", tc.Name, tc.Args, "failed", nil, nil, err.Error())
 					s.appendToolResult(convID, tc, "failed", fmt.Sprintf(`{"error":%q}`, err.Error()))
+					trace.Steps = append(trace.Steps, traceStep(tc, perm, "failed", nil, err.Error()))
 				} else {
 					rjson, _ := json.Marshal(result)
 					s.broadcastTool(convID, "", tc.Name, tc.Args, "succeeded", result, nil, "")
 					s.appendToolResult(convID, tc, "succeeded", string(rjson))
+					trace.Steps = append(trace.Steps, traceStep(tc, perm, "succeeded", result, ""))
 				}
 			} else {
 				// PermWrite / PermDangerous — require user confirmation
@@ -160,12 +172,14 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 						s.broadcastTool(convID, msgID, tc.Name, tc.Args, "rejected", nil, nil, "")
 						s.Repo.UpdateMessage(msgID, strPtr("rejected"), strPtr(`{"rejected":true}`))
 						s.clearPending(msgID)
+						trace.Steps = append(trace.Steps, traceStep(tc, perm, "rejected", nil, ""))
 						continue
 					}
 				case <-time.After(ConfirmationTimeout):
 					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "rejected", nil, nil, "timeout")
 					s.Repo.UpdateMessage(msgID, strPtr("rejected"), strPtr(`{"error":"timeout"}`))
 					s.clearPending(msgID)
+					trace.Steps = append(trace.Steps, traceStep(tc, perm, "rejected", nil, "timeout"))
 					continue
 				case <-ctx.Done():
 					return ctx.Err()
@@ -175,16 +189,24 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 				if err != nil {
 					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "failed", nil, nil, err.Error())
 					s.Repo.UpdateMessage(msgID, strPtr("failed"), strPtr(fmt.Sprintf(`{"error":%q}`, err.Error())))
+					trace.Steps = append(trace.Steps, traceStep(tc, perm, "failed", nil, err.Error()))
 				} else {
 					rjson, _ := json.Marshal(result)
 					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "succeeded", result, nil, "")
 					s.Repo.UpdateMessage(msgID, strPtr("succeeded"), strPtr(string(rjson)))
+					trace.Steps = append(trace.Steps, traceStep(tc, perm, "succeeded", result, ""))
 				}
 			}
 		}
 	}
 	s.broadcastDone(convID, "max_tools")
 	return nil
+}
+
+// traceStep builds a TraceStep from the in-scope tool-call decision and its
+// terminal outcome, keeping each append site in runTurn a one-liner.
+func traceStep(tc ai.ToolCall, perm ToolPermission, status string, result any, errMsg string) TraceStep {
+	return TraceStep{ToolCall: tc, Permission: perm, Status: status, Result: result, Error: errMsg}
 }
 
 func (s *agentService) Confirm(ctx context.Context, msgID, decision string) error {
