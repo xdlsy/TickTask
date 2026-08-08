@@ -25,15 +25,18 @@ func buildLLMMessages(system string, history []*model.AgentMessage) []ai.Message
 				}
 			}
 			msgs = append(msgs, am)
-		case "tool_result":
+		case "tool_result", "tool_call":
+			// tool_result = PermRead auto-executed results; tool_call = PermWrite/
+			// Dangerous results persisted after user confirmation. Both reconstruct
+			// as a tool message whose tool_call_id is the originating call's id
+			// (ParentID), pairing each result with the assistant's preceding
+			// tool_calls (Bug 4: tool_call was skipped, orphaning write-tool calls
+			// and breaking every turn after a create/update/delete/start).
 			if m.ToolName != nil {
 				msgs = append(msgs, ai.Message{
 					Role: "tool", Name: *m.ToolName, ToolCallID: deref(m.ParentID), Content: derep(m.ToolResult),
 				})
 			}
-		case "tool_call":
-			// assistant message carrying tool_calls is reconstructed in the previous assistant turn;
-			// here we skip; full reconstruction handled when persisting assistant turns with tool_calls
 		}
 	}
 	return msgs

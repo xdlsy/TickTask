@@ -184,7 +184,7 @@ func (s *agentService) runTurn(ctx context.Context, convID, userText string, too
 				// PermWrite / PermDangerous — require user confirmation
 				preview, _ := tool.Preview(ctx, tc.Args)
 				status := "pending_confirmation"
-				msgID, _ := s.Repo.AppendMessage(convID, "tool_call", "", &tc.Name, strPtr(string(tc.Args)), nil, &status, nil, nil)
+				msgID, _ := s.Repo.AppendMessage(convID, "tool_call", "", &tc.Name, strPtr(string(tc.Args)), nil, &status, nil, strPtr(tc.ID))
 				s.broadcastTool(convID, msgID, tc.Name, tc.Args, "pending_confirmation", nil, preview, "")
 				ch := make(chan string, 1)
 				s.setPending(msgID, ch)

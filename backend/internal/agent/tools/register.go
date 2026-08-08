@@ -42,6 +42,7 @@ func RegisterAll(reg agent.ToolRegistry, deps Deps) {
 	// Schedule tools (Task 11)
 	reg.MustRegister(&GenerateScheduleTool{Svc: deps.Schedule})
 	reg.MustRegister(&ListScheduleTool{Svc: deps.Schedule})
+	reg.MustRegister(&DeleteScheduleTool{Svc: deps.Schedule})
 
 	// Insight tools (Task 11)
 	reg.MustRegister(&GetDailyInsightsTool{Svc: deps.Analytics})

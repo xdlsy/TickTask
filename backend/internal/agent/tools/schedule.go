@@ -20,6 +20,7 @@ import (
 type ScheduleService interface {
 	GetSchedules(start, end time.Time) ([]service.ScheduleEvent, error)
 	GenerateSchedule(startTime, endTime string) ([]service.ScheduleEvent, string, error)
+	DeleteSchedule(id string) error
 }
 
 // =====================================================================
@@ -179,4 +180,62 @@ func (t *ListScheduleTool) Execute(ctx context.Context, args json.RawMessage) (a
 
 func (t *ListScheduleTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
 	return t.Execute(ctx, args)
+}
+
+// =====================================================================
+// delete_schedule
+// =====================================================================
+
+// DeleteScheduleTool removes a single schedule by id. PermDangerous: deletion is
+// irreversible, so the agent loop requires explicit user confirmation. The id
+// comes from a prior list_schedule call. This closes the tool-coverage gap
+// where the agent previously had no way to delete schedules and would fake it
+// by misusing delete_task.
+type DeleteScheduleTool struct {
+	Svc ScheduleService
+}
+
+func (t *DeleteScheduleTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "delete_schedule",
+		Function: agent.FunctionSpec{
+			Name:        "delete_schedule",
+			Description: "Delete one schedule by its id (irreversible). Get the id from list_schedule first.",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"schedule_id": map[string]any{"type": "string", "description": "id of the schedule to delete"},
+				},
+				"required": []any{"schedule_id"},
+			},
+		},
+		Permission: agent.PermDangerous,
+	}
+}
+
+func (t *DeleteScheduleTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		ScheduleID string `json:"schedule_id"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	if in.ScheduleID == "" {
+		return nil, fmt.Errorf("schema: missing required field schedule_id")
+	}
+	if err := t.Svc.DeleteSchedule(in.ScheduleID); err != nil {
+		return nil, err
+	}
+	return map[string]any{"deleted": true, "schedule_id": in.ScheduleID}, nil
+}
+
+func (t *DeleteScheduleTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	var in struct {
+		ScheduleID string `json:"schedule_id"`
+	}
+	_ = json.Unmarshal(args, &in)
+	return map[string]any{"action": "delete_schedule", "schedule_id": in.ScheduleID}, nil
 }

@@ -28,6 +28,44 @@ type mockScheduleSvc struct {
 	genStart   string
 	genEnd     string
 	genCalls   int
+
+	delErr    error
+	delCalls  int
+	delIDs    []string
+}
+
+func (m *mockScheduleSvc) DeleteSchedule(id string) error {
+	m.delCalls++
+	m.delIDs = append(m.delIDs, id)
+	return m.delErr
+}
+
+// --- DeleteScheduleTool ---
+
+func TestDeleteSchedule_DelegatesAndRequiresID(t *testing.T) {
+	svc := &mockScheduleSvc{}
+	tool := &DeleteScheduleTool{Svc: svc}
+
+	res, err := tool.Execute(context.Background(), json.RawMessage(`{"schedule_id":"s-1"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if svc.delCalls != 1 || len(svc.delIDs) != 1 || svc.delIDs[0] != "s-1" {
+		t.Errorf("DeleteSchedule call = %+v", svc.delIDs)
+	}
+	m, _ := res.(map[string]any)
+	if m["deleted"] != true || m["schedule_id"] != "s-1" {
+		t.Errorf("result = %+v", res)
+	}
+
+	// missing id must fail BEFORE touching the service
+	svc.delCalls = 0
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{}`)); err == nil {
+		t.Error("expected error for missing schedule_id")
+	}
+	if svc.delCalls != 0 {
+		t.Errorf("service called %d times for invalid args", svc.delCalls)
+	}
 }
 
 func (m *mockScheduleSvc) GetSchedules(start, end time.Time) ([]service.ScheduleEvent, error) {

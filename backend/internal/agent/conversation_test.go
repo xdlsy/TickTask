@@ -53,3 +53,29 @@ func TestBuildLLMMessages_AssistantWithoutToolCalls(t *testing.T) {
 		t.Fatalf("msgs = %+v", msgs)
 	}
 }
+
+// PermWrite/Dangerous tool results are stored as role=tool_call and must also
+// reconstruct as a tool message linked to the assistant's tool_call id. Before
+// Bug 4 they were skipped, orphaning the assistant's write-tool calls and
+// breaking every subsequent turn.
+func TestBuildLLMMessages_PermWriteToolCallLinked(t *testing.T) {
+	toolCallsJSON, _ := json.Marshal([]ai.ToolCall{
+		{ID: "wc1", Name: "delete_task", Args: json.RawMessage(`{"task_id":"t1"}`)},
+	})
+	history := []*model.AgentMessage{
+		{Role: "user", Content: "删掉任务 t1"},
+		{Role: "assistant", Content: "好的", ToolCalls: strPtr(string(toolCallsJSON))},
+		{Role: "tool_call", ToolName: strPtr("delete_task"), ToolResult: strPtr(`{"deleted":true}`), ParentID: strPtr("wc1")},
+	}
+	msgs := buildLLMMessages("sys", history)
+	// system, user, assistant(tool_calls), tool(linked)
+	if len(msgs) != 4 {
+		t.Fatalf("len = %d, want 4: %+v", len(msgs), msgs)
+	}
+	if len(msgs[2].ToolCalls) != 1 || msgs[2].ToolCalls[0].ID != "wc1" {
+		t.Errorf("assistant tool_calls = %+v, want id wc1", msgs[2].ToolCalls)
+	}
+	if msgs[3].Role != "tool" || msgs[3].ToolCallID != "wc1" {
+		t.Errorf("tool msg = %+v, want role=tool tool_call_id=wc1", msgs[3])
+	}
+}
