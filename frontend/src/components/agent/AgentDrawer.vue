@@ -27,7 +27,7 @@
     </template>
     <template #footer>
       <div v-if="!store.status.configured" class="not-configured-hint">
-        AI 未配置 — 请先到 <router-link to="/settings">设置</router-link> 填写 API Key,或切换 provider 到 CLI 模式
+        AI 未配置 — 请先到 <a class="link" @click="goToSettings">设置</a> 填写 API Key,或切换 provider 到 CLI 模式
       </div>
       <AgentInput
         v-else-if="!showHistory"
@@ -40,6 +40,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAgentStore } from '@/stores/agent'
 import AgentMessageList from './AgentMessageList.vue'
 import AgentInput from './AgentInput.vue'
@@ -47,6 +48,7 @@ import ConversationList from './ConversationList.vue'
 import ToolConfirmDialog from './ToolConfirmDialog.vue'
 
 const store = useAgentStore()
+const router = useRouter()
 const showHistory = ref(false)
 const open = computed({
   get: () => store.isOpen,
@@ -54,6 +56,10 @@ const open = computed({
 })
 const close = () => store.closeDrawer()
 const onSend = (text: string) => store.sendMessage(text)
+const goToSettings = () => {
+  close()
+  router.push('/settings')
+}
 </script>
 
 <style scoped>
@@ -86,8 +92,9 @@ const onSend = (text: string) => store.sendMessage(text)
   padding: 10px 12px;
   line-height: 1.5;
 }
-.not-configured-hint a {
+.not-configured-hint a.link {
   color: var(--accent-primary);
   text-decoration: underline;
+  cursor: pointer;
 }
 </style>
