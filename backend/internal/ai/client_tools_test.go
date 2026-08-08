@@ -44,8 +44,11 @@ func TestOpenAIClient_ChatWithTools_ParsesToolCalls(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := NewOpenAIClient("k", srv.URL, "m")
-	res, _ := c.ChatWithTools(context.Background(),
+	res, err := c.ChatWithTools(context.Background(),
 		[]Message{{Role: "user", Content: "go"}}, nil)
+	if err != nil {
+		t.Fatalf("ChatWithTools: %v", err)
+	}
 	if len(res.ToolCalls) != 1 {
 		t.Fatalf("tool calls = %d", len(res.ToolCalls))
 	}
@@ -54,7 +57,9 @@ func TestOpenAIClient_ChatWithTools_ParsesToolCalls(t *testing.T) {
 		t.Fatalf("tc = %+v", tc)
 	}
 	var args map[string]string
-	json.Unmarshal(tc.Args, &args)
+	if err := json.Unmarshal(tc.Args, &args); err != nil {
+		t.Fatalf("unmarshal args: %v", err)
+	}
 	if args["status"] != "todo" {
 		t.Fatalf("args = %+v", args)
 	}
@@ -80,5 +85,8 @@ func TestOpenAIClient_NetworkError_Retries(t *testing.T) {
 		[]Message{{Role: "user", Content: "x"}}, nil)
 	if err == nil || !strings.Contains(err.Error(), "503") {
 		t.Fatalf("err = %v", err)
+	}
+	if calls < 2 {
+		t.Errorf("expected at least 2 attempts, got %d", calls)
 	}
 }
