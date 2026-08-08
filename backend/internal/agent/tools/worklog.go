@@ -127,7 +127,7 @@ func (t *SaveWorklogTool) Schema() agent.ToolSchema {
 					"date":    map[string]any{"type": "string", "description": "YYYY-MM-DD"},
 					"summary": map[string]any{"type": "string", "description": "one-line day summary (optional)"},
 					"items": map[string]any{
-						"type": "array",
+						"type":        "array",
 						"description": "4D work items",
 						"items": map[string]any{
 							"type": "object",
