@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import type { AxiosResponse } from 'axios'
 import { api } from '@/api/client'
 import { wsClient } from '@/utils/websocket'
 import type { AgentConversation, AgentMessage, AgentStatus, AgentWsEvent, WSMessage } from '@/types'
@@ -10,13 +11,10 @@ interface PendingToolCall {
   preview?: unknown
 }
 
-// Note on return types: the `api.agent.*` group returns `AxiosResponse<T>` at
-// the type level, but consumers (and the test mock) treat the resolved value as
-// the bare payload. The store unwraps via `as unknown as T` so both the unit
-// tests and `vue-tsc` agree. Future tasks that re-shape the api group can drop
-// these casts.
-async function unwrap<T>(p: Promise<unknown>): Promise<T> {
-  return (await p) as T
+// `api.agent.*` returns `AxiosResponse<T>`; this helper extracts the `.data`
+// payload so the store never holds an AxiosResponse in state.
+async function unwrap<T>(p: Promise<AxiosResponse<T>>): Promise<T> {
+  return (await p).data
 }
 
 export const useAgentStore = defineStore('agent', {

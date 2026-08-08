@@ -5,12 +5,12 @@ import { useAgentStore } from './agent'
 vi.mock('@/api/client', () => ({
   api: {
     agent: {
-      listConversations: vi.fn().mockResolvedValue({ items: [], total: 0 }),
-      createConversation: vi.fn().mockResolvedValue({ id: 'c1', title: 'New' }),
+      listConversations: vi.fn().mockResolvedValue({ data: { items: [], total: 0 } }),
+      createConversation: vi.fn().mockResolvedValue({ data: { id: 'c1', title: 'New' } }),
       chat: vi.fn(),
-      runTool: vi.fn().mockResolvedValue({ result: 'ok' }),
+      runTool: vi.fn().mockResolvedValue({ data: { result: 'ok' } }),
       confirm: vi.fn(),
-      status: vi.fn().mockResolvedValue({ configured: true, supports_function_calling: true, provider: 'openai' }),
+      status: vi.fn().mockResolvedValue({ data: { configured: true, supports_function_calling: true, provider: 'openai' } }),
     },
   },
 }))
