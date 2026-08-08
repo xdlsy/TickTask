@@ -30,7 +30,6 @@ type CORSConfig struct {
 
 type AIConfig struct {
 	Provider string        `yaml:"provider"`
-	APIKey   string        `yaml:"api_key"`
 	BaseURL  string        `yaml:"base_url"`
 	Model    string        `yaml:"model"`
 	Timeout  time.Duration `yaml:"timeout"`
@@ -46,11 +45,6 @@ func Load(path string) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
-	}
-
-	// 从环境变量覆盖 API Key
-	if apiKey := os.Getenv("TT_AI_API_KEY"); apiKey != "" {
-		cfg.AI.APIKey = apiKey
 	}
 
 	return &cfg, nil
@@ -72,7 +66,6 @@ func LoadDefault() *Config {
 		},
 		AI: AIConfig{
 			Provider: "openai",
-			APIKey:   "",
 			BaseURL:  "https://api.openai.com/v1",
 			Model:    "gpt-4o-mini",
 			Timeout:  30 * time.Second,

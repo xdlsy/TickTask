@@ -12,8 +12,8 @@ cors:
 
 ai:
   provider: "openai"
-  # Set your OpenAI-compatible API key here (or via env). Never commit a real key.
-  api_key: ""
   base_url: "https://api.openai.com/v1"
   model: "gpt-4o-mini"
   timeout: 30s
+  # API Key is entered via the Settings page (stored encrypted in DB).
+  # Do NOT put it in this file.

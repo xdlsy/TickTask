@@ -2,23 +2,22 @@
 
 ## Responsibility [~ inferred]
 
-YAML configuration loader providing a single `Config` struct with typed sub-configs for server, database, CORS, and AI settings. Loads from file with environment variable override for the AI API key.
+YAML configuration loader providing a single `Config` struct with typed sub-configs for server, database, CORS, and AI settings. Loads from file. The AI API key is no longer part of this config — it is entered via the Settings page and stored encrypted in SQLite.
 
 Key types:
 - `Config` — top-level struct aggregating `ServerConfig`, `DatabaseConfig`, `CORSConfig`, `AIConfig`
 - `ServerConfig` — host, port, mode (debug/release)
-- `AIConfig` — provider, API key, base URL, model, timeout
+- `AIConfig` — provider, base URL, model, timeout (no API key)
 
 Key functions:
-- `Load(path string) (*Config, error)` — reads YAML file, applies env override (`TT_AI_API_KEY`)
+- `Load(path string) (*Config, error)` — reads YAML file
 - `LoadDefault() *Config` — sensible defaults (port 8080, gpt-4o-mini, 30s timeout)
 
 ## Conventions [~ inferred]
 
-- Environment variable `TT_AI_API_KEY` overrides config file value
+- API Key is no longer configured via yaml/env. Users enter it in the Settings page; it is stored encrypted in SQLite. `TT_AI_API_KEY` is read once at startup by `cmd/server/main.go` for the legacy one-time migration, then ignored.
 - Defaults are hardcoded in `LoadDefault()`, not in a separate defaults file
 - YAML struct tags map directly to `configs/config.yaml` keys
-- AI API key stored in plaintext in config — never committed to git
 
 ## Dependencies [✓ auto]
 
