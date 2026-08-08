@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -365,4 +366,101 @@ func TestAgentService_PermDangerousTool_SecondConfirm(t *testing.T) {
 	}
 	svc.Confirm(context.Background(), msgID, "approve")
 	<-done
+}
+
+// typedFakeTool declares a real schema so ValidateArgs has something to check.
+// (fakeTool declares only {"type":"object"} with no properties, which is treated
+// leniently to keep that test-double usable as a no-arg tool.)
+type typedFakeTool struct{ name string }
+
+func (t *typedFakeTool) Schema() ToolSchema {
+	return ToolSchema{
+		Name: t.name,
+		Function: FunctionSpec{
+			Description: "typed fake",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"status": map[string]any{"type": "string"},
+				},
+			},
+		},
+		Permission: PermRead,
+	}
+}
+func (t *typedFakeTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	return "ok:" + t.name, nil
+}
+func (t *typedFakeTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	return "preview:" + t.name, nil
+}
+
+func repeat(r ai.ToolResponse, n int) []ai.ToolResponse {
+	out := make([]ai.ToolResponse, n)
+	for i := range out {
+		out[i] = r
+	}
+	return out
+}
+
+// TestAgentService_MaxToolCalls verifies the runTurn outer loop terminates at
+// MaxToolCallsPerTurn even when the LLM keeps returning tool calls forever.
+func TestAgentService_MaxToolCalls(t *testing.T) {
+	reg := NewToolRegistry()
+	reg.Register(&fakeTool{name: "list_tasks", perm: PermRead})
+	// LLM always returns the same tool_call
+	llm := &mockLLM{responses: repeat(ai.ToolResponse{
+		ToolCalls:    []ai.ToolCall{{ID: "c", Name: "list_tasks", Args: json.RawMessage(`{}`)}},
+		FinishReason: "tool_calls",
+	}, MaxToolCallsPerTurn+5)}
+	hub := &mockHub{}
+	repo := newInMemoryRepo(t)
+	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	conv, _ := repo.CreateConversation()
+	if err := svc.SendMessage(context.Background(), conv.ID, "loop"); err != nil {
+		t.Fatal(err)
+	}
+	var doneReason string
+	for _, e := range hub.snapshot() {
+		if e.Type == "agent_done" {
+			doneReason, _ = e.Payload.(map[string]any)["finish_reason"].(string)
+		}
+	}
+	if doneReason != "max_tools" {
+		t.Fatalf("finish = %q, want max_tools", doneReason)
+	}
+}
+
+// TestAgentService_SchemaValidationError verifies that a tool call whose args
+// fail JSON-schema validation is short-circuited: a failed agent_tool event is
+// broadcast and the turn continues without executing the tool.
+func TestAgentService_SchemaValidationError(t *testing.T) {
+	reg := NewToolRegistry()
+	reg.Register(&typedFakeTool{name: "list_tasks"})
+	// Tool call with bad args type — status is declared as string but we pass a number.
+	llm := &mockLLM{responses: []ai.ToolResponse{
+		{ToolCalls: []ai.ToolCall{{ID: "c1", Name: "list_tasks", Args: json.RawMessage(`{"status":123}`)}}, FinishReason: "tool_calls"},
+		{Content: "ok", FinishReason: "stop"},
+	}}
+	hub := &mockHub{}
+	repo := newInMemoryRepo(t)
+	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	conv, _ := repo.CreateConversation()
+	if err := svc.SendMessage(context.Background(), conv.ID, "bad args"); err != nil {
+		t.Fatal(err)
+	}
+	// Expect agent_tool failed with a "schema: ..." error message.
+	var found bool
+	for _, e := range hub.snapshot() {
+		if e.Type == "agent_tool" {
+			if p, ok := e.Payload.(map[string]any); ok && p["status"] == "failed" {
+				if msg, _ := p["error"].(string); strings.Contains(msg, "schema") {
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatal("no schema failure event")
+	}
 }

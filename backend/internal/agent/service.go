@@ -89,6 +89,16 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 				s.appendToolResult(convID, tc, "failed", `{"error":"not found"}`)
 				continue
 			}
+			// Schema-validate args BEFORE the permission branch: a malformed
+			// tool call should never reach Execute (PermRead) or the user
+			// confirmation flow (PermWrite/Dangerous). The error is re-fed to
+			// the LLM via the appended tool_result so the next turn can correct
+			// itself. Note: ValidateArgs prefixes its errors with "schema:".
+			if err := ValidateArgs(tool.Schema().Function.Parameters, tc.Args); err != nil {
+				s.broadcastTool(convID, "", tc.Name, tc.Args, "failed", nil, nil, err.Error())
+				s.appendToolResult(convID, tc, "failed", fmt.Sprintf(`{"schema_error":%q}`, err.Error()))
+				continue
+			}
 			perm := tool.Schema().Permission
 			if perm == PermRead {
 				s.broadcastTool(convID, "", tc.Name, tc.Args, "started", nil, nil, "")
