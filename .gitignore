@@ -45,3 +45,8 @@ tasks-redesign.png
 
 # ===== OS / editor =====
 .DS_Store
+
+# ===== Agent eval artifacts =====
+backend/internal/agent/testdata/traces/*.jsonl
+eval/node_modules/
+eval/.promptfoo/

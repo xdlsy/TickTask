@@ -1,0 +1,104 @@
+description: TickTask 对话式 Agent 端到端意图验证（L2）
+
+# 自定义 WS provider：黑盒驱动 /api/agent/*，从 WS 重建 {tool_calls, assistant_text}
+providers:
+  - id: file://./provider.mjs
+    config:
+      baseUrl: '{{AGENT_BASE_URL|http://localhost:8080}}'
+
+tests:
+  - description: 我一会有啥安排吗 → list_schedule 覆盖今天
+    vars: { prompt: '我一会有啥安排吗？' }
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const ls = (r.tool_calls||[]).find(t => t.name === 'list_schedule');
+          if (!ls) return { pass: false, reason: 'list_schedule 未被调用' };
+          let a = typeof ls.args === 'string' ? JSON.parse(ls.args) : (ls.args||{});
+          const today = new Date().toISOString().slice(0,10);
+          const from = (a.from||'').slice(0,10), to = (a.to||'').slice(0,10);
+          return { pass: from <= today && today <= to, reason: `from=${from} to=${to} today=${today}` };
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const kw = ['审查 PR-1234','和 Alice 1:1','发布 v2.3'];
+          return { pass: kw.some(k => (r.assistant_text||'').includes(k)), reason: r.assistant_text };
+
+  - description: 今天还剩什么安排 → list_schedule
+    vars: { prompt: '今天还剩什么安排？' }
+    assert:
+      - type: javascript
+        value: JSON.parse(output).tool_calls.some(t => t.name === 'list_schedule')
+
+  - description: 有哪些没做的任务 → list_tasks
+    vars: { prompt: '我有哪些没做的任务？' }
+    assert:
+      - type: javascript
+        value: JSON.parse(output).tool_calls.some(t => t.name === 'list_tasks')
+
+  - description: 下一个任务 → list_tasks
+    vars: { prompt: '下一个任务是啥？' }
+    assert:
+      - type: javascript
+        value: JSON.parse(output).tool_calls.some(t => t.name === 'list_tasks')
+
+  - description: 今天专注了多久 → get_daily_insights
+    vars: { prompt: '我今天专注了多久？' }
+    assert:
+      - type: javascript
+        value: JSON.parse(output).tool_calls.some(t => t.name === 'get_daily_insights')
+
+  - description: 番茄钟状态 → get_timer_status
+    vars: { prompt: '番茄钟现在啥状态？' }
+    assert:
+      - type: javascript
+        value: JSON.parse(output).tool_calls.some(t => t.name === 'get_timer_status')
+
+  - description: 建任务 → create_task 触发确认
+    vars: { prompt: '帮我建个任务：周报' }
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const c = (r.tool_calls||[]).find(t => t.name === 'create_task');
+          return { pass: !!c && c.status === 'pending_confirmation', reason: JSON.stringify(c) };
+
+  - description: 标完成 → update_task 触发确认
+    vars: { prompt: '把「整理周报」标完成' }
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const c = (r.tool_calls||[]).find(t => t.name === 'update_task');
+          return { pass: !!c && c.status === 'pending_confirmation', reason: JSON.stringify(c) };
+
+  - description: 删任务 → delete_task 触发确认
+    vars: { prompt: '删掉任务「修复登录 bug」' }
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const c = (r.tool_calls||[]).find(t => t.name === 'delete_task');
+          return { pass: !!c && c.status === 'pending_confirmation', reason: JSON.stringify(c) };
+
+  - description: 开始番茄钟 → start_pomodoro 触发确认
+    vars: { prompt: '开始一个番茄钟' }
+    assert:
+      - type: javascript
+        value: |
+          const r = JSON.parse(output);
+          const c = (r.tool_calls||[]).find(t => t.name === 'start_pomodoro');
+          return { pass: !!c && c.status === 'pending_confirmation', reason: JSON.stringify(c) };
+
+  - description: 今天有啥洞察 → get_daily_insights
+    vars: { prompt: '我今天有啥洞察？' }
+    assert:
+      - type: javascript
+        value: JSON.parse(output).tool_calls.some(t => t.name === 'get_daily_insights')
+
+  - description: 记工作日志 → structure_worklog
+    vars: { prompt: '帮我把这段工作记成日志：今天修了登录 bug 并发了 v2.3' }
+    assert:
+      - type: javascript
+        value: JSON.parse(output).tool_calls.some(t => t.name === 'structure_worklog')
