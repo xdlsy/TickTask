@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"ticktask/internal/ai"
 	"ticktask/internal/repository"
@@ -74,9 +75,33 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 			s.broadcastDone(convID, "stop")
 			return nil
 		}
-		// Tool execution handled in Tasks 6-9
-		s.broadcastDone(convID, "stop")
-		return nil
+		for _, tc := range resp.ToolCalls {
+			toolCount++
+			tool, err := s.Registry.Lookup(tc.Name)
+			if err != nil {
+				s.broadcastTool(convID, "", tc.Name, tc.Args, "failed", nil, fmt.Sprintf("tool not found: %s", tc.Name))
+				s.appendToolResult(convID, tc, "failed", `{"error":"not found"}`)
+				continue
+			}
+			perm := tool.Schema().Permission
+			if perm == PermRead {
+				s.broadcastTool(convID, "", tc.Name, tc.Args, "started", nil, "")
+				result, err := tool.Execute(ctx, tc.Args)
+				if err != nil {
+					s.broadcastTool(convID, "", tc.Name, tc.Args, "failed", nil, err.Error())
+					s.appendToolResult(convID, tc, "failed", fmt.Sprintf(`{"error":%q}`, err.Error()))
+				} else {
+					rjson, _ := json.Marshal(result)
+					s.broadcastTool(convID, "", tc.Name, tc.Args, "succeeded", result, "")
+					s.appendToolResult(convID, tc, "succeeded", string(rjson))
+				}
+			} else {
+				// PermWrite / PermDangerous handled in Tasks 7-8
+				s.broadcastTool(convID, "", tc.Name, tc.Args, "started", nil, "")
+				s.broadcastDone(convID, "stop")
+				return nil
+			}
+		}
 	}
 	s.broadcastDone(convID, "max_tools")
 	return nil
@@ -106,4 +131,27 @@ func (s *agentService) broadcastDone(convID, reason string) {
 	s.broadcast(convID, websocket.EventAgentDone, map[string]any{
 		"conversation_id": convID, "finish_reason": reason,
 	})
+}
+
+func (s *agentService) broadcastTool(convID, msgID, name string, args json.RawMessage, status string, result any, errMsg string) {
+	payload := map[string]any{
+		"conversation_id": convID, "tool_name": name,
+		"args": json.RawMessage(args), "status": status,
+	}
+	if msgID != "" {
+		payload["message_id"] = msgID
+	}
+	if result != nil {
+		payload["result"] = result
+	}
+	if errMsg != "" {
+		payload["error"] = errMsg
+	}
+	s.broadcast(convID, websocket.EventAgentTool, payload)
+}
+
+func (s *agentService) appendToolResult(convID string, tc ai.ToolCall, status, resultJSON string) {
+	statusPtr := &status
+	resultPtr := &resultJSON
+	s.Repo.AppendMessage(convID, "tool_result", "", &tc.Name, nil, resultPtr, statusPtr)
 }

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -155,5 +156,34 @@ func TestAgentService_NoToolCall_RepoAppendError(t *testing.T) {
 	}
 	if got := payload["finish_reason"]; got != "error" {
 		t.Errorf("finish_reason = %v, want %q", got, "error")
+	}
+}
+
+func TestAgentService_PermReadToolAutoExecutes(t *testing.T) {
+	reg := NewToolRegistry()
+	reg.Register(&fakeTool{name: "list_tasks", perm: PermRead})
+	llm := &mockLLM{responses: []ai.ToolResponse{
+		{ToolCalls: []ai.ToolCall{{ID: "c1", Name: "list_tasks", Args: json.RawMessage(`{"status":"todo"}`)}}, FinishReason: "tool_calls"},
+		{Content: "all done", FinishReason: "stop"},
+	}}
+	hub := &mockHub{}
+	repo := newInMemoryRepo(t)
+	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	conv, _ := repo.CreateConversation()
+	if err := svc.SendMessage(context.Background(), conv.ID, "go"); err != nil {
+		t.Fatal(err)
+	}
+	// Expect at least: 1 agent_tool(succeeded) + 1 agent_message + 1 agent_done
+	found := false
+	for _, e := range hub.events {
+		if e.Type == "agent_tool" {
+			p := e.Payload.(map[string]any)
+			if p["status"] == "succeeded" && p["tool_name"] == "list_tasks" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("no succeeded tool event in %+v", hub.events)
 	}
 }
