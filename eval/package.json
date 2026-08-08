@@ -1,0 +1,14 @@
+{
+  "name": "ticktask-agent-eval",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed": "node seed.mjs",
+    "eval": "promptfoo eval",
+    "test": "node --test provider.test.mjs"
+  },
+  "devDependencies": {
+    "promptfoo": "^0.103.0",
+    "ws": "^8.18.0"
+  }
+}
