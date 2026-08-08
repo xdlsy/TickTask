@@ -151,6 +151,7 @@ func TestRegisterAll_RegistersAllTools(t *testing.T) {
 		"start_pomodoro", "stop_pomodoro", "get_timer_status",
 		"generate_schedule", "list_schedule",
 		"get_daily_insights",
+		"structure_worklog", "save_worklog",
 	}
 	for _, name := range wantNames {
 		if _, err := reg.Lookup(name); err != nil {
