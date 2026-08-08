@@ -31,6 +31,17 @@ type AgentService interface {
 	SendMessage(ctx context.Context, convID, text string) error
 	Confirm(ctx context.Context, msgID string, decision string) error
 	RunTool(ctx context.Context, name string, args json.RawMessage) (any, error)
+	Status() AgentStatus
+}
+
+// AgentStatus describes runtime capability flags surfaced to the frontend via
+// GET /api/agent/status. Task 22 replaces the stub implementation with one that
+// reads the live settings (provider / API-key presence / function-calling
+// capability).
+type AgentStatus struct {
+	Configured              bool   `json:"configured"`
+	SupportsFunctionCalling bool   `json:"supports_function_calling"`
+	Provider                string `json:"provider"`
 }
 
 type agentService struct {
@@ -190,6 +201,18 @@ func (s *agentService) RunTool(ctx context.Context, name string, args json.RawMe
 		return nil, err
 	}
 	return t.Execute(ctx, args)
+}
+
+// Status is a hardcoded stub added by Task 13 so the HTTP handler can compile
+// against the AgentService interface. Task 22 replaces this with a real
+// implementation that reads AI settings (configured flag, provider, function
+// calling capability).
+func (s *agentService) Status() AgentStatus {
+	return AgentStatus{
+		Configured:              true,
+		SupportsFunctionCalling: true,
+		Provider:                "openai",
+	}
 }
 
 func (s *agentService) broadcast(convID, eventType string, payload map[string]any) {
