@@ -462,14 +462,20 @@ async function testAIConnection() {
 
   testing.value = true
   try {
-    // 关键改动:不调 updateAISettings — 测试连接应当允许"试探性" key 而不持久化。
-    // 直接把 form 中的临时值传给 /agent/test;api_key 为空时后端从 DB 读已存的。
-    const r = await api.agent.test({
-      provider: aiSettings.value.provider,
-      api_key: aiSettings.value.api_key,
-      base_url: aiSettings.value.base_url,
-      model: aiSettings.value.model,
-    })
+    // 不调 updateAISettings — 测试连接允许"试探性" key 而不持久化。
+    // GET /settings 只回掩码预览,所以刷新页面后 form 的 api_key 永远为空。
+    // - 用户输入了 key → 用 form 值做一次性测试(test typed key,不落库)。
+    // - 没输入 key(但已存,apiSettingsPreview 非空)→ 发空 body,后端走 nil 路径
+    //   测试「已保存」的配置。发带空 api_key 的半截表单会被后端判为"AI 未配置"。
+    const payload: Partial<AISettings> = aiSettings.value.api_key
+      ? {
+          provider: aiSettings.value.provider,
+          api_key: aiSettings.value.api_key,
+          base_url: aiSettings.value.base_url,
+          model: aiSettings.value.model,
+        }
+      : {}
+    const r = await api.agent.test(payload)
     const result = r.data
     if (result.ok) {
       const latency = result.latency_ms ? ` · ${result.latency_ms}ms` : ''
