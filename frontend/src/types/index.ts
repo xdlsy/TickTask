@@ -78,6 +78,9 @@ export type WSMessageType =
   | 'task_updated'
   | 'terminal_output'
   | 'terminal_status'
+  | 'agent_message'
+  | 'agent_tool'
+  | 'agent_done'
   | 'error'
 
 export interface TimerTickMessage {
@@ -112,7 +115,7 @@ export interface TerminalStatusMessage {
   detail?: string
 }
 
-export type WSMessage = TimerTickMessage | SessionStateMessage | TimerCompleteMessage | TerminalOutputMessage | TerminalStatusMessage
+export type WSMessage = TimerTickMessage | SessionStateMessage | TimerCompleteMessage | TerminalOutputMessage | TerminalStatusMessage | AgentWsEvent
 
 // AI 相关类型
 export interface ClassificationResult {
