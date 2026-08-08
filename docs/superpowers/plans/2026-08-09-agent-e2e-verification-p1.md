@@ -1122,8 +1122,6 @@ tests:
 # 打分制：非二值闸门；建议阈值 0.9，手动/改 prompt 时跑
 ```
 
-> 注：第 7 条（建任务）第一个 assert 里 `t_status` 引用了下方第二个 assert 才定义的函数——**以第二个 assert 为准**（它自包含 `t_status` 定义）。实现时把第 7 条的两个 assert 合并/对齐成自包含写法，删除第一个冗余断言。最终第 7 条应只有一条自包含 javascript 断言。
-
 - [ ] **Step 3: 写 `eval/README.md`**
 
 Create `eval/README.md`:
