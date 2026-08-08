@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>TickTask Agent 入口 — 设计 Mockup</title>
+<style>
+  :root {
+    --el-color-primary: #409eff;
+    --el-color-success: #67c23a;
+    --el-color-warning: #e6a23c;
+    --el-color-danger: #f56c6c;
+    --el-bg-color: #ffffff;
+    --el-bg-color-page: #f2f3f5;
+    --el-text-color-primary: #303133;
+    --el-text-color-regular: #606266;
+    --el-text-color-secondary: #909399;
+    --el-border-color: #dcdfe6;
+    --el-border-color-light: #e4e7ed;
+    --el-fill-color-light: #f5f7fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    color: var(--el-text-color-primary);
+    background: var(--el-bg-color-page);
+  }
+  h1 { padding: 20px 24px; background: white; border-bottom: 1px solid var(--el-border-color-light); margin: 0; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  .intro { background: white; padding: 16px 20px; border-radius: 4px; margin-bottom: 24px; color: var(--el-text-color-regular); line-height: 1.7; }
+  .intro ul { margin: 8px 0 0; padding-left: 20px; }
+  .intro li { margin-bottom: 4px; }
+
+  .mock-page { padding: 20px; min-height: 100vh; }
+  .mock-page h2 { margin: 0 0 16px; font-weight: 500; }
+  .mock-tasks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .mock-task-card { background: white; border: 1px solid var(--el-border-color-light); border-radius: 4px; padding: 12px; }
+  .mock-task-card h4 { margin: 0 0 8px; font-size: 14px; }
+  .mock-task-card p { margin: 0; color: var(--el-text-color-secondary); font-size: 12px; }
+
+  .fab {
+    position: absolute;
+    bottom: 32px; right: 32px;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    background: var(--el-color-primary);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    font-size: 24px;
+    z-index: 100;
+  }
+
+  .drawer {
+    position: absolute;
+    top: 0; right: 0;
+    width: 480px; height: 100%;
+    background: white;
+    box-shadow: -2px 0 8px rgba(0,0,0,0.08);
+    display: flex; flex-direction: column;
+    z-index: 200;
+  }
+  .drawer-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--el-border-color-light);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .drawer-header .title { font-weight: 500; font-size: 15px; }
+  .drawer-header .actions { display: flex; gap: 4px; }
+  .icon-btn {
+    background: none; border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--el-text-color-regular);
+    font-size: 13px;
+  }
+  .icon-btn:hover { background: var(--el-fill-color-light); }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px;
+    display: flex; flex-direction: column;
+    gap: 14px;
+  }
+  .msg { display: flex; flex-direction: column; gap: 4px; }
+  .msg .role { font-size: 11px; color: var(--el-text-color-secondary); padding: 0 4px; }
+  .msg .bubble {
+    padding: 9px 13px;
+    border-radius: 8px;
+    line-height: 1.55;
+    font-size: 13.5px;
+  }
+  .msg.user .bubble {
+    background: var(--el-color-primary);
+    color: white;
+    align-self: flex-end;
+    max-width: 80%;
+  }
+  .msg.agent .bubble {
+    background: var(--el-fill-color-light);
+    color: var(--el-text-color-primary);
+    align-self: flex-start;
+    max-width: 85%;
+  }
+
+  .tool-card {
+    background: var(--el-fill-color-light);
+    border-left: 3px solid var(--el-color-primary);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-size: 13px;
+    margin-left: 4px;
+    align-self: flex-start;
+    max-width: 90%;
+    width: 100%;
+  }
+  .tool-card.read { border-left-color: var(--el-color-success); }
+  .tool-card.write { border-left-color: var(--el-color-warning); }
+  .tool-card.danger { border-left-color: var(--el-color-danger); background: #fef0f0; }
+  .tool-card.failed { border-left-color: var(--el-color-danger); opacity: 0.85; }
+
+  .tool-card .tool-name {
+    font-weight: 500;
+    color: var(--el-text-color-primary);
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 4px;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 13px;
+  }
+  .tool-card .tool-args {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    background: white;
+    padding: 6px 8px;
+    border-radius: 3px;
+    margin: 6px 0;
+    border: 1px solid var(--el-border-color-light);
+  }
+  .tool-card .tool-result { color: var(--el-text-color-regular); margin-top: 6px; line-height: 1.55; }
+  .status-pill {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    color: white;
+    font-family: -apple-system, sans-serif;
+  }
+  .status-pill.success { background: var(--el-color-success); }
+  .status-pill.warning { background: var(--el-color-warning); }
+  .status-pill.danger { background: var(--el-color-danger); }
+  .status-pill.info { background: var(--el-text-color-secondary); }
+
+  .tool-card .actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    padding: 5px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--el-border-color);
+    background: white;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--el-text-color-regular);
+  }
+  .btn:hover { border-color: var(--el-color-primary); color: var(--el-color-primary); }
+  .btn-primary { background: var(--el-color-primary); color: white; border-color: var(--el-color-primary); }
+  .btn-primary:hover { background: #66b1ff; border-color: #66b1ff; color: white; }
+  .btn-danger { background: var(--el-color-danger); color: white; border-color: var(--el-color-danger); }
+  .btn-danger:hover { background: #f78989; border-color: #f78989; color: white; }
+
+  .input-area { border-top: 1px solid var(--el-border-color-light); padding: 10px 18px 14px; background: white; }
+  .input-area textarea {
+    width: 100%;
+    border: 1px solid var(--el-border-color);
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    resize: none;
+    height: 56px;
+    outline: none;
+  }
+  .input-area textarea:focus { border-color: var(--el-color-primary); }
+  .input-area .send-row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+  .shortcuts { font-size: 11px; color: var(--el-text-color-secondary); }
+  .shortcuts code {
+    background: var(--el-fill-color-light);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: Consolas, Monaco, monospace;
+    margin-right: 4px;
+  }
+
+  .typing { display: inline-flex; gap: 3px; padding: 0 2px; vertical-align: middle; }
+  .typing span {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--el-text-color-secondary);
+    animation: blink 1.4s infinite both;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
+
+  .history-item {
+    padding: 10px 12px;
+    border: 1px solid var(--el-border-color-light);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  .history-item:hover { background: var(--el-fill-color-light); }
+  .history-item.active { border-color: var(--el-color-primary); background: rgba(64,158,255,0.06); }
+  .history-item .title { font-weight: 500; margin-bottom: 4px; font-size: 13px; }
+  .history-item .preview { font-size: 12px; color: var(--el-text-color-secondary); margin-bottom: 4px; }
+  .history-item .meta { font-size: 11px; color: var(--el-text-color-secondary); }
+
+  .confirm-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 300;
+  }
+  .confirm-dialog {
+    background: white;
+    border-radius: 8px;
+    width: 460px;
+    max-height: 80%;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  }
+  .confirm-dialog.danger { border-top: 4px solid var(--el-color-danger); }
+  .confirm-dialog .header { padding: 14px 18px; border-bottom: 1px solid var(--el-border-color-light); font-weight: 500; }
+  .confirm-dialog .body { padding: 14px 18px; overflow-y: auto; font-size: 13px; line-height: 1.6; }
+  .confirm-dialog .body p { margin: 6px 0; }
+  .confirm-dialog .body code { background: var(--el-fill-color-light); padding: 1px 6px; border-radius: 3px; font-family: Consolas, monospace; }
+  .confirm-dialog .footer { padding: 10px 18px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--el-border-color-light); }
+  .preview-list { list-style: none; padding: 0; margin: 8px 0; }
+  .preview-list li {
+    padding: 6px 10px;
+    background: var(--el-fill-color-light);
+    border-radius: 3px;
+    margin-bottom: 4px;
+    font-size: 12.5px;
+  }
+
+  .scene {
+    margin: 24px 0;
+    border: 1px solid var(--el-border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--el-bg-color-page);
+  }
+  .scene-label {
+    background: #303133;
+    color: white;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .scene-canvas {
+    position: relative;
+    height: 700px;
+    overflow: hidden;
+  }
+  .scene-canvas.compact { height: 540px; }
+</style>
+</head>
+<body>
+
+<h1>TickTask Agent 入口 — 设计 Mockup</h1>
+
+<div class="container">
+  <div class="intro">
+    下面用 <strong>6 个场景</strong> 演示 Agent 抽屉的视觉与交互。抽屉宽 480px，从右侧滑入，叠在当前页（这里是 Tasks 页）之上。
+    <ul>
+      <li><strong>PermRead</strong> 读类工具：自主执行（绿色边）</li>
+      <li><strong>PermWrite</strong> 写类工具：需用户在卡片上点"确认"（黄色边）</li>
+      <li><strong>PermDangerous</strong> 危险操作：inline 红色卡片 + 弹窗二次确认（红色边）</li>
+      <li>消息流支持流式 LLM 输出（typing indicator）、tool_call 卡片嵌套、tool_result 回显</li>
+    </ul>
+  </div>
+
+  <!-- 场景 1 -->
+  <div class="scene">
+    <div class="scene-label">场景 1 · 抽屉刚打开（空状态）</div>
+    <div class="scene-canvas compact">
+      <div class="mock-page">
+        <h2>任务</h2>
+        <div class="mock-tasks">
+          <div class="mock-task-card"><h4>写周报</h4><p>重要且紧急 · 今天</p></div>
+          <div class="mock-task-card"><h4>修复登录 bug</h4><p>重要且紧急 · 今天</p></div>
+          <div class="mock-task-card"><h4>学习 Rust</h4><p>重要不紧急 · 本周</p></div>
+          <div class="mock-task-card"><h4>整理桌面</h4><p>不重要不紧急 · 空闲</p></div>
+        </div>
+      </div>
+      <div class="drawer">
+        <div class="drawer-header">
+          <div class="title">🤖 Agent</div>
+          <div class="actions">
+            <button class="icon-btn">历史 ▾</button>
+            <button class="icon-btn">─</button>
+            <button class="icon-btn">✕</button>
+          </div>
+        </div>
+        <div class="messages">
+          <div style="text-align:center; color: var(--el-text-color-secondary); margin-top: 80px;">
+            <div style="font-size: 56px; margin-bottom: 14px;">🤖</div>
+            <div style="font-size: 14px; color: var(--el-text-color-primary);">你好，我可以帮你处理任务、番茄钟、日程和工作日志</div>
+            <div style="font-size: 12.5px; margin-top: 12px; line-height: 1.7;">
+              试试：<br>
+              "把今天没做完的任务顺延到明天"<br>
+              "启动一个番茄钟"<br>
+              "写个简单的日报"
+            </div>
+          </div>
+        </div>
+        <div class="input-area">
+          <textarea placeholder="问点什么都行..."></textarea>
+          <div class="send-row">
+            <div class="shortcuts"><code>/clear</code><code>/history</code><code>/new</code></div>
+            <button class="btn btn-primary">发送 ➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 场景 2 -->
+  <div class="scene">
+    <div class="scene-label">场景 2 · 对话进行中（读类 tool 已自主执行）</div>
+    <div class="scene-canvas">
+      <div class="mock-page">
+        <h2>任务</h2>
+        <div class="mock-tasks">
+          <div class="mock-task-card"><h4>写周报</h4><p>重要且紧急 · 今天</p></div>
+          <div class="mock-task-card"><h4>修复登录 bug</h4><p>重要且紧急 · 今天</p></div>
+        </div>
+      </div>
+      <div class="drawer">
+        <div class="drawer-header">
+          <div class="title">🤖 Agent</div>
+          <div class="actions">
+            <button class="icon-btn">历史 ▾</button>
+            <button class="icon-btn">─</button>
+            <button class="icon-btn">✕</button>
+          </div>
+        </div>
+        <div class="messages">
+          <div class="msg user">
+            <div class="role">你</div>
+            <div class="bubble">今天有哪些没做完的任务？</div>
+          </div>
+          <div class="msg agent">
+            <div class="role">Agent</div>
+            <div class="bubble">让我查一下今天的任务状态。</div>
+          </div>
+          <div class="tool-card read">
+            <div class="tool-name">
+              ▶ list_tasks
+              <span class="status-pill success">已执行 · PermRead</span>
+            </div>
+            <div class="tool-args">{ "status": "todo", "due": "today" }</div>
+            <div class="tool-result">找到 3 个未完成任务：写周报、修复登录 bug、整理桌面</div>
+          </div>
+          <div class="msg agent">
+            <div class="bubble">今天还有 <strong>3 个</strong> 未完成任务：写周报、修复登录 bug、整理桌面。要我帮你做点什么吗？</div>
+          </div>
+        </div>
+        <div class="input-area">
+          <textarea placeholder="问点什么都行..."></textarea>
+          <div class="send-row">
+            <div class="shortcuts"><code>/clear</code><code>/history</code><code>/new</code></div>
+            <button class="btn btn-primary">发送 ➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 场景 3 -->
+  <div class="scene">
+    <div class="scene-label">场景 3 · 写操作待确认（inline 卡片含 plan 预览）</div>
+    <div class="scene-canvas">
+      <div class="mock-page">
+        <h2>任务</h2>
+        <div class="mock-tasks">
+          <div class="mock-task-card"><h4>写周报</h4><p>重要且紧急 · 今天</p></div>
+        </div>
+      </div>
+      <div class="drawer">
+        <div class="drawer-header">
+          <div class="title">🤖 Agent</div>
+          <div class="actions">
+            <button class="icon-btn">历史 ▾</button>
+            <button class="icon-btn">─</button>
+            <button class="icon-btn">✕</button>
+          </div>
+        </div>
+        <div class="messages">
+          <div class="msg user">
+            <div class="bubble">把今天没做完的任务顺延到明天</div>
+          </div>
+          <div class="msg agent">
+            <div class="bubble">好的，先看一下今天的任务，再帮你顺延。</div>
+          </div>
+          <div class="tool-card read">
+            <div class="tool-name">▶ list_tasks <span class="status-pill success">已执行</span></div>
+            <div class="tool-args">{ "status": "todo", "due": "today" }</div>
+            <div class="tool-result">找到 4 个任务</div>
+          </div>
+          <div class="tool-card write">
+            <div class="tool-name">
+              ⏸ reschedule_tasks
+              <span class="status-pill warning">待确认 · PermWrite</span>
+            </div>
+            <div class="tool-args">{ "task_ids": [12, 13, 14, 15], "new_due": "2026-08-09" }</div>
+            <div class="tool-result">
+              将顺延 <strong>4 个任务</strong> 到明天（2026-08-09）：<br>
+              · 写周报<br>
+              · 修复登录 bug<br>
+              · 整理桌面<br>
+              · 学习 Rust（未开始）
+            </div>
+            <div class="actions">
+              <button class="btn btn-primary">✓ 确认执行</button>
+              <button class="btn">✕ 取消</button>
+              <button class="btn">查看详情</button>
+            </div>
+          </div>
+        </div>
+        <div class="input-area">
+          <textarea placeholder="问点什么都行..."></textarea>
+          <div class="send-row">
+            <div class="shortcuts"><code>/clear</code><code>/history</code><code>/new</code></div>
+            <button class="btn btn-primary">发送 ➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 场景 4 -->
+  <div class="scene">
+    <div class="scene-label">场景 4 · 流式输出 + 多 tool 调用</div>
+    <div class="scene-canvas">
+      <div class="mock-page"><h2>任务</h2></div>
+      <div class="drawer">
+        <div class="drawer-header">
+          <div class="title">🤖 Agent</div>
+          <div class="actions">
+            <button class="icon-btn">历史 ▾</button>
+            <button class="icon-btn">─</button>
+            <button class="icon-btn">✕</button>
+          </div>
+        </div>
+        <div class="messages">
+          <div class="msg user">
+            <div class="bubble">启动一个番茄钟，再帮我写个简单的日报</div>
+          </div>
+          <div class="tool-card write">
+            <div class="tool-name">▶ start_pomodoro <span class="status-pill success">已确认 · 执行中</span></div>
+            <div class="tool-args">{ "task_id": 12, "duration_min": 25 }</div>
+            <div class="tool-result">🍅 番茄钟已启动，剩余 25:00</div>
+          </div>
+          <div class="msg agent">
+            <div class="bubble">番茄钟已启动。下面是今天的日报草稿，待你确认后保存：</div>
+          </div>
+          <div class="tool-card read">
+            <div class="tool-name">▶ structure_worklog <span class="status-pill success">已执行</span></div>
+            <div class="tool-args">{ "brain_dump": "今天修复了登录bug、写了周报草稿..." }</div>
+            <div class="tool-result">已结构化为 4 个工作项（content/problem_solved/result/impact）</div>
+          </div>
+          <div class="msg agent">
+            <div class="bubble">正在生成日报总结<span class="typing"><span></span><span></span><span></span></span></div>
+          </div>
+        </div>
+        <div class="input-area">
+          <textarea placeholder="问点什么都行..."></textarea>
+          <div class="send-row">
+            <div class="shortcuts"><code>/clear</code><code>/history</code><code>/new</code></div>
+            <button class="btn btn-primary">发送 ➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 场景 5 -->
+  <div class="scene">
+    <div class="scene-label">场景 5 · 历史会话切换（抽屉顶部"历史 ▾"展开）</div>
+    <div class="scene-canvas">
+      <div class="drawer">
+        <div class="drawer-header">
+          <div class="title">🤖 历史会话</div>
+          <div class="actions">
+            <button class="icon-btn">返回 ▾</button>
+            <button class="icon-btn">─</button>
+            <button class="icon-btn">✕</button>
+          </div>
+        </div>
+        <div style="flex:1; overflow-y: auto; padding: 18px;">
+          <button class="btn btn-primary" style="width:100%; margin-bottom: 16px; padding: 8px;">+ 新建会话</button>
+          <div class="history-item active">
+            <div class="title">把今天没做完的任务顺延到明天</div>
+            <div class="preview">已顺延 4 个任务到 2026-08-09</div>
+            <div class="meta">今天 14:32 · 6 条消息</div>
+          </div>
+          <div class="history-item">
+            <div class="title">生成今日日程安排</div>
+            <div class="preview">已为 5 个任务生成日程，含 3 个番茄钟</div>
+            <div class="meta">今天 09:15 · 4 条消息</div>
+          </div>
+          <div class="history-item">
+            <div class="title">写昨天的工作日报</div>
+            <div class="preview">已结构化 4 个工作项并保存日报</div>
+            <div class="meta">昨天 22:08 · 8 条消息</div>
+          </div>
+          <div class="history-item">
+            <div class="title">分析上周完成情况</div>
+            <div class="preview">完成率 75%，专注时长 18h，建议...</div>
+            <div class="meta">2026-08-04 · 12 条消息</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 场景 6 -->
+  <div class="scene">
+    <div class="scene-label">场景 6 · 危险操作二次确认（PermDangerous，inline 红色卡片 + 弹窗）</div>
+    <div class="scene-canvas">
+      <div class="drawer">
+        <div class="drawer-header">
+          <div class="title">🤖 Agent</div>
+          <div class="actions"><button class="icon-btn">✕</button></div>
+        </div>
+        <div class="messages">
+          <div class="msg user">
+            <div class="bubble">删除所有已完成的任务</div>
+          </div>
+          <div class="tool-card danger">
+            <div class="tool-name">
+              ⚠ delete_tasks
+              <span class="status-pill danger">危险 · PermDangerous</span>
+            </div>
+            <div class="tool-args">{ "status": "completed" }</div>
+            <div class="tool-result" style="color: var(--el-color-danger);">
+              将永久删除 <strong>23 个已完成任务</strong>，不可恢复！
+            </div>
+            <div class="actions">
+              <button class="btn btn-danger">⚠ 二次确认删除</button>
+              <button class="btn">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="confirm-overlay">
+        <div class="confirm-dialog danger">
+          <div class="header">⚠ 危险操作二次确认</div>
+          <div class="body">
+            <p>即将调用工具 <code>delete_tasks</code>，参数如下：</p>
+            <div class="tool-args" style="background: var(--el-fill-color-light); padding: 6px 10px; border-radius: 3px; font-family: Consolas, monospace; font-size: 12px; color: var(--el-text-color-secondary);">{ "status": "completed" }</div>
+            <p style="margin-top: 12px;">影响预览：</p>
+            <ul class="preview-list">
+              <li>删除"完成 Q3 报告"（2026-07-15 完成）</li>
+              <li>删除"重构 timer 服务"（2026-07-12 完成）</li>
+              <li>删除"备份 6 月数据"（2026-07-01 完成）</li>
+              <li>... 共 23 个任务</li>
+            </ul>
+            <p style="color: var(--el-color-danger); font-size: 12.5px; margin-top: 12px;">⚠ 此操作不可恢复，删除后无法找回（除非从备份恢复）。</p>
+          </div>
+          <div class="footer">
+            <button class="btn">取消</button>
+            <button class="btn btn-danger">我已知晓，确认删除</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
