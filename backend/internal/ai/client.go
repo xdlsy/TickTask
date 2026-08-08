@@ -582,10 +582,31 @@ func (c CLIClient) ChatWithTools(ctx context.Context, messages []Message, tools 
 	return ToolResponse{}, ErrFunctionCallNotSupported
 }
 
+// protocolFor maps a vendor id (AISettings.Provider) to one of the three
+// implemented client protocols. Known vendors resolve to their protocol;
+// unknown values — including "custom" and the empty string — fall back to
+// the OpenAI-compatible client, matching historical behavior so existing
+// stored settings keep working without migration.
+//
+// The frontend vendor-preset registry
+// (frontend/src/utils/aiVendors.ts) is the display source of truth for vendor
+// labels, default base URLs, and model presets; this function is the backend
+// routing counterpart and must stay in sync with the preset list.
+func protocolFor(provider string) string {
+	switch provider {
+	case "claude", "cli":
+		return "cli"
+	case "anthropic", "minimax":
+		return "anthropic"
+	default: // openai, deepseek, qwen, zhipu, moonshot, custom, "" → OpenAI-compatible
+		return "openai"
+	}
+}
+
 // NewClientFromSettings constructs the appropriate LLMClient for a given
-// AISettings. Returns nil if the provider needs an API key and none is set,
-// so callers can distinguish "nothing configured" from "configured but
-// rejected" by checking for nil.
+// AISettings, routing by the vendor's protocol (see protocolFor). Returns nil
+// if the provider needs an API key and none is set, so callers can distinguish
+// "nothing configured" from "configured but rejected" by checking for nil.
 //
 // Extracted from cmd/server/main.go's constructLLMClient so other packages
 // (notably the agent service's TestConnection temp-settings path) can build
@@ -595,15 +616,15 @@ func NewClientFromSettings(settings *model.AISettings) LLMClient {
 	if settings == nil {
 		return nil
 	}
-	switch settings.Provider {
-	case "claude", "cli":
+	switch protocolFor(settings.Provider) {
+	case "cli":
 		return NewCLIClient()
 	case "anthropic":
 		if settings.APIKey == "" {
 			return nil
 		}
 		return NewAnthropicClient(settings.APIKey, settings.BaseURL, settings.Model)
-	default: // openai / custom / OpenAI-compatible
+	default: // openai
 		if settings.APIKey == "" {
 			return nil
 		}
