@@ -316,3 +316,53 @@ func TestAgentService_PermWriteTool_Reject(t *testing.T) {
 		t.Fatal("no rejected event")
 	}
 }
+
+func TestAgentService_PermDangerousTool_SecondConfirm(t *testing.T) {
+	reg := NewToolRegistry()
+	reg.Register(&fakeTool{name: "delete_task", perm: PermDangerous})
+	llm := &mockLLM{responses: []ai.ToolResponse{
+		{ToolCalls: []ai.ToolCall{{ID: "c1", Name: "delete_task", Args: json.RawMessage(`{"task_id":"12"}`)}}, FinishReason: "tool_calls"},
+		{Content: "deleted", FinishReason: "stop"},
+	}}
+	hub := &mockHub{}
+	repo := newInMemoryRepo(t)
+	svc := NewAgentService(AgentDeps{Repo: repo, LLM: llm, Registry: reg, Hub: hub})
+	conv, _ := repo.CreateConversation()
+	done := make(chan error, 1)
+	go func() { done <- svc.SendMessage(context.Background(), conv.ID, "go") }()
+	var msgID string
+	for i := 0; i < 50; i++ {
+		for _, e := range hub.snapshot() {
+			if e.Type == "agent_tool" {
+				if p, ok := e.Payload.(map[string]any); ok && p["status"] == "pending_confirmation" {
+					if pn, _ := p["tool_name"].(string); pn == "delete_task" {
+						msgID, _ = p["message_id"].(string)
+					}
+				}
+			}
+		}
+		if msgID != "" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if msgID == "" {
+		t.Fatal("no pending_confirmation for dangerous tool")
+	}
+	// preview should be present
+	var previewSeen bool
+	for _, e := range hub.snapshot() {
+		if e.Type == "agent_tool" {
+			if p, ok := e.Payload.(map[string]any); ok && p["message_id"] == msgID {
+				if _, ok := p["preview"]; ok {
+					previewSeen = true
+				}
+			}
+		}
+	}
+	if !previewSeen {
+		t.Fatal("no preview field in dangerous pending_confirmation")
+	}
+	svc.Confirm(context.Background(), msgID, "approve")
+	<-done
+}

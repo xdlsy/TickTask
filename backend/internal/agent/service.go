@@ -85,20 +85,20 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 			toolCount++
 			tool, err := s.Registry.Lookup(tc.Name)
 			if err != nil {
-				s.broadcastTool(convID, "", tc.Name, tc.Args, "failed", nil, fmt.Sprintf("tool not found: %s", tc.Name))
+				s.broadcastTool(convID, "", tc.Name, tc.Args, "failed", nil, nil, fmt.Sprintf("tool not found: %s", tc.Name))
 				s.appendToolResult(convID, tc, "failed", `{"error":"not found"}`)
 				continue
 			}
 			perm := tool.Schema().Permission
 			if perm == PermRead {
-				s.broadcastTool(convID, "", tc.Name, tc.Args, "started", nil, "")
+				s.broadcastTool(convID, "", tc.Name, tc.Args, "started", nil, nil, "")
 				result, err := tool.Execute(ctx, tc.Args)
 				if err != nil {
-					s.broadcastTool(convID, "", tc.Name, tc.Args, "failed", nil, err.Error())
+					s.broadcastTool(convID, "", tc.Name, tc.Args, "failed", nil, nil, err.Error())
 					s.appendToolResult(convID, tc, "failed", fmt.Sprintf(`{"error":%q}`, err.Error()))
 				} else {
 					rjson, _ := json.Marshal(result)
-					s.broadcastTool(convID, "", tc.Name, tc.Args, "succeeded", result, "")
+					s.broadcastTool(convID, "", tc.Name, tc.Args, "succeeded", result, nil, "")
 					s.appendToolResult(convID, tc, "succeeded", string(rjson))
 				}
 			} else {
@@ -106,19 +106,19 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 				preview, _ := tool.Preview(ctx, tc.Args)
 				status := "pending_confirmation"
 				msgID, _ := s.Repo.AppendMessage(convID, "tool_call", "", &tc.Name, strPtr(string(tc.Args)), nil, &status)
-				s.broadcastTool(convID, msgID, tc.Name, tc.Args, "pending_confirmation", preview, "")
+				s.broadcastTool(convID, msgID, tc.Name, tc.Args, "pending_confirmation", nil, preview, "")
 				ch := make(chan string, 1)
 				s.setPending(msgID, ch)
 				select {
 				case decision := <-ch:
 					if decision != "approve" {
-						s.broadcastTool(convID, msgID, tc.Name, tc.Args, "rejected", nil, "")
+						s.broadcastTool(convID, msgID, tc.Name, tc.Args, "rejected", nil, nil, "")
 						s.Repo.UpdateMessage(msgID, strPtr("rejected"), strPtr(`{"rejected":true}`))
 						s.clearPending(msgID)
 						continue
 					}
 				case <-time.After(ConfirmationTimeout):
-					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "rejected", nil, "timeout")
+					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "rejected", nil, nil, "timeout")
 					s.Repo.UpdateMessage(msgID, strPtr("rejected"), strPtr(`{"error":"timeout"}`))
 					s.clearPending(msgID)
 					continue
@@ -128,11 +128,11 @@ func (s *agentService) runTurn(ctx context.Context, convID string, toolCount int
 				s.clearPending(msgID)
 				result, err := tool.Execute(ctx, tc.Args)
 				if err != nil {
-					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "failed", nil, err.Error())
+					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "failed", nil, nil, err.Error())
 					s.Repo.UpdateMessage(msgID, strPtr("failed"), strPtr(fmt.Sprintf(`{"error":%q}`, err.Error())))
 				} else {
 					rjson, _ := json.Marshal(result)
-					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "succeeded", result, "")
+					s.broadcastTool(convID, msgID, tc.Name, tc.Args, "succeeded", result, nil, "")
 					s.Repo.UpdateMessage(msgID, strPtr("succeeded"), strPtr(string(rjson)))
 				}
 			}
@@ -196,7 +196,7 @@ func (s *agentService) broadcastDone(convID, reason string) {
 	})
 }
 
-func (s *agentService) broadcastTool(convID, msgID, name string, args json.RawMessage, status string, result any, errMsg string) {
+func (s *agentService) broadcastTool(convID, msgID, name string, args json.RawMessage, status string, result any, preview any, errMsg string) {
 	payload := map[string]any{
 		"conversation_id": convID, "tool_name": name,
 		"args": json.RawMessage(args), "status": status,
@@ -206,6 +206,9 @@ func (s *agentService) broadcastTool(convID, msgID, name string, args json.RawMe
 	}
 	if result != nil {
 		payload["result"] = result
+	}
+	if preview != nil {
+		payload["preview"] = preview
 	}
 	if errMsg != "" {
 		payload["error"] = errMsg
