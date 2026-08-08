@@ -252,6 +252,14 @@ func (m *mockLLMClient) ChatCompletion(ctx context.Context, prompt string) (stri
 	return m.response, m.err
 }
 
+// ChatWithTools is required to satisfy the extended ai.LLMClient interface.
+// These service-level tests exercise ChatCompletion only; tool-calling is
+// covered by ai package tests. Returning ErrFunctionCallNotSupported keeps
+// the mock honest about its unsupported surface.
+func (m *mockLLMClient) ChatWithTools(ctx context.Context, messages []ai.Message, tools []ai.ToolSpec) (ai.ToolResponse, error) {
+	return ai.ToolResponse{}, ai.ErrFunctionCallNotSupported
+}
+
 // mockTaskRepository is a minimal in-memory repo for service tests
 type mockTaskRepo struct {
 	tasks map[string]*model.Task

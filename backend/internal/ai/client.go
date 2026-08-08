@@ -4,16 +4,67 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os/exec"
 	"strings"
+	"time"
 )
+
+// ErrFunctionCallNotSupported indicates the LLM provider does not support
+// function/tool calling (e.g. CLI-based providers, or stubs awaiting impl).
+var ErrFunctionCallNotSupported = errors.New("function calling not supported by this provider")
 
 // LLMClient LLM 客户端接口
 type LLMClient interface {
 	ChatCompletion(ctx context.Context, prompt string) (string, error)
+	ChatWithTools(ctx context.Context, messages []Message, tools []ToolSpec) (ToolResponse, error)
+}
+
+// Message is the unified chat message envelope used by both ChatCompletion
+// (single user-prompt convenience wrapper) and ChatWithTools (full
+// multi-turn, tool-calling form). The ToolCalls/ToolCallID/Name fields are
+// omitted when empty so existing ChatCompletion JSON payloads are unchanged.
+type Message struct {
+	Role       string     `json:"role"`
+	Content    string     `json:"content,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Name       string     `json:"name,omitempty"`
+}
+
+// ToolCall is a normalized tool/function invocation produced by the model.
+// Args is the raw JSON arguments string from the provider, kept as RawMessage
+// so callers can unmarshal into whatever shape they expect.
+type ToolCall struct {
+	ID   string          `json:"id"`
+	Name string          `json:"name"`
+	Args json.RawMessage `json:"args"`
+}
+
+// FunctionSpec describes a single function tool's schema.
+type FunctionSpec struct {
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Parameters  map[string]any `json:"parameters"`
+}
+
+// ToolSpec wraps a FunctionSpec with the provider-required "type":"function"
+// discriminator. Matches the OpenAI tool-call request shape.
+type ToolSpec struct {
+	Type     string       `json:"type"`
+	Function FunctionSpec `json:"function"`
+}
+
+// ToolResponse is the normalized result of a ChatWithTools call: the model's
+// textual content (possibly empty when the model only emits tool calls), the
+// parsed tool calls, and the provider's termination reason.
+type ToolResponse struct {
+	Content      string     `json:"content"`
+	ToolCalls    []ToolCall `json:"tool_calls"`
+	FinishReason string     `json:"finish_reason"`
 }
 
 // OpenAIClient OpenAI 客户端实现
@@ -27,11 +78,6 @@ type OpenAIClient struct {
 type ChatRequest struct {
 	Model    string    `json:"model"`
 	Messages []Message `json:"messages"`
-}
-
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
 }
 
 type ChatResponse struct {
@@ -96,7 +142,9 @@ type AnthropicContent struct {
 }
 
 // CLIClient 通过 claude CLI 调用
-type CLIClient struct{}
+type CLIClient struct {
+	Binary string
+}
 
 func NewCLIClient() LLMClient {
 	return &CLIClient{}
@@ -241,4 +289,118 @@ func (c *OpenAIClient) ChatCompletion(ctx context.Context, prompt string) (strin
 	}
 
 	return chatResp.Choices[0].Message.Content, nil
+}
+
+// === Function-calling extension: ChatWithTools implementations ===
+
+// ChatWithTools sends a multi-turn conversation with optional tool/function
+// definitions to an OpenAI-compatible chat endpoint. It retries up to 3 times
+// on transient network errors or HTTP 5xx responses using exponential backoff
+// (1s, 2s, 4s). Non-5xx errors and successful parses are returned immediately.
+func (c *OpenAIClient) ChatWithTools(ctx context.Context, messages []Message, tools []ToolSpec) (ToolResponse, error) {
+	body := map[string]any{
+		"model":    c.model,
+		"messages": messages,
+	}
+	if len(tools) > 0 {
+		body["tools"] = tools
+		body["tool_choice"] = "auto"
+	}
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return ToolResponse{}, fmt.Errorf("marshal request: %w", err)
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/chat/completions", bytes.NewReader(jsonBody))
+		if err != nil {
+			return ToolResponse{}, fmt.Errorf("build request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := c.client.Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt < 2 {
+				time.Sleep(time.Duration(1<<attempt) * time.Second)
+			}
+			continue
+		}
+
+		raw, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if readErr != nil {
+			lastErr = readErr
+			if attempt < 2 {
+				time.Sleep(time.Duration(1<<attempt) * time.Second)
+			}
+			continue
+		}
+
+		if resp.StatusCode >= 500 {
+			lastErr = fmt.Errorf("openai %d: %s", resp.StatusCode, string(raw))
+			if attempt < 2 {
+				time.Sleep(time.Duration(1<<attempt) * time.Second)
+			}
+			continue
+		}
+		if resp.StatusCode != 200 {
+			return ToolResponse{}, fmt.Errorf("openai %d: %s", resp.StatusCode, string(raw))
+		}
+
+		var parsed struct {
+			Choices []struct {
+				Message struct {
+					Role      string `json:"role"`
+					Content   string `json:"content"`
+					ToolCalls []struct {
+						ID       string `json:"id"`
+						Type     string `json:"type"`
+						Function struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						} `json:"function"`
+					} `json:"tool_calls"`
+				} `json:"message"`
+				FinishReason string `json:"finish_reason"`
+			} `json:"choices"`
+		}
+		if err := json.Unmarshal(raw, &parsed); err != nil {
+			return ToolResponse{}, fmt.Errorf("decode: %w", err)
+		}
+		if len(parsed.Choices) == 0 {
+			return ToolResponse{}, errors.New("no choices")
+		}
+		ch := parsed.Choices[0]
+		out := ToolResponse{
+			Content:      ch.Message.Content,
+			FinishReason: ch.FinishReason,
+		}
+		for _, tc := range ch.Message.ToolCalls {
+			out.ToolCalls = append(out.ToolCalls, ToolCall{
+				ID:   tc.ID,
+				Name: tc.Function.Name,
+				Args: json.RawMessage(tc.Function.Arguments),
+			})
+		}
+		return out, nil
+	}
+	if lastErr == nil {
+		lastErr = errors.New("openai: exhausted retries")
+	}
+	return ToolResponse{}, lastErr
+}
+
+// ChatWithTools on AnthropicClient is unsupported pending the dedicated
+// implementation (planned in a later task). Returns ErrFunctionCallNotSupported.
+func (c *AnthropicClient) ChatWithTools(ctx context.Context, messages []Message, tools []ToolSpec) (ToolResponse, error) {
+	return ToolResponse{}, ErrFunctionCallNotSupported
+}
+
+// ChatWithTools on CLIClient is permanently unsupported: the CLI provider
+// surface does not expose structured tool calls. Returns ErrFunctionCallNotSupported.
+func (c CLIClient) ChatWithTools(ctx context.Context, messages []Message, tools []ToolSpec) (ToolResponse, error) {
+	return ToolResponse{}, ErrFunctionCallNotSupported
 }
