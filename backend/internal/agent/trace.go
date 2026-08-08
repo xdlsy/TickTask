@@ -53,6 +53,8 @@ type jsonTracer struct {
 	mu  sync.Mutex
 }
 
+// RecordTurn appends one JSONL line. Errors are intentionally ignored: tracing
+// is a byproduct and must never break the agent's runTurn.
 func (j *jsonTracer) RecordTurn(convID string, trace TurnTrace) {
 	trace.ConversationID = convID
 	data, err := json.Marshal(trace)
