@@ -422,7 +422,7 @@ func (c *AnthropicClient) ChatWithTools(ctx context.Context, messages []Message,
 	body := map[string]any{
 		"model":       c.model,
 		"max_tokens":  1024,
-		"messages":    userMsgs,
+		"messages":    convertMessagesToAnthropic(userMsgs),
 		"system":      system,
 	}
 	if len(tools) > 0 {
@@ -499,6 +499,56 @@ func (c *AnthropicClient) ChatWithTools(ctx context.Context, messages []Message,
 		lastErr = errors.New("anthropic: exhausted retries")
 	}
 	return ToolResponse{}, lastErr
+}
+
+// convertMessagesToAnthropic maps the unified (OpenAI-style) message list to
+// Anthropic's Messages API shape. Anthropic does not understand OpenAI's
+// `role: "tool"` or assistant-level `tool_calls`; it represents tool calls as
+// `tool_use` content blocks on assistant messages and tool results as
+// `tool_result` content blocks on user messages. Multiple tool results from one
+// assistant turn are merged into a single user message because Anthropic
+// requires alternating user/assistant roles. System messages are stripped (the
+// caller sends the system prompt as a separate top-level field).
+func convertMessagesToAnthropic(msgs []Message) []map[string]any {
+	out := []map[string]any{}
+	for _, m := range msgs {
+		switch m.Role {
+		case "system":
+			continue
+		case "user":
+			out = append(out, map[string]any{"role": "user", "content": m.Content})
+		case "assistant":
+			blocks := []map[string]any{}
+			if m.Content != "" {
+				blocks = append(blocks, map[string]any{"type": "text", "text": m.Content})
+			}
+			for _, tc := range m.ToolCalls {
+				var input any
+				if err := json.Unmarshal(tc.Args, &input); err != nil {
+					input = map[string]any{} // malformed args: send an empty object rather than fail
+				}
+				blocks = append(blocks, map[string]any{
+					"type": "tool_use", "id": tc.ID, "name": tc.Name, "input": input,
+				})
+			}
+			out = append(out, map[string]any{"role": "assistant", "content": blocks})
+		case "tool":
+			block := map[string]any{
+				"type": "tool_result", "tool_use_id": m.ToolCallID, "content": m.Content,
+			}
+			// Merge into the previous message iff it is the user message we
+			// built from earlier tool results this turn (content is a block list,
+			// not a plain string). Keeps roles alternating.
+			if n := len(out); n > 0 && out[n-1]["role"] == "user" {
+				if blocks, ok := out[n-1]["content"].([]map[string]any); ok {
+					out[n-1]["content"] = append(blocks, block)
+					continue
+				}
+			}
+			out = append(out, map[string]any{"role": "user", "content": []map[string]any{block}})
+		}
+	}
+	return out
 }
 
 // splitSystemMessage separates leading system messages from the conversation.
