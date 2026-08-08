@@ -23,13 +23,7 @@
         :streaming-text="store.streamingText"
         :is-thinking="store.isThinking"
       />
-      <ToolConfirmDialog
-        v-if="store.pendingConfirm"
-        :message-id="store.pendingConfirm.messageId"
-        :tool-name="store.pendingConfirm.toolName"
-        :args="store.pendingConfirm.args"
-        :preview="store.pendingConfirm.preview"
-      />
+      <ToolConfirmDialog v-if="store.pendingConfirm" />
     </template>
     <template #footer>
       <AgentInput v-if="!showHistory" :disabled="store.isThinking" @send="onSend" />
