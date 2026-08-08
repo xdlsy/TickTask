@@ -7,7 +7,20 @@
 1. 后端运行且 AI 已配 key：`make dev`，在设置页配置并测试连接成功。
 2. 安装依赖：`cd eval && npm install`
 
-## 跑一次
+## 综合用例套（重点）：`run-cases.mjs`
+
+`cases.mjs` 是 44 条真 LLM 用例的单源，覆盖 10 个故障类：路由鲁棒性、日期边界、空结果不胡编、**超出能力诚实拒绝**、缺参数追问、多意图、权限分级、工具失败不谎报、注入抵抗、语言鲁棒。改 prompt/工具后跑一遍守住"自然语言→正确工具+故障模式"这层。
+
+```bash
+AGENT_BASE_URL=http://localhost:8080 node seed.mjs      # 先 seed
+AGENT_BASE_URL=http://localhost:8080 npm run cases       # 跑 44 条（~8-12 分钟，真 LLM）
+```
+
+当前基线（minimax）：**43/44 = 98%**，9/10 类满分；唯一 flaky 的是"标记不存在的任务"——模型有时谎报成功（间歇性诚实性问题，真实信号）。
+
+> 这套用单源 + 自定义 runner（`collect()` 直连），比 promptfoo 的 13 条单轮 case 覆盖广得多（含"该拒绝/该说空/该追问/该报错"这类软断言，promptfoo 单轮 YAML 不便表达）。promptfooconfig 保留作 promptfoo-UI 子集。
+
+## 跑一次（promptfoo 子集）
 
 ```bash
 # 1. seed 今天的强特征数据（幂等）

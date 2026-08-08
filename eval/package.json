@@ -5,6 +5,7 @@
   "scripts": {
     "seed": "node seed.mjs",
     "eval": "promptfoo eval",
+    "cases": "node run-cases.mjs",
     "test": "node --test provider.test.mjs"
   },
   "devDependencies": {
