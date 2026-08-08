@@ -123,6 +123,27 @@ describe('Settings.vue — API Key input', () => {
       expect.objectContaining({ api_key: 'sk-typed-in-form' }),
     )
   })
+
+  it('testAIConnection with no typed key sends empty body to test the saved config', async () => {
+    const { api } = await import('@/api/client')
+    ;(api.getSettings as any).mockResolvedValue(mockSettingsResponse())
+
+    const wrapper = mount(Settings, { global: { stubs: elStubs } })
+    await flushPromises()
+
+    // Fresh page load: form api_key is empty (GET /settings returns only the
+    // masked preview), but a key IS stored.
+    expect((wrapper.vm as any).aiSettings.api_key).toBe('')
+    expect((wrapper.vm as any).aiSettingsPreview).toBe('sk-ab****wxyz')
+
+    await (wrapper.vm as any).testAIConnection()
+    await flushPromises()
+
+    // No typed key → send an EMPTY body so the backend tests the SAVED config
+    // via its nil-settings path. Sending the partial form (empty api_key)
+    // would make the backend reject it as "AI 未配置".
+    expect(api.agent.test).toHaveBeenCalledWith({})
+  })
 })
 
 describe('Settings.vue — vendor presets', () => {
