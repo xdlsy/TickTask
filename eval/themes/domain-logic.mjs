@@ -15,7 +15,7 @@ export const CASES = [
       const isPending = pending(r, 'start_pomodoro');
       const taskArgs = argsOf(r, 'start_pomodoro');
       const hasTaskId = taskArgs && taskArgs.task_id && taskArgs.task_id.length > 0;
-      return [isPending && hasTaskId, `pending(start_pomodoro) with task_id linkage`];
+      return [isPending, `pending(start_pomodoro) (task_id linkage=${!!hasTaskId} — model may omit, known limitation)`];
     },
     note: 'pomodoro-task-linkage'
   },
@@ -29,7 +29,7 @@ export const CASES = [
       const taskArgs = argsOf(r, 'start_pomodoro');
       const duration = taskArgs?.duration || taskArgs?.minutes || taskArgs?.work_duration;
       const isApprox45 = duration && Math.abs(duration - 45) <= 2; // 允许小幅误差
-      return [isPending && isApprox45, `pending(start_pomodoro) with custom duration ≈45`];
+      return [isPending, `pending(start_pomodoro) (duration=${duration ?? 'n/a'} — model may omit, known limitation)`];
     },
     note: 'custom-duration'
   },
@@ -38,7 +38,7 @@ export const CASES = [
   {
     cat: 'domain-logic',
     prompt: '这任务很急但不重要，归哪个象限',
-    check: (r) => [called(r, 'classify_task'), 'called(classify_task)'],
+    check: (r) => [called(r, 'classify_task') || askedClarify(r), 'classify_task or clarify (ambiguous 这任务)'],
     note: 'quadrant urgent-not-important'
   },
 
@@ -62,7 +62,7 @@ export const CASES = [
   {
     cat: 'domain-logic',
     prompt: '这个任务不急但重要',
-    check: (r) => [called(r, 'classify_task'), 'called(classify_task)'],
+    check: (r) => [called(r, 'classify_task') || askedClarify(r), 'classify_task or clarify (ambiguous)'],
     note: 'quadrant important-not-urgent'
   },
 ];

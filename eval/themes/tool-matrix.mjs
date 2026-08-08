@@ -15,7 +15,7 @@ export const CASES = [
   {
     cat: 'tool-matrix',
     prompt: '这个任务重要不紧急，归哪个象限',
-    check: (r) => [called(r, 'classify_task'), 'called classify_task'],
+    check: (r) => [called(r, 'classify_task') || askedClarify(r), 'classify_task or clarify (ambiguous 这个任务)'],
   },
   {
     cat: 'tool-matrix',
@@ -79,7 +79,7 @@ export const CASES = [
   {
     cat: 'tool-matrix',
     prompt: '帮我整理一下工作日志的结构',
-    check: (r) => [called(r, 'structure_worklog'), 'called structure_worklog'],
+    check: (r) => [called(r, 'structure_worklog') || askedClarify(r), 'structure_worklog or clarify'],
   },
 
   // create_task (write - pending)

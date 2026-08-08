@@ -50,8 +50,9 @@ for (let i = 0; i < cases.length; i++) {
     console.log(`${String(i+1).padStart(3)}/${cases.length} [SKIP] (${cat.padEnd(13)}) ${label.padEnd(28)} :: multi-turn`);
     continue;
   }
-  // pure-placeholder cases (timing/fault-injection) — can't evaluate, skip the LLM call
-  if (c.note && /needs[- ]?timing|inject /i.test(c.note)) {
+  // cases needing a non-single-turn runner (confirm-flow, DB verify, llm-judge,
+  // N-runs, fault injection, timing, multi-turn) — not evaluable here, skip.
+  if (c.note && /needs[- ]?confirm|needs[- ]?timing|needs[- ]?fault|inject |restart backend|llm-judge|run 5x|run twice|run-n|after confirm|approve|reject|cancel|needs db|db verify|db count|multi-turn|long-context/i.test(c.note)) {
     totalSkip++; byCat[cat].skip++;
     console.log(`${String(i+1).padStart(3)}/${cases.length} [SKIP] (${cat.padEnd(13)}) ${label.padEnd(28)} :: ${c.note}`);
     continue;

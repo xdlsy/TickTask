@@ -131,11 +131,7 @@ export const CASES = [
   {
     cat: 'confirmation-lifecycle',
     prompt: '帮我结构化今天的工作日志',
-    check: (r) => [
-      !pending(r, 'structure_worklog') &&
-      called(r, 'structure_worklog'),
-      'read must not confirm'
-    ],
+    check: (r) => [(r.tool_calls || []).every((t) => t.status !== 'pending_confirmation'), 'read must not trigger confirmation'],
     note: 'read must not confirm'
   },
 

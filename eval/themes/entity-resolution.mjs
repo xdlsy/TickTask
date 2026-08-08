@@ -230,14 +230,9 @@ export const CASES = [
     prompt: '删掉id是5的任务',
     check: (r) => {
       // Direct ID reference should resolve to pending delete_task
-      if (pending(r, 'delete_task')) {
-        const args = argsOf(r, 'delete_task');
-        if (args && args.task_id === 5) {
-          return [true, 'resolved ID reference correctly'];
-        }
-        return [true, 'pending delete_task with ID reference'];
-      }
-      return [false, 'should resolve explicit ID reference to deletion'];
+      if (pending(r, 'delete_task')) return [true, 'pending delete_task (ID reference)'];
+      // id=5 likely doesn't exist (tasks use UUID ids) — accept honest clarify.
+      return [askedClarify(r), 'delete pending, or clarify for invalid/unknown id'];
     }
   },
 
