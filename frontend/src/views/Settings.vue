@@ -171,9 +171,7 @@
         <div class="form-item">
           <label>服务商</label>
           <el-select v-model="aiSettings.provider" @change="handleProviderChange" size="large">
-            <el-option label="OpenAI" value="openai" />
-            <el-option label="Anthropic" value="anthropic" />
-            <el-option label="自定义" value="custom" />
+            <el-option v-for="v in VENDOR_PRESETS" :key="v.id" :label="v.label" :value="v.id" />
           </el-select>
         </div>
 
@@ -188,16 +186,14 @@
           />
         </div>
 
-        <div class="form-item" v-if="aiSettings.provider === 'custom' || aiSettings.provider === 'openai'">
+        <div class="form-item">
           <label>API 地址</label>
           <el-input
             v-model="aiSettings.base_url"
-            placeholder="例如: https://api.openai.com/v1"
+            :placeholder="baseUrlPlaceholder"
             size="large"
           />
-          <div class="form-tip">
-            {{ aiSettings.provider === 'openai' ? '默认使用 OpenAI 官方地址，如需代理可修改' : '请输入兼容 OpenAI API 的地址' }}
-          </div>
+          <div class="form-tip">{{ baseUrlHint }}</div>
         </div>
 
         <div class="form-item">
@@ -304,6 +300,7 @@ import { api } from '@/api/client'
 import { useAgentStore } from '@/stores/agent'
 import ImportWizard from '@/components/settings/ImportWizard.vue'
 import type { PomodoroSettings, AISettings, ClearResult } from '@/types'
+import { VENDOR_PRESETS, getVendorPreset } from '@/utils/aiVendors'
 
 const agentStore = useAgentStore()
 
@@ -341,20 +338,24 @@ const apiKeyPlaceholder = computed(() => {
   return '请输入 API Key'
 })
 
-const openaiModels = ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo']
-const anthropicModels = ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-opus-latest']
+const currentPreset = computed(() => getVendorPreset(aiSettings.value.provider))
 
-const availableModels = computed(() => {
-  if (aiSettings.value.provider === 'openai') return openaiModels
-  if (aiSettings.value.provider === 'anthropic') return anthropicModels
-  return []
-})
+const availableModels = computed(() => currentPreset.value?.models ?? [])
 
 const modelPlaceholder = computed(() => {
-  if (aiSettings.value.provider === 'openai') return '选择或输入 OpenAI 模型'
-  if (aiSettings.value.provider === 'anthropic') return '选择或输入 Anthropic 模型'
-  return '输入模型名称'
+  const label = currentPreset.value?.label
+  return label ? `选择或输入 ${label} 模型` : '输入模型名称'
 })
+
+const baseUrlPlaceholder = computed(() =>
+  currentPreset.value?.baseURL || '例如: https://api.openai.com/v1'
+)
+
+const baseUrlHint = computed(() =>
+  aiSettings.value.provider === 'custom'
+    ? '请输入兼容 OpenAI API 的地址'
+    : '默认使用官方地址，如需代理可修改'
+)
 
 const taskTimePrefs = computed({
   get: () => {
@@ -370,12 +371,10 @@ const taskTimePrefs = computed({
 })
 
 function handleProviderChange() {
-  if (aiSettings.value.provider === 'openai') {
-    aiSettings.value.base_url = 'https://api.openai.com/v1'
-    aiSettings.value.model = 'gpt-4o-mini'
-  } else if (aiSettings.value.provider === 'anthropic') {
-    aiSettings.value.base_url = 'https://api.anthropic.com/v1'
-    aiSettings.value.model = 'claude-3-5-sonnet-latest'
+  const preset = getVendorPreset(aiSettings.value.provider)
+  if (preset) {
+    aiSettings.value.base_url = preset.baseURL
+    aiSettings.value.model = preset.models[0] ?? ''
   } else {
     aiSettings.value.base_url = ''
     aiSettings.value.model = ''
