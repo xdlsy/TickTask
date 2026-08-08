@@ -76,6 +76,20 @@ func NewAgentService(d AgentDeps) AgentService {
 	return &agentService{AgentDeps: d, pending: make(map[string]chan string)}
 }
 
+// systemPromptWithDate appends the current local date/time to the configured
+// system prompt so the model can resolve relative references like "today" or
+// "this week" when routing to date-scoped tools (e.g. list_schedule, which
+// requires explicit YYYY-MM-DD from/to). Computed per turn so it stays current
+// across long-lived processes.
+func (s *agentService) systemPromptWithDate() string {
+	now := time.Now()
+	return s.System + fmt.Sprintf(
+		"\n\nCurrent date: %s (%s). Current time: %s. "+
+			"Use this date when the user refers to \"today\", \"this week\", or any relative date.",
+		now.Format("2006-01-02"), now.Weekday(), now.Format("15:04"),
+	)
+}
+
 func (s *agentService) SendMessage(ctx context.Context, convID, text string) error {
 	if _, err := s.Repo.GetConversation(convID); err != nil {
 		return err
@@ -103,7 +117,7 @@ func (s *agentService) runTurn(ctx context.Context, convID, userText string, too
 		if err != nil {
 			return err
 		}
-		msgs := buildLLMMessages(s.System, history)
+		msgs := buildLLMMessages(s.systemPromptWithDate(), history)
 		resp, err := client.ChatWithTools(ctx, msgs, s.Registry.ToOpenAITools())
 		if err != nil {
 			s.broadcastDone(convID, "error")

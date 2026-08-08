@@ -2,8 +2,11 @@
 // reference stable keywords. Idempotent: clears prior seed data first.
 // Run against a live backend:  AGENT_BASE_URL=http://localhost:8080 node seed.mjs
 const BASE = process.env.AGENT_BASE_URL || 'http://localhost:8080';
-const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-const rfc = (hhmm) => `${today}T${hhmm}:00Z`; // time.RFC3339, UTC
+// Local YYYY-MM-DD — must match the server's time.Now() notion of "today"
+// (the agent injects the current local date into its system prompt).
+const _d = new Date();
+const today = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, '0')}-${String(_d.getDate()).padStart(2, '0')}`;
+const rfc = (hhmm) => `${today}T${hhmm}:00Z`; // time.RFC3339
 
 const SCHEDULE_TITLES = ['审查 PR-1234', '和 Alice 1:1', '发布 v2.3'];
 const TASK_TITLES = ['整理周报', '修复登录 bug'];
