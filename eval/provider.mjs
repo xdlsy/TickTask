@@ -1,14 +1,5 @@
 import { WebSocket } from 'ws';
 
-// Default env-driven entry point Promptfoo calls. Returns Promptfoo's
-// { output: <json string> } shape; assertions parse output back to JSON.
-export async function callApi(prompt) {
-  const baseUrl = process.env.AGENT_BASE_URL || 'http://localhost:8080';
-  const wsUrl = process.env.AGENT_WS_URL || 'ws://localhost:8080/ws';
-  const result = await collect({ baseUrl, wsUrl, prompt, timeoutMs: 60_000 });
-  return { output: JSON.stringify(result) };
-}
-
 // Core logic, exported for unit testing with mock servers. Creates a
 // conversation, opens WS, posts the chat, collects agent_* events for that
 // conversation until agent_done (or timeout), and returns the reconstruction.
@@ -57,4 +48,18 @@ export function collect({ baseUrl, wsUrl, prompt, timeoutMs }) {
   })();
 }
 
-export default { callApi };
+// Promptfoo instantiates a file provider's default export with `new` and then
+// calls callApi(prompt). options.config carries baseUrl/wsUrl from
+// promptfooconfig, falling back to env vars / localhost defaults. collect stays
+// a named export so the unit meta-test can call it directly with mock servers.
+export default class AgentEvalProvider {
+  constructor(options = {}) {
+    const cfg = (options && options.config) || {};
+    this.baseUrl = cfg.baseUrl || process.env.AGENT_BASE_URL || 'http://localhost:8080';
+    this.wsUrl = cfg.wsUrl || process.env.AGENT_WS_URL || 'ws://localhost:8080/ws';
+  }
+  async callApi(prompt) {
+    const result = await collect({ baseUrl: this.baseUrl, wsUrl: this.wsUrl, prompt, timeoutMs: 60_000 });
+    return { output: JSON.stringify(result) };
+  }
+}
