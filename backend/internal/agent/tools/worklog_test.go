@@ -109,6 +109,40 @@ func (m *mockWorkLogReportSvc) ListReports(t model.WorkReportType) ([]*model.Wor
 	return m.listOut, nil
 }
 
+type mockWorkLogWriteSvc struct {
+	updIn     *service.SaveWorkLogInput
+	updOut    *model.WorkLog
+	updErr    error
+	sumDates  []string
+	sumVals   []string
+	sumErr    error
+	qAddIn    *service.CreateQuickEntryInput
+	qAddOut   *model.WorkItem
+	qAddErr   error
+	qAddDates []string
+}
+
+func (m *mockWorkLogWriteSvc) UpdateWorkLog(input service.SaveWorkLogInput) (*model.WorkLog, error) {
+	m.updIn = &input
+	if m.updErr != nil {
+		return nil, m.updErr
+	}
+	return m.updOut, nil
+}
+func (m *mockWorkLogWriteSvc) UpdateSummary(date string, summary string) error {
+	m.sumDates = append(m.sumDates, date)
+	m.sumVals = append(m.sumVals, summary)
+	return m.sumErr
+}
+func (m *mockWorkLogWriteSvc) AddQuickEntry(date string, in service.CreateQuickEntryInput) (*model.WorkItem, error) {
+	m.qAddIn = &in
+	m.qAddDates = append(m.qAddDates, date)
+	if m.qAddErr != nil {
+		return nil, m.qAddErr
+	}
+	return m.qAddOut, nil
+}
+
 // --- StructureWorklogTool ---
 
 func TestStructureWorklog_HappyPath(t *testing.T) {
@@ -430,5 +464,74 @@ func TestGetWorkReport_GetByPeriod(t *testing.T) {
 	m, _ := json.Marshal(res)
 	if !strings.Contains(string(m), "monthly") {
 		t.Errorf("result should include the report: %s", m)
+	}
+}
+
+func TestUpdateWorklogSummary_Delegates(t *testing.T) {
+	svc := &mockWorkLogWriteSvc{}
+	tool := &UpdateWorklogSummaryTool{Svc: svc}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"date":"2026-08-08","summary":"今天主要搞了 agent 工具"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(svc.sumDates) != 1 || svc.sumDates[0] != "2026-08-08" {
+		t.Errorf("date forwarded = %+v", svc.sumDates)
+	}
+	if len(svc.sumVals) != 1 || svc.sumVals[0] != "今天主要搞了 agent 工具" {
+		t.Errorf("summary forwarded = %+v", svc.sumVals)
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"summary":"x"}`)); err == nil {
+		t.Error("expected error for missing date")
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"date":"2026-08-08"}`)); err == nil {
+		t.Error("expected error for missing summary")
+	}
+}
+
+func TestAddWorklogEntry_Delegates(t *testing.T) {
+	svc := &mockWorkLogWriteSvc{qAddOut: &model.WorkItem{ID: "wi-1"}}
+	tool := &AddWorklogEntryTool{Svc: svc}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"date":"2026-08-09","activity":"写文档","start_time":"2026-08-09T10:00:00Z","end_time":"2026-08-09T11:00:00Z"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(svc.qAddDates) != 1 || svc.qAddDates[0] != "2026-08-09" {
+		t.Errorf("dates = %+v", svc.qAddDates)
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"date":"2026-08-09"}`)); err == nil {
+		t.Error("expected error for missing activity")
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"activity":"x"}`)); err == nil {
+		t.Error("expected error for missing date")
+	}
+}
+
+func TestUpdateWorklog_Delegates(t *testing.T) {
+	svc := &mockWorkLogWriteSvc{updOut: &model.WorkLog{Date: "2026-08-08"}}
+	tool := &UpdateWorklogTool{Svc: svc}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"date":"2026-08-08","summary":"s1","items":[{"seq":1,"title":"t","content":"c","problem_solved":"p","result":"r","impact":"i"}]}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if svc.updIn == nil || svc.updIn.Date != "2026-08-08" || svc.updIn.Summary != "s1" {
+		t.Errorf("UpdateWorkLog input = %+v", svc.updIn)
+	}
+	if len(svc.updIn.Items) != 1 || svc.updIn.Items[0].Title != "t" || svc.updIn.Items[0].Impact != "i" {
+		t.Errorf("items not forwarded correctly: %+v", svc.updIn.Items)
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"items":[]}`)); err == nil {
+		t.Error("expected error for missing date")
+	}
+}
+
+func TestAddWorklogEntry_ForwardsOptionalFields(t *testing.T) {
+	svc := &mockWorkLogWriteSvc{qAddOut: &model.WorkItem{ID: "wi-1"}}
+	tool := &AddWorklogEntryTool{Svc: svc}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"date":"2026-08-09","activity":"写文档","content":"c","problem_solved":"p","result":"r","impact":"i","quadrant":2}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if svc.qAddIn == nil || svc.qAddIn.Content != "c" || svc.qAddIn.Result != "r" || svc.qAddIn.Quadrant != 2 {
+		t.Errorf("optional 4D fields not forwarded: %+v", svc.qAddIn)
 	}
 }

@@ -50,6 +50,13 @@ type WorkLogReportSvc interface {
 	ListReports(t model.WorkReportType) ([]*model.WorkReport, error)
 }
 
+// WorkLogWriteSvc covers editing existing daily logs.
+type WorkLogWriteSvc interface {
+	UpdateWorkLog(input service.SaveWorkLogInput) (*model.WorkLog, error)
+	UpdateSummary(date string, summary string) error
+	AddQuickEntry(date string, in service.CreateQuickEntryInput) (*model.WorkItem, error)
+}
+
 // =====================================================================
 // structure_worklog
 // =====================================================================
@@ -447,4 +454,234 @@ func (t *GetWorkReportTool) Execute(ctx context.Context, args json.RawMessage) (
 
 func (t *GetWorkReportTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
 	return t.Execute(ctx, args)
+}
+
+// =====================================================================
+// update_worklog (full upsert)
+// =====================================================================
+
+type UpdateWorklogTool struct{ Svc WorkLogWriteSvc }
+
+func (t *UpdateWorklogTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "update_worklog",
+		Function: agent.FunctionSpec{
+			Name:        "update_worklog",
+			Description: "Upsert a work log for a date (replaces items). Use update_worklog_summary to edit only the summary without touching items.",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"date":    map[string]any{"type": "string", "description": "YYYY-MM-DD"},
+					"summary": map[string]any{"type": "string"},
+					"items": map[string]any{
+						"type":        "array",
+						"description": "4D work items (same shape as save_worklog)",
+						"items": map[string]any{
+							"type": "object",
+							"properties": map[string]any{
+								"seq":            map[string]any{"type": "integer"},
+								"title":          map[string]any{"type": "string"},
+								"content":        map[string]any{"type": "string"},
+								"problem_solved": map[string]any{"type": "string"},
+								"result":         map[string]any{"type": "string"},
+								"impact":         map[string]any{"type": "string"},
+							},
+						},
+					},
+				},
+				"required": []any{"date"},
+			},
+		},
+		Permission: agent.PermWrite,
+	}
+}
+
+func (t *UpdateWorklogTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Date    string `json:"date"`
+		Summary string `json:"summary"`
+		Items   []struct {
+			Seq           int    `json:"seq"`
+			Title         string `json:"title"`
+			Content       string `json:"content"`
+			ProblemSolved string `json:"problem_solved"`
+			Result        string `json:"result"`
+			Impact        string `json:"impact"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	if in.Date == "" {
+		return nil, fmt.Errorf("schema: missing required field date")
+	}
+	items := make([]service.SaveItemInput, 0, len(in.Items))
+	for _, it := range in.Items {
+		items = append(items, service.SaveItemInput{
+			Seq:           it.Seq,
+			Title:         it.Title,
+			Content:       it.Content,
+			ProblemSolved: it.ProblemSolved,
+			Result:        it.Result,
+			Impact:        it.Impact,
+		})
+	}
+	return t.Svc.UpdateWorkLog(service.SaveWorkLogInput{Date: in.Date, Summary: in.Summary, Items: items})
+}
+
+func (t *UpdateWorklogTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	var in struct {
+		Date string `json:"date"`
+	}
+	_ = json.Unmarshal(args, &in)
+	return map[string]any{"action": "update_worklog", "date": in.Date}, nil
+}
+
+// =====================================================================
+// update_worklog_summary
+// =====================================================================
+
+type UpdateWorklogSummaryTool struct{ Svc WorkLogWriteSvc }
+
+func (t *UpdateWorklogSummaryTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "update_worklog_summary",
+		Function: agent.FunctionSpec{
+			Name:        "update_worklog_summary",
+			Description: "Edit only the summary line of an existing work log (items untouched).",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"date":    map[string]any{"type": "string", "description": "YYYY-MM-DD"},
+					"summary": map[string]any{"type": "string"},
+				},
+				"required": []any{"date", "summary"},
+			},
+		},
+		Permission: agent.PermWrite,
+	}
+}
+
+func (t *UpdateWorklogSummaryTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Date    string `json:"date"`
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	if in.Date == "" {
+		return nil, fmt.Errorf("schema: missing required field date")
+	}
+	if in.Summary == "" {
+		return nil, fmt.Errorf("schema: missing required field summary")
+	}
+	if err := t.Svc.UpdateSummary(in.Date, in.Summary); err != nil {
+		return nil, err
+	}
+	return map[string]any{"date": in.Date, "updated": true}, nil
+}
+
+func (t *UpdateWorklogSummaryTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	var in struct {
+		Date string `json:"date"`
+	}
+	_ = json.Unmarshal(args, &in)
+	return map[string]any{"action": "update_worklog_summary", "date": in.Date}, nil
+}
+
+// =====================================================================
+// add_worklog_entry
+// =====================================================================
+
+type AddWorklogEntryTool struct{ Svc WorkLogWriteSvc }
+
+func (t *AddWorklogEntryTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "add_worklog_entry",
+		Function: agent.FunctionSpec{
+			Name:        "add_worklog_entry",
+			Description: "Append one manual entry to a date's work log (creates the log if needed). activity is required; start_time/end_time are RFC3339.",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"date":           map[string]any{"type": "string", "description": "YYYY-MM-DD"},
+					"activity":       map[string]any{"type": "string"},
+					"start_time":     map[string]any{"type": "string", "description": "RFC3339"},
+					"end_time":       map[string]any{"type": "string", "description": "RFC3339"},
+					"quadrant":       map[string]any{"type": "integer", "description": "1-4"},
+					"content":        map[string]any{"type": "string"},
+					"problem_solved": map[string]any{"type": "string"},
+					"result":         map[string]any{"type": "string"},
+					"impact":         map[string]any{"type": "string"},
+				},
+				"required": []any{"date", "activity"},
+			},
+		},
+		Permission: agent.PermWrite,
+	}
+}
+
+func (t *AddWorklogEntryTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Date          string  `json:"date"`
+		Activity      string  `json:"activity"`
+		StartTime     *string `json:"start_time"`
+		EndTime       *string `json:"end_time"`
+		Quadrant      *int    `json:"quadrant"`
+		Content       *string `json:"content"`
+		ProblemSolved *string `json:"problem_solved"`
+		Result        *string `json:"result"`
+		Impact        *string `json:"impact"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	if in.Date == "" {
+		return nil, fmt.Errorf("schema: missing required field date")
+	}
+	if in.Activity == "" {
+		return nil, fmt.Errorf("schema: missing required field activity")
+	}
+	ci := service.CreateQuickEntryInput{Activity: in.Activity}
+	if in.StartTime != nil {
+		ci.StartTime = *in.StartTime
+	}
+	if in.EndTime != nil {
+		ci.EndTime = *in.EndTime
+	}
+	if in.Quadrant != nil {
+		ci.Quadrant = *in.Quadrant
+	}
+	if in.Content != nil {
+		ci.Content = *in.Content
+	}
+	if in.ProblemSolved != nil {
+		ci.ProblemSolved = *in.ProblemSolved
+	}
+	if in.Result != nil {
+		ci.Result = *in.Result
+	}
+	if in.Impact != nil {
+		ci.Impact = *in.Impact
+	}
+	return t.Svc.AddQuickEntry(in.Date, ci)
+}
+
+func (t *AddWorklogEntryTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	var in struct {
+		Date     string `json:"date"`
+		Activity string `json:"activity"`
+	}
+	_ = json.Unmarshal(args, &in)
+	return map[string]any{"action": "add_worklog_entry", "date": in.Date, "activity": in.Activity}, nil
 }

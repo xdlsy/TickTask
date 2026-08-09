@@ -14,6 +14,7 @@ type mockWorkLogSvc struct {
 	mockWorkLogSaveSvc
 	mockWorkLogReadSvc
 	mockWorkLogReportSvc
+	mockWorkLogWriteSvc
 }
 
 // Compile-time guards: ensure the combined mock satisfies both interfaces.
@@ -22,6 +23,7 @@ var (
 	_ WorkLogSaveSvc      = (*mockWorkLogSvc)(nil)
 	_ WorkLogReadSvc      = (*mockWorkLogSvc)(nil)
 	_ WorkLogReportSvc    = (*mockWorkLogSvc)(nil)
+	_ WorkLogWriteSvc     = (*mockWorkLogSvc)(nil)
 )
 
 // newTestRegistry wires RegisterAll with all mocks pre-populated, returning
