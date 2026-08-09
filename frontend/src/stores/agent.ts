@@ -3,6 +3,7 @@ import type { AxiosResponse } from 'axios'
 import { api } from '@/api/client'
 import { wsClient } from '@/utils/websocket'
 import type { AgentConversation, AgentMessage, AgentStatus, AgentWsEvent, WSMessage } from '@/types'
+import { useTaskStore } from './task'
 
 interface PendingToolCall {
   messageId: string
@@ -24,6 +25,12 @@ const nextLocalId = (prefix: string) => `${prefix}-${++localSeq}`
 function safeStringify(v: unknown): string {
   try { return JSON.stringify(v) } catch { return String(v) }
 }
+
+// Agent tools that mutate task data. On success we refresh the task store so the
+// list/quadrant views reflect agent-made changes live — the agent writes through
+// the backend directly and otherwise bypasses the task store's own actions
+// (createTask/updateTask/etc. only fire when the USER acts in the UI).
+const TASK_MUTATION_TOOLS = new Set(['create_task', 'update_task', 'delete_task', 'move_task', 'classify_task'])
 
 export const useAgentStore = defineStore('agent', {
   state: () => ({
@@ -129,6 +136,13 @@ export const useAgentStore = defineStore('agent', {
             }
           }
         }
+      }
+      // A task mutation committed via the agent — refresh the task store so the
+      // list/quadrant views update without a manual reload.
+      if (e.status === 'succeeded' && TASK_MUTATION_TOOLS.has(e.tool_name)) {
+        const tasks = useTaskStore()
+        tasks.fetchTasks()
+        tasks.fetchTasksByQuadrant()
       }
     },
     onAgentDone(e: Extract<AgentWsEvent, { type: 'agent_done' }>) {
