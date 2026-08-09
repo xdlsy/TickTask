@@ -9,14 +9,14 @@
 
 ## 综合用例套（重点）：`run-cases.mjs` + `cases/`
 
-**197 条真 LLM 用例，25 个类别**。`cases.mjs`（原 44 条 / 10 类）+ `themes/`（15 个主题文件，153 条）。主题覆盖：工具矩阵完整性、参数保真、实体消歧、确认全生命周期、多轮状态、幂等/副作用、输入边界/对抗参数、安全/内容策略、输出质量、i18n/时区、领域逻辑、动作后自验（防假成功）、确定性/flaky、性能 SLO、韧性/故障注入。共享断言 helper 在 `lib/helpers.mjs`。
+**208 条真 LLM 用例，26 个类别**。`cases.mjs`（44 条 / 10 类）+ `themes/`（16 个主题文件，164 条）。主题覆盖：工具矩阵完整性、参数保真、实体消歧、确认全生命周期、多轮状态、幂等/副作用、输入边界/对抗参数、安全/内容策略、输出质量、i18n/时区、领域逻辑、动作后自验（防假成功）、日程生命周期（schedule-lifecycle：新工具路由 + 原 bug 回归 + confirm/dbVerify + revise 两步）、确定性/flaky、性能 SLO、韧性/故障注入。共享断言 helper 在 `lib/helpers.mjs`。
 
 ```bash
 AGENT_BASE_URL=http://localhost:8080 node seed.mjs      # 先 seed
 AGENT_BASE_URL=http://localhost:8080 npm run cases       # 跑全量（~20 分钟，真 LLM）
 ```
 
-**当前基线（minimax）：168/184 = 91%（增强 runner 可评估集）| SKIP 13/197 | 总 197。**
+**当前基线（minimax，工具扩展前）：168/184 = 91%（增强 runner 可评估集）| SKIP 13/197 | 总 197。** ⚠️ 工具扩展（+16 工具 / +schedule-lifecycle 11 条）后总用例升至 208，该基线需重跑重新标定。
 
 runner 现支持多模式（`run-cases.mjs`）：多轮 `turns[]`、确认流 `confirm:'approve'|'reject'`（自动 `/confirm` 续跑）、N 次重复 `runs`、计时 `maxMs`、DB 核验 `dbVerify`。runnable 因此从 124 → 184，SKIP 从 73 → 13（只剩故障注入 + llm-judge，需额外基建）。
 
@@ -56,7 +56,7 @@ L2 是打分制（建议通过率 ≥0.9），偶发 miss 不挂 CI。默认 `go
 
 ## 多轮 e2e（写工具后接着聊）
 
-promptfooconfig 每条 case 是**单轮**，覆盖不到「用了写工具（建/改/删/番茄钟）确认后，下一轮是否还能正常答」——这条曾经是真实 bug（多轮工具调用断裂，每用一次写工具后续就卡死）。`multiturn-test.mjs` 守这条：建任务 → `/confirm` approve → 同一会话追问 → 断言答复真的提到该任务。
+promptfooconfig 每条 case 是**单轮**，覆盖不到「用了写工具（建/改/删/番茄钟）确认后，下一轮是否还能正常答」——这条曾经是真实 bug（多轮工具调用断裂，每用一次写工具后续就卡死）。`multiturn-test.mjs` 守这条：对每个写工具（create_task、create_schedule）各跑一遍 → `/confirm` approve → 同一会话追问 → 断言答复真的提到该实体。
 
 ```bash
 AGENT_BASE_URL=http://localhost:8080 node multiturn-test.mjs
@@ -66,3 +66,5 @@ AGENT_BASE_URL=http://localhost:8080 node multiturn-test.mjs
 
 - spec：`docs/superpowers/specs/2026-08-09-agent-e2e-verification-design.md`
 - 计划：`docs/superpowers/plans/2026-08-09-agent-e2e-verification-p1.md`
+- 工具扩展 spec：`docs/superpowers/specs/2026-08-09-agent-tool-expansion-design.md`
+- 工具扩展 计划：`docs/superpowers/plans/2026-08-09-agent-tool-expansion.md`

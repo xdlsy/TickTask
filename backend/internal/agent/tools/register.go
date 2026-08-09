@@ -28,7 +28,7 @@ type Deps struct {
 }
 
 // RegisterAll wires every tool the agent package exposes into the given
-// registry. After Task 8 it registers 30 tools: 6 task + 5 timer + 7 schedule + 2 insight + 9 work-log + 1 settings.
+// registry. It registers 30 tools: 6 task + 5 timer + 7 schedule + 2 insight + 9 work-log + 1 settings.
 func RegisterAll(reg agent.ToolRegistry, deps Deps) {
 	// Task tools (Task 10)
 	reg.MustRegister(&ListTasksTool{Svc: deps.Tasks})
