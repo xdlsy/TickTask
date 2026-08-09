@@ -26,7 +26,7 @@ test.describe('@p0 Tasks · UI 创建/编辑/删除/完成', () => {
 
   test('TASK-UI-002: 列表视图下拉「编辑」改标题并保存生效', async ({ page, taskFactory }) => {
     const original = `待编辑-${Date.now()}`
-    const task = await taskFactory.create({ title: original, quadrant: 2 })
+    await taskFactory.create({ title: original, quadrant: 2 })
     const changed = `${original}-改`
 
     await page.goto('/tasks')
@@ -45,7 +45,6 @@ test.describe('@p0 Tasks · UI 创建/编辑/删除/完成', () => {
 
     await expect(dialog).toBeHidden({ timeout: 10000 })
     await expect(page.getByText(changed).first()).toBeVisible({ timeout: 10000 })
-    expect(task.id).toBeTruthy()
   })
 
   test('TASK-UI-003: 列表视图下拉「删除」移除任务(无确认弹窗)', async ({ page, taskFactory }) => {

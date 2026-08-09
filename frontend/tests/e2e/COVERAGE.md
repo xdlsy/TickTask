@@ -76,3 +76,4 @@
 2. WorkLog 全页交互覆盖(含启用/移除 `v-if="false"` 的脑暴入口的产品决策)。
 3. Analytics「获取洞察」未配 AI 时加 `ElMessage.warning` 反馈。
 4. 拖拽(任务跨象限、日程挪动/缩放)——单独评估 Playwright HTML5 drag 稳定性。
+5. 任务「完成/删除」缺成功反馈(Dashboard 与 QuadrantView 共性缺口)——操作生效但无 `ElMessage.success` toast。

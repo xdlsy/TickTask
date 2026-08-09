@@ -28,7 +28,7 @@ test.describe('@p0 Schedule · UI 增删改', () => {
 
   test('SCH-UI-002: 点事件块打开「编辑日程」,改标题保存生效', async ({ page, scheduleFactory }) => {
     const original = `原日程-${Date.now()}`
-    const ev = await scheduleFactory.create({ title: original })
+    await scheduleFactory.create({ title: original })
     const changed = `${original}-改`
 
     await page.goto('/schedule')
@@ -45,7 +45,6 @@ test.describe('@p0 Schedule · UI 增删改', () => {
     await dialog.getByRole('button', { name: '保存' }).click()
 
     await expect(page.getByText(changed).first()).toBeVisible({ timeout: 10000 })
-    expect(ev.id).toBeTruthy()
   })
 
   test('SCH-UI-003: 编辑对话框内点「删除」移除日程', async ({ page, scheduleFactory }) => {
