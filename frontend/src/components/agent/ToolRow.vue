@@ -14,8 +14,8 @@
       <div v-if="message.tool_status === 'pending_confirmation'" class="confirm">
         <pre v-if="previewText" class="preview">{{ previewText }}</pre>
         <div class="actions">
-          <el-button size="small" type="primary" data-testid="tool-confirm-approve" @click="decide('approve')">✓ 批准</el-button>
-          <el-button size="small" data-testid="tool-confirm-reject" @click="decide('reject')">✕ 拒绝</el-button>
+          <el-button size="small" type="primary" data-testid="tool-confirm-approve" :loading="busy === 'approve'" :disabled="busy !== null" @click="decide('approve')">✓ 批准</el-button>
+          <el-button size="small" data-testid="tool-confirm-reject" :loading="busy === 'reject'" :disabled="busy !== null" @click="decide('reject')">✕ 拒绝</el-button>
         </div>
       </div>
 
@@ -34,6 +34,7 @@ import { classifyPermission, summarizeTool } from './toolFormatters'
 const props = defineProps<{ message: AgentMessage }>()
 const store = useAgentStore()
 const open = ref(false)
+const busy = ref<'approve' | 'reject' | null>(null)
 
 const perm = computed(() => {
   if (props.message.tool_status === 'failed') return 'failed'
@@ -79,8 +80,14 @@ function pretty(s: string | undefined): string {
 const prettyArgs = computed(() => pretty(props.message.tool_args))
 const prettyResult = computed(() => pretty(props.message.tool_result))
 
-function decide(d: 'approve' | 'reject') {
-  store.confirmToolCall(props.message.id, d)
+async function decide(d: 'approve' | 'reject') {
+  if (busy.value) return
+  busy.value = d
+  try {
+    await store.confirmToolCall(props.message.id, d)
+  } finally {
+    busy.value = null
+  }
 }
 </script>
 

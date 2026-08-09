@@ -47,4 +47,25 @@ describe('ToolRow', () => {
     await w.find('[data-testid="tool-confirm-approve"]').trigger('click')
     expect(spy).toHaveBeenCalledWith('tc1', 'approve')
   })
+
+  it('reject click calls store.confirmToolCall with reject', async () => {
+    const store = useAgentStore()
+    const spy = vi.spyOn(store, 'confirmToolCall').mockResolvedValue(undefined as never)
+    const w = mount(ToolRow, { props: { message: { ...baseMsg, id: 'tc1', tool_name: 'create_task', tool_args: '{"title":"x"}', tool_status: 'pending_confirmation' } }, global: { plugins: [ElementPlus] } })
+    await w.find('[data-testid="tool-confirm-reject"]').trigger('click')
+    expect(spy).toHaveBeenCalledWith('tc1', 'reject')
+  })
+
+  it('renders the preview when pendingConfirm matches this row', async () => {
+    const store = useAgentStore()
+    store.pendingConfirm = { messageId: 'tc1', toolName: 'create_task', args: { title: 'x' }, preview: { title: 'x', quadrant: 1 } }
+    const w = mount(ToolRow, { props: { message: { ...baseMsg, id: 'tc1', tool_name: 'create_task', tool_args: '{"title":"x"}', tool_status: 'pending_confirmation' } }, global: { plugins: [ElementPlus] } })
+    expect(w.find('.preview').exists()).toBe(true)
+    expect(w.text()).toContain('quadrant')
+    // a different row's pendingConfirm must NOT leak:
+    store.pendingConfirm = { messageId: 'other', toolName: 'create_task', args: {}, preview: { secret: 1 } }
+    await w.vm.$nextTick()
+    expect(w.find('.preview').exists()).toBe(false)
+    expect(w.text()).not.toContain('secret')
+  })
 })
