@@ -24,7 +24,7 @@ test.describe('@p0 Tasks · UI 创建/编辑/删除/完成', () => {
     }
   })
 
-  test('TASK-UI-002: 列表视图下拉「编辑」改标题并保存生效', async ({ page, taskFactory, apiClient }) => {
+  test('TASK-UI-002: 列表视图下拉「编辑」改标题并保存生效', async ({ page, taskFactory }) => {
     const original = `待编辑-${Date.now()}`
     const task = await taskFactory.create({ title: original, quadrant: 2 })
     const changed = `${original}-改`
@@ -40,32 +40,11 @@ test.describe('@p0 Tasks · UI 创建/编辑/删除/完成', () => {
     const dialog = page.locator('.el-dialog', { hasText: '编辑任务' })
     await expect(dialog).toBeVisible()
 
-    // Clear the title field and fill in the new title
-    const titleInput = dialog.getByPlaceholder('输入任务标题')
-    await titleInput.fill('')
-    await titleInput.fill(changed)
+    await dialog.getByPlaceholder('输入任务标题').fill(changed)
+    await dialog.getByRole('button', { name: '保存' }).click()
 
-    // Try clicking the save button
-    const saveButton = dialog.locator('.el-dialog__footer button.el-button--primary')
-    await saveButton.click()
-
-    // Wait for dialog to close
-    await expect(dialog).toBeHidden({ timeout: 3000 }).catch(() => {})
-
-    // If dialog didn't close, manually close it and report the issue
-    if (await dialog.isVisible()) {
-      await page.keyboard.press('Escape')
-
-      // Try updating via API to verify the backend works
-      await apiClient.updateTask(task.id, { title: changed }).catch(() => {})
-
-      // Reload to check if API update worked
-      await page.reload()
-      await page.getByRole('button', { name: '列表' }).click()
-    }
-
-    // Wait for the updated text to appear in the list
-    await expect(page.locator('.task-item', { hasText: changed })).toBeVisible({ timeout: 10000 })
+    await expect(dialog).toBeHidden({ timeout: 10000 })
+    await expect(page.getByText(changed).first()).toBeVisible({ timeout: 10000 })
     expect(task.id).toBeTruthy()
   })
 
