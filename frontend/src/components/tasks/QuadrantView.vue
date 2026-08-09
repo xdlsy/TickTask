@@ -22,6 +22,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import TaskCard from './TaskCard.vue'
 import TaskForm from './TaskForm.vue'
 import { useTaskStore } from '@/stores/task'
@@ -45,8 +46,8 @@ function onEditTask(t: TaskResponse) { editingTask.value = t; showForm.value = t
 function onShowDetail(t: TaskResponse) { pomodoroDetailRef.value?.open(t) }
 function onAddTask() { editingTask.value = null; showForm.value = true }
 async function onSaveTask(d: any) { if (editingTask.value) await taskStore.updateTask(editingTask.value.id, d); else await taskStore.createTask(d); showForm.value = false; editingTask.value = null }
-async function onCompleteTask(id: string) { await taskStore.markCompleted(id) }
-async function onDeleteTask(id: string) { await taskStore.deleteTask(id) }
+async function onCompleteTask(id: string) { await taskStore.markCompleted(id); ElMessage.success('任务已完成') }
+async function onDeleteTask(id: string) { await taskStore.deleteTask(id); ElMessage.success('任务已删除') }
 async function onStartPomodoro(taskId: string) {
   try {
     await timerStore.createSession(taskId, 'work')

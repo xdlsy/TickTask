@@ -162,10 +162,12 @@ function onEditTask(task: TaskResponse) {
 
 async function onCompleteTask(id: string) {
   await taskStore.markCompleted(id)
+  ElMessage.success('任务已完成')
 }
 
 async function onDeleteTask(id: string) {
   await taskStore.deleteTask(id)
+  ElMessage.success('任务已删除')
 }
 
 async function onSaveTask(data: any) {
