@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"ticktask/internal/model"
@@ -230,14 +231,30 @@ func (s *TaskService) GetPomodoroSettings() (*model.PomodoroSettings, error) {
 	return s.settingRepo.GetPomodoroSettings()
 }
 
+// encodeTags serializes a tag slice into the string column via JSON,
+// so tags round-trip losslessly through create/update/read.
 func encodeTags(tags []string) string {
-	// 简化处理，实际应使用 json.Marshal
-	return ""
+	if len(tags) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(tags)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
+// decodeTags parses the JSON-encoded tag column back into a slice.
+// Returns an empty slice for empty/invalid stored values (incl. legacy "" rows).
 func decodeTags(s string) []string {
-	// 简化处理，实际应使用 json.Unmarshal
-	return []string{}
+	if s == "" {
+		return []string{}
+	}
+	var tags []string
+	if err := json.Unmarshal([]byte(s), &tags); err != nil {
+		return []string{}
+	}
+	return tags
 }
 
 // TaskResponse is the enriched API response DTO with computed pomodoro fields.
@@ -258,7 +275,7 @@ type TaskResponse struct {
 	RecurrenceDay      int        `json:"recurrence_day"`
 	PreferredStartTime string     `json:"preferred_start_time"`
 	PreferredEndTime   string     `json:"preferred_end_time"`
-	Tags               string     `json:"tags"`
+	Tags               []string   `json:"tags"`
 	Order              int        `json:"order"`
 	CreatedAt          time.Time  `json:"created_at"`
 	UpdatedAt          time.Time  `json:"updated_at"`
@@ -347,7 +364,7 @@ func (s *TaskService) enrichTask(task *model.Task, workDurationMinutes int) *Tas
 		RecurrenceDay:      task.RecurrenceDay,
 		PreferredStartTime: task.PreferredStartTime,
 		PreferredEndTime:   task.PreferredEndTime,
-		Tags:               task.Tags,
+		Tags:               decodeTags(task.Tags),
 		Order:              task.Order,
 		CreatedAt:          task.CreatedAt,
 		UpdatedAt:          task.UpdatedAt,
