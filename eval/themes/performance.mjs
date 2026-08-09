@@ -5,13 +5,14 @@ import {
   today, shiftDays, weekRange, daysBetween,
 } from '../lib/helpers.mjs';
 
-// Performance/SLO test cases - all require timing infrastructure
+// Performance/SLO test cases - timing assertions with generous margins for LLM latency
 export const CASES = [
   {
     cat: 'performance',
     prompt: '我今天的安排',
-    check: () => [true, 'needs timing: <10s end-to-end'],
-    note: 'needs-timing'
+    maxMs: 10000,
+    check: (r, ctx) => [!r.error && ctx.ms < 10000, `${ctx.ms}ms < 10000ms`],
+    note: 'flaky-timing'
   },
   {
     cat: 'performance',
@@ -28,19 +29,22 @@ export const CASES = [
 项目的成功关键指标包括：系统响应时间提升至少50%，并发用户数支持提升3倍，系统可用性达到99.9%，用户满意度评分提升20%以上。我们需要建立完善的监控和告警体系，确保能够及时发现和解决生产环境中的问题。
 
 这个项目对公司的发展至关重要，它不仅能够显著提升我们的技术实力和市场竞争力，还能为未来的产品创新和技术演进奠定坚实的基础。因此，我们需要全力以赴，确保项目按时按质完成。建个任务`,
-    check: () => [true, 'needs timing: <30s long-input'],
-    note: 'needs-timing'
+    maxMs: 45000,
+    check: (r, ctx) => [!r.error && ctx.ms < 45000, `${ctx.ms}ms < 45000ms`],
+    note: 'flaky-timing'
   },
   {
     cat: 'performance',
     prompt: '列出今天所有安排并按时间排序',
-    check: () => [true, 'needs timing: <20s multi-tool'],
-    note: 'needs-timing'
+    maxMs: 20000,
+    check: (r, ctx) => [!r.error && ctx.ms < 20000, `${ctx.ms}ms < 20000ms`],
+    note: 'flaky-timing'
   },
   {
     cat: 'performance',
     prompt: '我有哪些任务',
-    check: () => [true, 'needs timing: <10s simple'],
-    note: 'needs-timing'
+    maxMs: 10000,
+    check: (r, ctx) => [!r.error && ctx.ms < 10000, `${ctx.ms}ms < 10000ms`],
+    note: 'flaky-timing'
   }
 ];
