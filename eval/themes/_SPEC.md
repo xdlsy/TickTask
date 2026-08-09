@@ -77,3 +77,39 @@ system prompt 约束：简洁友好；**修改类操作要确认**；**只能用
 4. 需要多轮/确认流/计时/故障注入/LLM-judge/DB核验的用例，加 `note` 字段说明（如 `note: 'multi-turn'`、`note: 'needs-confirm'`、`note: 'llm-judge'`），`check` 仍写"单轮能验的部分"或留 `()=>[true,'needs <x> runner']` 占位。
 5. 写完用 `node --check eval/themes/<theme>.mjs` 验证语法通过。**不要跑后端、不要跑用例。**
 6. 报告：文件路径、用例数、`node --check` 结果。
+
+---
+
+# 增强版 runner（run-cases.mjs）——重写占位 check 时用
+
+runner 现在支持多种执行模式，由 case 字段选择。**check 签名升级为 `check(r, ctx)`**，旧 `check(r)` 仍兼容（ctx 被忽略）。
+
+## 模式字段（加到 case 上）
+
+- `turns: ['p1', 'p2', ...]` → 多轮：同一会话顺序跑每轮。`ctx.history = [r1, r2, ...]`（每轮一个 `{tool_calls, assistant_text, error}`）；传入 check 的 `r` 是**合并**后的（所有轮 tool_calls 拼接、assistant_text 换行拼接）。
+- `confirm: 'approve' | 'reject'` → 确认流：单轮，遇到 `pending_confirmation` 自动 POST `/confirm`（按 approve/reject），**继续收集**到 agent_done。`r.tool_calls` 会含工具确认后的状态（succeeded/rejected）。
+- `runs: N` → N 次重复：N 个独立会话各跑一次同一 prompt。`ctx.runs = [r1, ..., rN]`；`r` = 最后一次。
+- `maxMs: 数字` → 计时：`ctx.ms` = 该 case 端到端毫秒；check 断言 `ctx.ms < maxMs`。
+- `dbVerify: 'tasks' | 'schedules' | 'sessions'` → 跑完查 API：`ctx.dbState` = GET `/api/<type>` 的结果。
+
+## ctx 形态
+
+```js
+ctx = {
+  ms: number,                 // 总有
+  history?: [...],            // 仅多轮
+  runs?: [...],               // 仅 N 次
+  dbState?: {...},            // 仅 dbVerify
+}
+```
+
+## 重写规则（把占位改成真断言）
+
+- **多轮**：用 `ctx.history`。如代词指代「建任务X」→「把它的截止日期改周五」：第二轮应 `pending(update_task)`，断言 `(ctx.history[1])` 里 update_task pending。
+- **确认流 approve**：`confirm:'approve'`，断言 `succeeded(r, 'create_task')`（确认后工具真执行）+ 可选 `ctx.dbState`（dbVerify:'tasks'）里有该任务。
+- **确认流 reject**：`confirm:'reject'`，断言工具**未** succeeded（被拒）+ dbState 不变。
+- **N 次（确定性）**：`runs:5`，断言 `ctx.runs` 每次路由一致（如每次都 `called(ri,'list_schedule')`）。
+- **计时**：`maxMs:10000`，断言 `ctx.ms < 10000`（注意 LLM 延迟，给余量；可标 `note:'flaky-timing'`）。
+
+**仍 SKIP（runner 不支持，保留占位 `()=>[true,'needs ...']`）**：故障注入（needs-fault/inject/restart backend）、llm-judge。
+
