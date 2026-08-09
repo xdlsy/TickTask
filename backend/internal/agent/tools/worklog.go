@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"ticktask/internal/agent"
 	"ticktask/internal/model"
@@ -34,6 +35,19 @@ type WorkLogStructureSvc interface {
 // the service package, but the persisted WorkLog entity is the model type.
 type WorkLogSaveSvc interface {
 	SaveWorkLog(input service.SaveWorkLogInput) (*model.WorkLog, error)
+}
+
+// WorkLogReadSvc covers reading daily logs.
+type WorkLogReadSvc interface {
+	GetWorkLog(date string) (*model.WorkLog, error)
+	ListWorkLogs(from, to string) ([]*model.WorkLog, error)
+}
+
+// WorkLogReportSvc covers period reports (weekly/monthly/halfyear/yearly).
+type WorkLogReportSvc interface {
+	GenerateReport(input service.GenerateReportInput) (*model.WorkReport, error)
+	GetReport(t model.WorkReportType, periodKey string) (*model.WorkReport, error)
+	ListReports(t model.WorkReportType) ([]*model.WorkReport, error)
 }
 
 // =====================================================================
@@ -213,4 +227,224 @@ func (t *SaveWorklogTool) Preview(ctx context.Context, args json.RawMessage) (an
 		"items_count": len(in.Items),
 	}
 	return plan, nil
+}
+
+var reportTypes = map[string]model.WorkReportType{
+	"weekly": model.ReportWeekly, "monthly": model.ReportMonthly,
+	"halfyear": model.ReportHalfYear, "yearly": model.ReportYearly,
+}
+
+// =====================================================================
+// get_worklog
+// =====================================================================
+
+type GetWorklogTool struct{ Svc WorkLogReadSvc }
+
+func (t *GetWorklogTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "get_worklog",
+		Function: agent.FunctionSpec{
+			Name:        "get_worklog",
+			Description: "Get the work log for a single date (YYYY-MM-DD).",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"date": map[string]any{"type": "string", "description": "YYYY-MM-DD"},
+				},
+				"required": []any{"date"},
+			},
+		},
+		Permission: agent.PermRead,
+	}
+}
+
+func (t *GetWorklogTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Date string `json:"date"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	if in.Date == "" {
+		return nil, fmt.Errorf("schema: missing required field date")
+	}
+	if _, err := time.Parse("2006-01-02", in.Date); err != nil {
+		return nil, fmt.Errorf("invalid date %q (expected YYYY-MM-DD): %w", in.Date, err)
+	}
+	return t.Svc.GetWorkLog(in.Date)
+}
+
+func (t *GetWorklogTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	return t.Execute(ctx, args)
+}
+
+// =====================================================================
+// list_worklogs
+// =====================================================================
+
+type ListWorklogsTool struct{ Svc WorkLogReadSvc }
+
+func (t *ListWorklogsTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "list_worklogs",
+		Function: agent.FunctionSpec{
+			Name:        "list_worklogs",
+			Description: "List work logs in a YYYY-MM-DD date range (inclusive).",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"from": map[string]any{"type": "string", "description": "YYYY-MM-DD inclusive"},
+					"to":   map[string]any{"type": "string", "description": "YYYY-MM-DD inclusive"},
+				},
+				"required": []any{"from", "to"},
+			},
+		},
+		Permission: agent.PermRead,
+	}
+}
+
+func (t *ListWorklogsTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	if in.From == "" {
+		return nil, fmt.Errorf("schema: missing required field from")
+	}
+	if in.To == "" {
+		return nil, fmt.Errorf("schema: missing required field to")
+	}
+	if _, err := time.Parse("2006-01-02", in.From); err != nil {
+		return nil, fmt.Errorf("invalid from %q (expected YYYY-MM-DD): %w", in.From, err)
+	}
+	if _, err := time.Parse("2006-01-02", in.To); err != nil {
+		return nil, fmt.Errorf("invalid to %q (expected YYYY-MM-DD): %w", in.To, err)
+	}
+	logs, err := t.Svc.ListWorkLogs(in.From, in.To)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"from": in.From, "to": in.To, "logs": logs, "count": len(logs)}, nil
+}
+
+func (t *ListWorklogsTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	return t.Execute(ctx, args)
+}
+
+// =====================================================================
+// generate_work_report
+// =====================================================================
+
+type GenerateWorkReportTool struct{ Svc WorkLogReportSvc }
+
+func (t *GenerateWorkReportTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "generate_work_report",
+		Function: agent.FunctionSpec{
+			Name:        "generate_work_report",
+			Description: "Generate a period work report (weekly|monthly|halfyear|yearly) via AI. period_key e.g. 2026-W32 / 2026-07 / 2026-H1 / 2026.",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"type":       map[string]any{"type": "string", "description": "weekly|monthly|halfyear|yearly"},
+					"period_key": map[string]any{"type": "string"},
+				},
+				"required": []any{"type", "period_key"},
+			},
+		},
+		Permission: agent.PermWrite,
+	}
+}
+
+func (t *GenerateWorkReportTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Type      string `json:"type"`
+		PeriodKey string `json:"period_key"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	rt, ok := reportTypes[in.Type]
+	if !ok {
+		return nil, fmt.Errorf("schema: type must be weekly|monthly|halfyear|yearly, got %q", in.Type)
+	}
+	if in.PeriodKey == "" {
+		return nil, fmt.Errorf("schema: missing required field period_key")
+	}
+	return t.Svc.GenerateReport(service.GenerateReportInput{Type: rt, PeriodKey: in.PeriodKey})
+}
+
+func (t *GenerateWorkReportTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	var in struct {
+		Type      string `json:"type"`
+		PeriodKey string `json:"period_key"`
+	}
+	_ = json.Unmarshal(args, &in)
+	return map[string]any{"action": "generate_work_report", "type": in.Type, "period_key": in.PeriodKey}, nil
+}
+
+// =====================================================================
+// get_work_report
+// =====================================================================
+
+type GetWorkReportTool struct{ Svc WorkLogReportSvc }
+
+func (t *GetWorkReportTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "get_work_report",
+		Function: agent.FunctionSpec{
+			Name:        "get_work_report",
+			Description: "Get one period report by type+period_key, or (when period_key omitted) list all reports of that type.",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"type":       map[string]any{"type": "string", "description": "weekly|monthly|halfyear|yearly"},
+					"period_key": map[string]any{"type": "string", "description": "omit to list all of this type"},
+				},
+				"required": []any{"type"},
+			},
+		},
+		Permission: agent.PermRead,
+	}
+}
+
+func (t *GetWorkReportTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Type      string `json:"type"`
+		PeriodKey string `json:"period_key"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	rt, ok := reportTypes[in.Type]
+	if !ok {
+		return nil, fmt.Errorf("schema: type must be weekly|monthly|halfyear|yearly, got %q", in.Type)
+	}
+	if in.PeriodKey == "" {
+		list, err := t.Svc.ListReports(rt)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"list": list, "count": len(list)}, nil
+	}
+	return t.Svc.GetReport(rt, in.PeriodKey)
+}
+
+func (t *GetWorkReportTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	return t.Execute(ctx, args)
 }

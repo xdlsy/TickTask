@@ -20,11 +20,13 @@ type Deps struct {
 	WorkLog   interface {
 		WorkLogStructureSvc
 		WorkLogSaveSvc
+		WorkLogReadSvc
+		WorkLogReportSvc
 	}
 }
 
 // RegisterAll wires every tool the agent package exposes into the given
-// registry. After Task 3 it registers 20 tools: 5 task + 5 timer + 7 schedule + 1 insight + 2 work-log.
+// registry. After Task 3 it registers 24 tools: 5 task + 5 timer + 7 schedule + 1 insight + 6 work-log.
 func RegisterAll(reg agent.ToolRegistry, deps Deps) {
 	// Task tools (Task 10)
 	reg.MustRegister(&ListTasksTool{Svc: deps.Tasks})
@@ -55,4 +57,8 @@ func RegisterAll(reg agent.ToolRegistry, deps Deps) {
 	// Work-log tools (Task 12)
 	reg.MustRegister(&StructureWorklogTool{Svc: deps.WorkLog})
 	reg.MustRegister(&SaveWorklogTool{Svc: deps.WorkLog})
+	reg.MustRegister(&GetWorklogTool{Svc: deps.WorkLog})
+	reg.MustRegister(&ListWorklogsTool{Svc: deps.WorkLog})
+	reg.MustRegister(&GenerateWorkReportTool{Svc: deps.WorkLog})
+	reg.MustRegister(&GetWorkReportTool{Svc: deps.WorkLog})
 }

@@ -12,12 +12,16 @@ import (
 type mockWorkLogSvc struct {
 	mockWorkLogStructureSvc
 	mockWorkLogSaveSvc
+	mockWorkLogReadSvc
+	mockWorkLogReportSvc
 }
 
 // Compile-time guards: ensure the combined mock satisfies both interfaces.
 var (
 	_ WorkLogStructureSvc = (*mockWorkLogSvc)(nil)
 	_ WorkLogSaveSvc      = (*mockWorkLogSvc)(nil)
+	_ WorkLogReadSvc      = (*mockWorkLogSvc)(nil)
+	_ WorkLogReportSvc    = (*mockWorkLogSvc)(nil)
 )
 
 // newTestRegistry wires RegisterAll with all mocks pre-populated, returning

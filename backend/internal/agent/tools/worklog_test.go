@@ -51,6 +51,64 @@ func (m *mockWorkLogSaveSvc) SaveWorkLog(input service.SaveWorkLogInput) (*model
 	return m.saveOut, nil
 }
 
+type mockWorkLogReadSvc struct {
+	getLog    *model.WorkLog
+	getErr    error
+	getDates  []string
+	listLogs  []*model.WorkLog
+	listErr   error
+	listCalls int
+	listFrom  string
+	listTo    string
+}
+
+func (m *mockWorkLogReadSvc) GetWorkLog(date string) (*model.WorkLog, error) {
+	m.getDates = append(m.getDates, date)
+	if m.getErr != nil {
+		return nil, m.getErr
+	}
+	return m.getLog, nil
+}
+func (m *mockWorkLogReadSvc) ListWorkLogs(from, to string) ([]*model.WorkLog, error) {
+	m.listCalls++
+	m.listFrom = from
+	m.listTo = to
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	return m.listLogs, nil
+}
+
+type mockWorkLogReportSvc struct {
+	genIn   *service.GenerateReportInput
+	genOut  *model.WorkReport
+	genErr  error
+	getOut  *model.WorkReport
+	getErr  error
+	listOut []*model.WorkReport
+	listErr error
+}
+
+func (m *mockWorkLogReportSvc) GenerateReport(input service.GenerateReportInput) (*model.WorkReport, error) {
+	m.genIn = &input
+	if m.genErr != nil {
+		return nil, m.genErr
+	}
+	return m.genOut, nil
+}
+func (m *mockWorkLogReportSvc) GetReport(t model.WorkReportType, periodKey string) (*model.WorkReport, error) {
+	if m.getErr != nil {
+		return nil, m.getErr
+	}
+	return m.getOut, nil
+}
+func (m *mockWorkLogReportSvc) ListReports(t model.WorkReportType) ([]*model.WorkReport, error) {
+	if m.listErr != nil {
+		return nil, m.listErr
+	}
+	return m.listOut, nil
+}
+
 // --- StructureWorklogTool ---
 
 func TestStructureWorklog_HappyPath(t *testing.T) {
@@ -265,5 +323,112 @@ func TestSaveWorklog_Preview_MalformedArgs(t *testing.T) {
 	m, _ := json.Marshal(preview)
 	if !strings.Contains(string(m), `"save_worklog"`) {
 		t.Fatalf("preview should expose action even on partial args: %s", m)
+	}
+}
+
+func TestGetWorkLog_DelegatesByDate(t *testing.T) {
+	svc := &mockWorkLogReadSvc{getLog: &model.WorkLog{Date: "2026-08-08"}}
+	tool := &GetWorklogTool{Svc: svc}
+	res, err := tool.Execute(context.Background(), json.RawMessage(`{"date":"2026-08-08"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(svc.getDates) != 1 || svc.getDates[0] != "2026-08-08" {
+		t.Errorf("dates = %+v", svc.getDates)
+	}
+	m, _ := json.Marshal(res)
+	if !strings.Contains(string(m), "2026-08-08") {
+		t.Errorf("result should include the log: %s", m)
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{}`)); err == nil {
+		t.Error("expected error for missing date")
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"date":"not-a-date"}`)); err == nil {
+		t.Error("expected error for invalid date")
+	}
+}
+
+func TestListWorklogs_Range(t *testing.T) {
+	svc := &mockWorkLogReadSvc{listLogs: []*model.WorkLog{{Date: "2026-08-08"}}}
+	tool := &ListWorklogsTool{Svc: svc}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"from":"2026-08-01","to":"2026-08-31"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if svc.listCalls != 1 {
+		t.Errorf("ListWorkLogs calls = %d", svc.listCalls)
+	}
+	if svc.listFrom != "2026-08-01" || svc.listTo != "2026-08-31" {
+		t.Errorf("from/to not forwarded: from=%s to=%s", svc.listFrom, svc.listTo)
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"from":"2026-08-01"}`)); err == nil {
+		t.Error("expected error for missing to")
+	}
+}
+
+func TestListWorklogs_InvalidDate(t *testing.T) {
+	svc := &mockWorkLogReadSvc{}
+	tool := &ListWorklogsTool{Svc: svc}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"from":"garbage","to":"2026-08-31"}`)); err == nil {
+		t.Error("expected error for invalid from")
+	}
+	if svc.listCalls != 0 {
+		t.Errorf("service must not be called on invalid date")
+	}
+}
+
+func TestListWorklogs_ServiceError(t *testing.T) {
+	svc := &mockWorkLogReadSvc{listErr: errors.New("db locked")}
+	tool := &ListWorklogsTool{Svc: svc}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"from":"2026-08-01","to":"2026-08-31"}`))
+	if err == nil || !strings.Contains(err.Error(), "db locked") {
+		t.Fatalf("expected wrapped service error, got %v", err)
+	}
+}
+
+func TestGenerateWorkReport_Delegates(t *testing.T) {
+	svc := &mockWorkLogReportSvc{genOut: &model.WorkReport{Type: model.ReportWeekly}}
+	tool := &GenerateWorkReportTool{Svc: svc}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"type":"weekly","period_key":"2026-W32"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if svc.genIn == nil || svc.genIn.Type != model.ReportWeekly || svc.genIn.PeriodKey != "2026-W32" {
+		t.Errorf("GenerateReport input = %+v", svc.genIn)
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"type":"bogus","period_key":"x"}`)); err == nil {
+		t.Error("expected error for bad report type")
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"type":"weekly"}`)); err == nil {
+		t.Error("expected error for missing period_key")
+	}
+}
+
+func TestGetWorkReport_ListWhenNoPeriod(t *testing.T) {
+	svc := &mockWorkLogReportSvc{listOut: []*model.WorkReport{{Type: model.ReportWeekly}}}
+	tool := &GetWorkReportTool{Svc: svc}
+	res, err := tool.Execute(context.Background(), json.RawMessage(`{"type":"weekly"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	m, _ := json.Marshal(res)
+	if !strings.Contains(string(m), `"list":`) {
+		t.Errorf("omitting period_key should list reports: %s", m)
+	}
+}
+
+func TestGetWorkReport_GetByPeriod(t *testing.T) {
+	svc := &mockWorkLogReportSvc{getOut: &model.WorkReport{Type: model.ReportMonthly}}
+	tool := &GetWorkReportTool{Svc: svc}
+	res, err := tool.Execute(context.Background(), json.RawMessage(`{"type":"monthly","period_key":"2026-08"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if svc.getOut == nil {
+		t.Error("expected GetReport path")
+	}
+	m, _ := json.Marshal(res)
+	if !strings.Contains(string(m), "monthly") {
+		t.Errorf("result should include the report: %s", m)
 	}
 }
