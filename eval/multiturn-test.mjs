@@ -1,6 +1,7 @@
-// Multi-turn e2e for Bug 4: after a PermWrite tool (create_task) is used and
-// confirmed, a subsequent turn must still produce a real summary (previously
-// the malformed history hung every later turn).
+// Multi-turn e2e for Bug 4: after a PermWrite tool (create_task / create_schedule)
+// is used and confirmed, a subsequent turn in the SAME conversation must still
+// produce a real summary (previously the malformed history hung every later
+// turn). Runs one scenario per write tool and reports each.
 import { WebSocket } from 'ws';
 const BASE = process.env.AGENT_BASE_URL || 'http://localhost:8080';
 const WS = process.env.AGENT_WS_URL || 'ws://localhost:8080/ws';
@@ -29,26 +30,60 @@ function run(convId, prompt, timeoutMs = 60_000) {
   });
 }
 
-const conv = await newConv();
+// One Bug-4 scenario: create an entity via a write tool, confirm it, then ask a
+// follow-up in the SAME conversation and check the agent still answers coherently
+// (mentioning the entity). `writeTool` is the tool we expect to reach
+// pending_confirmation on turn 1.
+async function scenario({ label, writeTool, createPrompt, name, followUp }) {
+  const conv = await newConv();
 
-// Turn 1: write tool (create_task)
-const TASK = 'e2e验证任务_' + Date.now();
-let r1 = await run(conv, `帮我建个任务：${TASK}`);
-console.log('turn1 tools:', r1.toolCalls.map(t=>`${t.name}(${t.status})`).join(','), '| pending:', !!r1.pendingMsgId);
-if (r1.error) { console.log('FAIL turn1 error:', r1.error); process.exit(1); }
-if (!r1.pendingMsgId) {
-  console.log('FAIL: create_task did not reach pending_confirmation'); process.exit(1);
+  // Turn 1: the write tool
+  const r1 = await run(conv, createPrompt);
+  console.log(`[${label}] turn1 tools:`, r1.toolCalls.map(t => `${t.name}(${t.status})`).join(','), '| pending:', !!r1.pendingMsgId);
+  if (r1.error) return { label, ok: false, reason: `turn1 error: ${r1.error}` };
+  const reached = r1.toolCalls.some(t => t.name === writeTool && t.status === 'pending_confirmation');
+  if (!reached) return { label, ok: false, reason: `${writeTool} did not reach pending_confirmation` };
+
+  // confirm
+  const conf = await fetch(`${BASE}/api/agent/confirm`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message_id: r1.pendingMsgId, decision: 'approve' }) });
+  console.log(`[${label}] confirm status:`, conf.status);
+  // (after confirm the agent finishes the turn; we don't need to collect the tail)
+
+  // Turn 2: a FOLLOW-UP in the SAME conversation — this is where Bug 4 hung
+  const r2 = await run(conv, followUp);
+  console.log(`[${label}] turn2 tools:`, r2.toolCalls.map(t => `${t.name}(${t.status})`).join(','));
+  console.log(`[${label}] turn2 text:`, (r2.text || '').slice(0, 160).replace(/\n/g, ' '));
+
+  const ok = r2.done && !r2.error && r2.text.includes(name);
+  return { label, ok, reason: ok ? 'follow-up answered and mentioned the entity' : 'follow-up did not mention the entity or errored' };
 }
-// confirm
-const conf = await fetch(`${BASE}/api/agent/confirm`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message_id: r1.pendingMsgId, decision:'approve'})});
-console.log('confirm status:', conf.status);
-// (after confirm the agent finishes the turn; we don't need to collect the tail)
 
-// Turn 2: a FOLLOW-UP in the SAME conversation — this is where Bug 4 hung
-const r2 = await run(conv, '我刚才让你建的是什么任务？');
-console.log('turn2 tools:', r2.toolCalls.map(t=>`${t.name}(${t.status})`).join(','));
-console.log('turn2 text:', (r2.text||'').slice(0,160).replace(/\n/g,' '));
+const stamp = Date.now();
+const results = [];
 
-const ok = r2.done && !r2.error && r2.text.includes(TASK);
-console.log(`\n=== Bug4 e2e: ${ok ? 'PASS' : 'FAIL'} (follow-up after write tool produced a real answer mentioning the task) ===`);
-if (!ok) process.exit(1);
+// Original Bug-4 guard: create_task
+results.push(await scenario({
+  label: 'create_task',
+  writeTool: 'create_task',
+  createPrompt: `帮我建个任务：e2e验证任务_${stamp}`,
+  name: `e2e验证任务_${stamp}`,
+  followUp: '我刚才让你建的是什么任务？',
+}));
+
+// New-tool guard: create_schedule (start+end+title given so the agent calls the
+// tool directly rather than asking for missing times)
+results.push(await scenario({
+  label: 'create_schedule',
+  writeTool: 'create_schedule',
+  createPrompt: `帮我在日历上加个会：明天 15:00-15:30「产品评审_${stamp}」`,
+  name: `产品评审_${stamp}`,
+  followUp: '我刚才让你加的是什么日程？',
+}));
+
+console.log('\n=== Bug4 multi-turn e2e ===');
+let allOk = true;
+for (const r of results) {
+  console.log(`${r.ok ? 'PASS' : 'FAIL'} [${r.label}] :: ${r.reason}`);
+  if (!r.ok) allOk = false;
+}
+if (!allOk) process.exit(1);
