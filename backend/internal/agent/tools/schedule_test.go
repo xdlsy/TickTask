@@ -41,6 +41,14 @@ type mockScheduleSvc struct {
 	createEvt *service.ScheduleEvent
 	createErr error
 	createDTOs []*service.CreateScheduleDTO
+
+	revResp    *service.ReviseResponse
+	revErr     error
+	revPrompts []string
+
+	applyEvts  []service.ScheduleEvent
+	applyErr   error
+	applyCalls int
 }
 
 func (m *mockScheduleSvc) DeleteSchedule(id string) error {
@@ -65,6 +73,22 @@ func (m *mockScheduleSvc) CreateScheduleEvent(dto *service.CreateScheduleDTO) (*
 		return m.createEvt, nil
 	}
 	return &service.ScheduleEvent{ID: "new-1", Title: dto.Title, Start: dto.StartTime, End: dto.EndTime, Type: dto.Type}, nil
+}
+
+func (m *mockScheduleSvc) ReviseSchedule(prompt string) (*service.ReviseResponse, error) {
+	m.revPrompts = append(m.revPrompts, prompt)
+	if m.revErr != nil {
+		return nil, m.revErr
+	}
+	return m.revResp, nil
+}
+
+func (m *mockScheduleSvc) ApplyRevision() ([]service.ScheduleEvent, error) {
+	m.applyCalls++
+	if m.applyErr != nil {
+		return nil, m.applyErr
+	}
+	return m.applyEvts, nil
 }
 
 // --- DeleteScheduleTool ---
@@ -383,5 +407,80 @@ func TestCreateSchedule_PreviewNoSideEffect(t *testing.T) {
 	m, _ := json.Marshal(pv)
 	if !strings.Contains(string(m), `"create_schedule"`) || len(svc.createDTOs) != 0 {
 		t.Fatalf("preview must echo plan and not call service: %s", m)
+	}
+}
+
+// --- ReviseScheduleTool ---
+
+func TestReviseSchedule_DelegatesAndReturnsDiff(t *testing.T) {
+	svc := &mockScheduleSvc{revResp: &service.ReviseResponse{
+		Summary: "moved 2", Applied: false,
+		Changes: []service.RevisionChange{{Type: "moved", Title: "审查 PR-1234"}},
+	}}
+	tool := &ReviseScheduleTool{Svc: svc}
+	res, err := tool.Execute(context.Background(), json.RawMessage(`{"prompt":"把下午的会都往后推一小时"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(svc.revPrompts) != 1 || svc.revPrompts[0] != "把下午的会都往后推一小时" {
+		t.Errorf("prompt forwarded = %+v", svc.revPrompts)
+	}
+	m, _ := json.Marshal(res)
+	if !strings.Contains(string(m), "moved 2") || !strings.Contains(string(m), `"applied":false`) {
+		t.Errorf("result should expose diff preview, got %s", m)
+	}
+	// missing prompt fails before service
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{}`)); err == nil {
+		t.Error("expected error for missing prompt")
+	}
+}
+
+// --- ApplyScheduleRevisionTool ---
+
+func TestApplyScheduleRevision_DelegatesAndReturnsEvents(t *testing.T) {
+	svc := &mockScheduleSvc{applyEvts: []service.ScheduleEvent{{ID: "s-1"}}}
+	tool := &ApplyScheduleRevisionTool{Svc: svc}
+	res, err := tool.Execute(context.Background(), json.RawMessage(`{}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if svc.applyCalls != 1 {
+		t.Fatalf("ApplyRevision calls = %d, want 1", svc.applyCalls)
+	}
+	m, _ := json.Marshal(res)
+	if !strings.Contains(string(m), `"applied":true`) {
+		t.Errorf("result should mark applied, got %s", m)
+	}
+}
+
+func TestReviseSchedule_PreviewNoSideEffect(t *testing.T) {
+	svc := &mockScheduleSvc{}
+	tool := &ReviseScheduleTool{Svc: svc}
+	pv, err := tool.Preview(context.Background(), json.RawMessage(`{"prompt":"test"}`))
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+	if len(svc.revPrompts) != 0 {
+		t.Fatalf("preview must not call service: prompts = %+v", svc.revPrompts)
+	}
+	m, _ := json.Marshal(pv)
+	if !strings.Contains(string(m), "revise_schedule") {
+		t.Fatalf("preview should echo action: %s", m)
+	}
+}
+
+func TestApplyScheduleRevision_PreviewNoSideEffect(t *testing.T) {
+	svc := &mockScheduleSvc{}
+	tool := &ApplyScheduleRevisionTool{Svc: svc}
+	pv, err := tool.Preview(context.Background(), json.RawMessage(`{}`))
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+	if svc.applyCalls != 0 {
+		t.Fatalf("preview must not call service: calls = %d", svc.applyCalls)
+	}
+	m, _ := json.Marshal(pv)
+	if !strings.Contains(string(m), "apply_schedule_revision") {
+		t.Fatalf("preview should echo action: %s", m)
 	}
 }

@@ -23,6 +23,8 @@ type ScheduleService interface {
 	DeleteSchedule(id string) error
 	UpdateSchedule(id string, dto *service.UpdateScheduleDTO) error
 	CreateScheduleEvent(dto *service.CreateScheduleDTO) (*service.ScheduleEvent, error)
+	ReviseSchedule(prompt string) (*service.ReviseResponse, error)
+	ApplyRevision() ([]service.ScheduleEvent, error)
 }
 
 // =====================================================================
@@ -430,4 +432,102 @@ func (t *CreateScheduleTool) Preview(ctx context.Context, args json.RawMessage) 
 	}
 	_ = json.Unmarshal(args, &in)
 	return map[string]any{"action": "create_schedule", "title": in.Title, "start": in.Start, "end": in.End}, nil
+}
+
+// =====================================================================
+// revise_schedule + apply_schedule_revision
+// =====================================================================
+
+// ReviseScheduleTool runs an AI schedule revision and returns a diff preview
+// WITHOUT writing the DB (it writes a baseline + revised schedule.ics on disk).
+// The user reviews the diff, then apply_schedule_revision persists it. PermWrite:
+// it calls the external AI skill and writes the ICS file, so it confirms.
+//
+// CONSTRAINT: apply_schedule_revision must follow in the same conversation
+// without an intervening generate_schedule (which overwrites schedule.ics).
+type ReviseScheduleTool struct {
+	Svc ScheduleService
+}
+
+func (t *ReviseScheduleTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "revise_schedule",
+		Function: agent.FunctionSpec{
+			Name:        "revise_schedule",
+			Description: "Ask the AI to revise the schedule per a natural-language prompt and return a diff preview (moved/added/removed). Does NOT persist — call apply_schedule_revision after the user agrees.",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"prompt": map[string]any{"type": "string", "description": "revision instruction, e.g. '把下午的会都往后推一小时'"},
+				},
+				"required": []any{"prompt"},
+			},
+		},
+		Permission: agent.PermWrite,
+	}
+}
+
+func (t *ReviseScheduleTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Prompt string `json:"prompt"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	if in.Prompt == "" {
+		return nil, fmt.Errorf("schema: missing required field prompt")
+	}
+	resp, err := t.Svc.ReviseSchedule(in.Prompt)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (t *ReviseScheduleTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	var in struct {
+		Prompt string `json:"prompt"`
+	}
+	_ = json.Unmarshal(args, &in)
+	return map[string]any{"action": "revise_schedule", "prompt": in.Prompt}, nil
+}
+
+// ApplyScheduleRevisionTool persists the most recent AI revision to the DB
+// (deletes old task schedules, writes new). PermDangerous: irreversible DB rewrite.
+// Must be preceded by revise_schedule in the same conversation.
+type ApplyScheduleRevisionTool struct {
+	Svc ScheduleService
+}
+
+func (t *ApplyScheduleRevisionTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "apply_schedule_revision",
+		Function: agent.FunctionSpec{
+			Name:        "apply_schedule_revision",
+			Description: "Apply the schedule revision produced by the last revise_schedule call to the database. Irreversible. Only call after revise_schedule and user agreement.",
+			Parameters: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		Permission: agent.PermDangerous,
+	}
+}
+
+func (t *ApplyScheduleRevisionTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	events, err := t.Svc.ApplyRevision()
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"applied": true, "events": events, "count": len(events)}, nil
+}
+
+func (t *ApplyScheduleRevisionTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	return map[string]any{"action": "apply_schedule_revision", "warning": "irreversibly rewrites schedule DB"}, nil
 }
