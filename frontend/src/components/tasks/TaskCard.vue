@@ -12,9 +12,20 @@
         <span v-else-if="task.planned_pomodoros > 0" class="row-pomodoro">{{ task.completed_pomodoros }}/{{ task.planned_pomodoros }} 番茄钟</span>
         <span v-else class="row-pomodoro row-pomodoro-na">—</span>
         <span v-if="task.status !== 'completed'" class="row-pomodoro-btn" @click.stop="$emit('start-pomodoro', task.id)" title="开始番茄钟">▶</span>
-        <span class="row-more" @click.stop>
-          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-        </span>
+        <el-dropdown @command="handleCommand" trigger="click">
+          <span class="row-more" @click.stop>
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+          </span>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item v-if="task.status !== 'completed'" command="startTimer">开始番茄</el-dropdown-item>
+              <el-dropdown-item command="edit">编辑</el-dropdown-item>
+              <el-dropdown-item command="ai-classify" :disabled="aiClassifying">AI 智能分类</el-dropdown-item>
+              <el-dropdown-item v-if="task.status !== 'completed'" command="complete">完成</el-dropdown-item>
+              <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </template>
     <div class="row-popover-content">
