@@ -83,9 +83,9 @@
               :key="task.id"
               :task="task"
               @drag-start="() => {}"
-              @edit="$emit('edit-task', task)"
-              @complete="$emit('complete-task', $event)"
-              @delete="$emit('delete-task', $event)"
+              @edit="onEditTask"
+              @complete="onCompleteTask"
+              @delete="onDeleteTask"
             />
           </div>
         </div>
@@ -124,6 +124,14 @@
         </div>
       </div>
     </div>
+
+    <TaskForm
+      v-if="showForm"
+      :visible="showForm"
+      :task="editingTask"
+      @close="showForm = false"
+      @save="onSaveTask"
+    />
   </div>
 </template>
 
@@ -133,6 +141,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowRight, Plus, VideoPlay } from '@element-plus/icons-vue'
 import TaskCard from '@/components/tasks/TaskCard.vue'
+import TaskForm from '@/components/tasks/TaskForm.vue'
 import { useTaskStore } from '@/stores/task'
 import { useTimerStore } from '@/stores/timer'
 import { useAgentStore } from '@/stores/agent'
@@ -143,12 +152,29 @@ const taskStore = useTaskStore()
 const timerStore = useTimerStore()
 const agentStore = useAgentStore()
 
-defineEmits<{
-  'edit-task': [task: TaskResponse]
-  'complete-task': [id: string]
-  'delete-task': [id: string]
-  'start-timer': []
-}>()
+const showForm = ref(false)
+const editingTask = ref<TaskResponse | null>(null)
+
+function onEditTask(task: TaskResponse) {
+  editingTask.value = task
+  showForm.value = true
+}
+
+async function onCompleteTask(id: string) {
+  await taskStore.markCompleted(id)
+}
+
+async function onDeleteTask(id: string) {
+  await taskStore.deleteTask(id)
+}
+
+async function onSaveTask(data: any) {
+  if (editingTask.value) {
+    await taskStore.updateTask(editingTask.value.id, data)
+  }
+  showForm.value = false
+  editingTask.value = null
+}
 
 const todayPomodoros = ref(0)
 const focusTime = ref(0)
