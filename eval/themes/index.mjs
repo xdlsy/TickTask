@@ -14,6 +14,7 @@ import { CASES as postActionVerify } from './post-action-verify.mjs';
 import { CASES as determinism } from './determinism.mjs';
 import { CASES as performance } from './performance.mjs';
 import { CASES as resilience } from './resilience.mjs';
+import { CASES as scheduleLifecycle } from './schedule-lifecycle.mjs';
 
 export const THEME_CASES = [
   ...toolMatrix,
@@ -31,4 +32,5 @@ export const THEME_CASES = [
   ...determinism,
   ...performance,
   ...resilience,
+  ...scheduleLifecycle,
 ];

@@ -9,7 +9,10 @@
 
 const WRITE_TOOLS = new Set([
   'create_task', 'update_task', 'delete_task', 'delete_schedule',
-  'start_pomodoro', 'stop_pomodoro', 'generate_schedule', 'save_worklog', 'classify_task',
+  'update_schedule', 'create_schedule', 'revise_schedule', 'apply_schedule_revision',
+  'start_pomodoro', 'stop_pomodoro', 'control_pomodoro', 'generate_schedule',
+  'generate_work_report', 'update_worklog', 'update_worklog_summary', 'add_worklog_entry',
+  'save_worklog', 'classify_task', 'move_task',
 ]);
 
 // ---- assertion helpers ----
