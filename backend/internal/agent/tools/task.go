@@ -22,6 +22,7 @@ type TaskService interface {
 	DeleteTask(id string) error
 	GetTask(id string) (*model.Task, error)
 	GetAllTasks() ([]model.Task, error)
+	MoveTask(id string, targetQuadrant model.Quadrant) error
 }
 
 // priorityMapping converts the agent-facing "priority" enum (used by the LLM)
@@ -379,4 +380,64 @@ func derefStr(p *string) string {
 		return ""
 	}
 	return *p
+}
+
+// =====================================================================
+// move_task
+// =====================================================================
+
+// MoveTaskTool moves a task to an Eisenhower quadrant (auto-syncs
+// IsImportant/IsUrgent on the service side). PermWrite. Overlaps with
+// update_task's priority field but exposes the cleaner "移到第二象限" semantic.
+type MoveTaskTool struct{ Svc TaskService }
+
+func (t *MoveTaskTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "move_task",
+		Function: agent.FunctionSpec{
+			Name:        "move_task",
+			Description: "Move a task to a different Eisenhower quadrant (1 important+urgent … 4 neither).",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"task_id":  map[string]any{"type": "string"},
+					"quadrant": map[string]any{"type": "integer", "description": "1-4"},
+				},
+				"required": []any{"task_id", "quadrant"},
+			},
+		},
+		Permission: agent.PermWrite,
+	}
+}
+
+func (t *MoveTaskTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		TaskID   string `json:"task_id"`
+		Quadrant int    `json:"quadrant"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	if in.TaskID == "" {
+		return nil, fmt.Errorf("schema: missing required field task_id")
+	}
+	if in.Quadrant < 1 || in.Quadrant > 4 {
+		return nil, fmt.Errorf("schema: quadrant must be 1-4, got %d", in.Quadrant)
+	}
+	if err := t.Svc.MoveTask(in.TaskID, model.Quadrant(in.Quadrant)); err != nil {
+		return nil, err
+	}
+	return map[string]any{"task_id": in.TaskID, "quadrant": in.Quadrant, "moved": true}, nil
+}
+
+func (t *MoveTaskTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	var in struct {
+		TaskID   string `json:"task_id"`
+		Quadrant int    `json:"quadrant"`
+	}
+	_ = json.Unmarshal(args, &in)
+	return map[string]any{"action": "move_task", "task_id": in.TaskID, "quadrant": in.Quadrant}, nil
 }

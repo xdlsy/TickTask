@@ -33,6 +33,10 @@ type mockTaskSvc struct {
 	createCall int
 	updateCall int
 	deleteCall int
+	// add fields
+	moveErr   error
+	moveIDs   []string
+	moveQuads []model.Quadrant
 }
 
 func (m *mockTaskSvc) CreateTask(req service.CreateTaskRequest) (*model.Task, error) {
@@ -74,6 +78,12 @@ func (m *mockTaskSvc) GetAllTasks() ([]model.Task, error) {
 		return nil, m.listErr
 	}
 	return m.tasks, nil
+}
+
+func (m *mockTaskSvc) MoveTask(id string, targetQuadrant model.Quadrant) error {
+	m.moveIDs = append(m.moveIDs, id)
+	m.moveQuads = append(m.moveQuads, targetQuadrant)
+	return m.moveErr
 }
 
 // mockLLM is a single-turn ChatCompletion stub. The tools package only uses
@@ -467,9 +477,48 @@ func TestClassifyTask_TaskNotFound(t *testing.T) {
 func TestRegisterAll_RegistersFiveTools(t *testing.T) {
 	reg := agent.NewToolRegistry()
 	RegisterAll(reg, Deps{Tasks: &mockTaskSvc{}, LLM: &mockLLM{}})
-	for _, name := range []string{"list_tasks", "create_task", "update_task", "delete_task", "classify_task"} {
+	for _, name := range []string{"list_tasks", "create_task", "update_task", "delete_task", "classify_task", "move_task"} {
 		if _, err := reg.Lookup(name); err != nil {
 			t.Errorf("tool %q not registered: %v", name, err)
 		}
+	}
+}
+
+func TestMoveTask_Delegates(t *testing.T) {
+	svc := &mockTaskSvc{}
+	tool := &MoveTaskTool{Svc: svc}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"task_id":"t-1","quadrant":2}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(svc.moveIDs) != 1 || svc.moveIDs[0] != "t-1" || svc.moveQuads[0] != model.Quadrant2 {
+		t.Errorf("MoveTask args = %+v / %+v", svc.moveIDs, svc.moveQuads)
+	}
+	// out-of-range quadrant rejected before service
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"task_id":"t-1","quadrant":9}`)); err == nil {
+		t.Error("expected error for quadrant 9")
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"task_id":"t-1","quadrant":0}`)); err == nil {
+		t.Error("expected error for quadrant 0")
+	}
+	if svc.moveIDs != nil && len(svc.moveIDs) != 1 {
+		t.Errorf("service must not be called on invalid quadrant")
+	}
+	// missing required fields
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"quadrant":2}`)); err == nil {
+		t.Error("expected error for missing task_id")
+	}
+}
+
+func TestMoveTask_PreviewNoSideEffect(t *testing.T) {
+	svc := &mockTaskSvc{}
+	tool := &MoveTaskTool{Svc: svc}
+	pv, err := tool.Preview(context.Background(), json.RawMessage(`{"task_id":"t-1","quadrant":2}`))
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+	m, _ := json.Marshal(pv)
+	if !strings.Contains(string(m), "move_task") || len(svc.moveIDs) != 0 {
+		t.Fatalf("preview must echo plan and not call service: %s", m)
 	}
 }
