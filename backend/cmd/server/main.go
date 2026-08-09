@@ -136,6 +136,7 @@ func main() {
 		Analytics: analyticsService,
 		WorkLog:   workLogService,
 		LLM:       llm,
+		Settings:  settingRepo,
 	})
 	agentSvc := agent.NewAgentService(agent.AgentDeps{
 		Repo:         agentRepo,

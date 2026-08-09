@@ -45,6 +45,7 @@ func newTestRegistry() agent.ToolRegistry {
 		Analytics: &mockAnalyticsSvc{},
 		LLM:       &mockLLM{},
 		WorkLog:   workLog,
+		Settings:  &mockSettingsReader{},
 	})
 	return reg
 }
