@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,20 @@ type mockTimerSvc struct {
 	pausedID    string
 	pauseCalls  int
 	activeCalls int
+
+	// new fields for control_pomodoro and get_pomodoro_stats
+	resumeErr   error
+	resumeCalls int
+	completeErr error
+	completeIDs []string
+	abandonErr  error
+	abandonIDs  []string
+	abandonWhy  []string
+	todayStats  []service.TaskTimeStats
+	todayErr    error
+	recent      []model.PomodoroSession
+	recentErr   error
+	recentLimit int
 }
 
 func (m *mockTimerSvc) StartSession(req service.CreateSessionRequest) (*model.PomodoroSession, error) {
@@ -71,6 +86,37 @@ func (m *mockTimerSvc) GetActiveSession() (*model.PomodoroSession, error) {
 		return nil, m.activeErr
 	}
 	return m.active, nil
+}
+
+func (m *mockTimerSvc) ResumeSession(sessionID string) error {
+	m.resumeCalls++
+	return m.resumeErr
+}
+
+func (m *mockTimerSvc) CompleteSession(sessionID string) error {
+	m.completeIDs = append(m.completeIDs, sessionID)
+	return m.completeErr
+}
+
+func (m *mockTimerSvc) AbandonSession(sessionID string, interruptReason string) error {
+	m.abandonIDs = append(m.abandonIDs, sessionID)
+	m.abandonWhy = append(m.abandonWhy, interruptReason)
+	return m.abandonErr
+}
+
+func (m *mockTimerSvc) GetTodayTaskStats() ([]service.TaskTimeStats, error) {
+	if m.todayErr != nil {
+		return nil, m.todayErr
+	}
+	return m.todayStats, nil
+}
+
+func (m *mockTimerSvc) GetRecentSessions(limit int) ([]model.PomodoroSession, error) {
+	m.recentLimit = limit
+	if m.recentErr != nil {
+		return nil, m.recentErr
+	}
+	return m.recent, nil
 }
 
 // --- StartPomodoroTool ---
@@ -263,5 +309,129 @@ func TestGetTimerStatus_Preview_EqualsExecute(t *testing.T) {
 	m, _ := json.Marshal(preview)
 	if !strings.Contains(string(m), `"s-active"`) {
 		t.Fatalf("preview should mirror execute for read tool: %s", m)
+	}
+}
+
+// --- ControlPomodoroTool ---
+
+func TestControlPomodoro_RoutesActionToSession(t *testing.T) {
+	cases := []struct {
+		action string
+		check  func(*mockTimerSvc) string // returns "" if ok, else a failure reason
+	}{
+		{"resume", func(s *mockTimerSvc) string {
+			if s.resumeCalls != 1 {
+				return fmt.Sprintf("resume: ResumeSession calls = %d, want 1", s.resumeCalls)
+			}
+			return ""
+		}},
+		{"complete", func(s *mockTimerSvc) string {
+			if len(s.completeIDs) != 1 {
+				return fmt.Sprintf("complete: CompleteSession calls = %d, want 1", len(s.completeIDs))
+			}
+			return ""
+		}},
+		{"abandon", func(s *mockTimerSvc) string {
+			if len(s.abandonIDs) != 1 {
+				return fmt.Sprintf("abandon: AbandonSession calls = %d, want 1", len(s.abandonIDs))
+			}
+			return ""
+		}},
+	}
+	for _, c := range cases {
+		svc := &mockTimerSvc{active: &model.PomodoroSession{ID: "s1"}}
+		tool := &ControlPomodoroTool{Svc: svc}
+		if _, err := tool.Execute(context.Background(), json.RawMessage(`{"action":"`+c.action+`"}`)); err != nil {
+			t.Errorf("action %s: %v", c.action, err)
+			continue
+		}
+		if reason := c.check(svc); reason != "" {
+			t.Errorf("action %s: %s", c.action, reason)
+		}
+	}
+	// cross-check: each action must call ONLY its own method
+	rsvc := &mockTimerSvc{active: &model.PomodoroSession{ID: "s1"}}
+	rtool := &ControlPomodoroTool{Svc: rsvc}
+	_, _ = rtool.Execute(context.Background(), json.RawMessage(`{"action":"resume"}`))
+	if len(rsvc.completeIDs) != 0 || len(rsvc.abandonIDs) != 0 {
+		t.Errorf("resume must not call complete/abandon: complete=%d abandon=%d", len(rsvc.completeIDs), len(rsvc.abandonIDs))
+	}
+
+	// unknown action rejected before touching the service
+	badSvc := &mockTimerSvc{}
+	badTool := &ControlPomodoroTool{Svc: badSvc}
+	_, err := badTool.Execute(context.Background(), json.RawMessage(`{"action":"bogus"}`))
+	if err == nil || !strings.Contains(err.Error(), "action") {
+		t.Fatalf("expected action enum error, got %v", err)
+	}
+	if badSvc.resumeCalls != 0 || len(badSvc.completeIDs) != 0 || len(badSvc.abandonIDs) != 0 {
+		t.Errorf("service must not be called on bad action")
+	}
+}
+
+func TestControlPomodoro_AbandonForwardsReason(t *testing.T) {
+	svc := &mockTimerSvc{active: &model.PomodoroSession{ID: "s1"}}
+	tool := &ControlPomodoroTool{Svc: svc}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"action":"abandon","reason":"被打断了"}`)); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(svc.abandonWhy) != 1 || svc.abandonWhy[0] != "被打断了" {
+		t.Errorf("reason not forwarded, got %+v", svc.abandonWhy)
+	}
+	// and: abandon with no reason defaults to ""
+	svc2 := &mockTimerSvc{active: &model.PomodoroSession{ID: "s2"}}
+	tool2 := &ControlPomodoroTool{Svc: svc2}
+	if _, err := tool2.Execute(context.Background(), json.RawMessage(`{"action":"abandon"}`)); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(svc2.abandonWhy) != 1 || svc2.abandonWhy[0] != "" {
+		t.Errorf("missing reason should default to \"\", got %+v", svc2.abandonWhy)
+	}
+}
+
+func TestControlPomodoro_RequiresActiveSession(t *testing.T) {
+	svc := &mockTimerSvc{} // no active session set → GetActiveSession returns nil
+	tool := &ControlPomodoroTool{Svc: svc}
+	res, err := tool.Execute(context.Background(), json.RawMessage(`{"action":"resume"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	m, _ := res.(map[string]any)
+	if m["active"] != false {
+		t.Errorf("expected active=false when no session, got %+v", res)
+	}
+}
+
+func TestControlPomodoro_PreviewNoSideEffect(t *testing.T) {
+	svc := &mockTimerSvc{}
+	tool := &ControlPomodoroTool{Svc: svc}
+	pv, err := tool.Preview(context.Background(), json.RawMessage(`{"action":"resume"}`))
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+	m, _ := json.Marshal(pv)
+	if !strings.Contains(string(m), "control_pomodoro") || svc.resumeCalls != 0 {
+		t.Fatalf("preview must echo plan and not call service: %s", m)
+	}
+}
+
+// --- GetPomodoroStatsTool ---
+
+func TestGetPomodoroStats_Aggregates(t *testing.T) {
+	svc := &mockTimerSvc{
+		todayStats: []service.TaskTimeStats{{TaskID: "t1", TaskTitle: "写文档", SessionCount: 2, TotalTime: 1800}},
+		recent:     []model.PomodoroSession{{ID: "s1"}},
+	}
+	tool := &GetPomodoroStatsTool{Svc: svc}
+	res, err := tool.Execute(context.Background(), json.RawMessage(`{}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	m, _ := json.Marshal(res)
+	if !strings.Contains(string(m), "写文档") || !strings.Contains(string(m), `"s1"`) {
+		t.Errorf("result should include today stats + recent sessions: %s", m)
+	}
+	if svc.recentLimit != 10 {
+		t.Errorf("default recent_limit should be 10, got %d", svc.recentLimit)
 	}
 }
