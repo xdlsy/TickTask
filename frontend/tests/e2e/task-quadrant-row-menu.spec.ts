@@ -25,6 +25,7 @@ test.describe('@p1 Tasks · 四象限 row 菜单', () => {
     await page.locator('.el-dropdown-menu__item:visible', { hasText: '完成' }).click()
 
     await expect(row).toHaveClass(/task-completed/, { timeout: 10000 })
+    await expect(page.locator('.el-message--success', { hasText: '已完成' })).toBeVisible({ timeout: 5000 })
   })
 
   test('ROW-UI-003: row 菜单「删除」移除任务', async ({ page, taskFactory }) => {

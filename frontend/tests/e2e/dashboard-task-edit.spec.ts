@@ -61,6 +61,7 @@ test.describe('@p0 Dashboard · 任务编辑入口', () => {
 
     // 卡片转为 completed 态(透明/删除线)
     await expect(card).toHaveClass(/task-completed/, { timeout: 10000 })
+    await expect(page.locator('.el-message--success', { hasText: '已完成' })).toBeVisible({ timeout: 5000 })
     expect(task.id).toBeTruthy()
   })
 
