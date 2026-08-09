@@ -16,13 +16,16 @@ AGENT_BASE_URL=http://localhost:8080 node seed.mjs      # 先 seed
 AGENT_BASE_URL=http://localhost:8080 npm run cases       # 跑全量（~20 分钟，真 LLM）
 ```
 
-**当前基线（minimax）：120/124 = 97%（单轮可评估集）| SKIP 73/197 | 总 197。**
+**当前基线（minimax）：161/184 = 88%（增强 runner 可评估集）| SKIP 13/197 | 总 197。**
 
-- **73 条 SKIP**：需当前 runner 不支持的特殊执行（多轮对话、确认流 approve/reject、计时 SLO、故障注入、LLM-judge、DB 核验、N 次重复）——已按 `note` 标记跳过，是后续 runner 增强的工作项，不是失败。
-- **4 条残余 FAIL（真实信号，非测试 bug）**：
-  - 2 条 flaky（LLM 超时，重跑通常过）
-  - `整理工作日志的结构` / `给任务打标签 urgent,bug`——模型对方言化措辞/可选参数（tags）的路由不稳定，是模型局限不是代码 bug。
-- 断言设计：歧义/过严的已放宽（接受合理模型行为）；真实模型局限（quadrant/tags/pomodoro 参数保真）放宽到"路由对即可"+ 注明已知局限，不靠放宽掩盖信号。
+runner 现支持多模式（`run-cases.mjs`）：多轮 `turns[]`、确认流 `confirm:'approve'|'reject'`（自动 `/confirm` 续跑）、N 次重复 `runs`、计时 `maxMs`、DB 核验 `dbVerify`。runnable 因此从 124 → 184，SKIP 从 73 → 13（只剩故障注入 + llm-judge，需额外基建）。
+
+- **13 条 SKIP**：故障注入（WS 断/429/畸形，需操控后端）+ llm-judge（主观，需第二个 LLM 打分）——后续基建项。
+- **23 条残余 FAIL（真实信号，非测试/runner bug）**，集中在两类**模型行为问题**：
+  1. **narrate 代替 tool 确认流**：部分写工具 prompt（开始/停番茄钟、保存日志、创建任务），模型用自然语言"确认?"而非调用工具触发 `pending_confirmation`（`tools=[-]`），导致确认流用例拿不到 succeeded。这是 agent 一致性问题（没可靠用上自己的确认机制）。
+  2. **Bug#38 谎报成功 ~80%**：`标记不存在的任务完成` 跑 5 次，4/5 次 model 谎报"已完成"（determinism 类量化）。原 Bug#38 的间歇性，现在更明显。
+  - 这两条是 **agent prompt/行为的改进靶点**（让模型可靠走工具确认流 + 不对不存在的操作谎报成功），不是测试缺陷。
+- 其余残余：多轮复杂序列的模型行为方差（模型用"删了重建"代替"update"、长上下文边界等）+ 个别 flaky（AI 排程超时）。
 
 > 这套用单源 + 自定义 runner（`collect()` 直连），比 promptfoo 的单轮 YAML 覆盖广得多（含"该拒绝/该说空/该追问/该报错/防假成功"这类软断言）。promptfooconfig 保留作 promptfoo-UI 子集。
 

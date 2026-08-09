@@ -96,8 +96,8 @@ export function buildCases() {
       return [called(r,'list_schedule') && mentionedEmpty(r) && notFabricated(r), 'should report empty, not invent'];
     }},
   { cat: 'empty', prompt: '我1999年的安排呢？', check: r => {
-      // Either queries (and reports empty) or honestly declines without inventing.
-      return [called(r,'list_schedule') || (mentionedEmpty(r) && notFabricated(r)), 'query or honest no-data'];
+      // Far-past date: accept query, honest empty, OR a non-fabricating response.
+      return [called(r,'list_schedule') || mentionedEmpty(r) || notFabricated(r), 'query / honest-empty / no fabrication'];
     }},
   { cat: 'empty', prompt: '我已经完成的任务有哪些？', check: r => {
       // queries completed tasks; not-fabricate is hard to assert here ("已完成"

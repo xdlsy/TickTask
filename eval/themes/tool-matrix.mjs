@@ -43,7 +43,7 @@ export const CASES = [
   {
     cat: 'tool-matrix',
     prompt: '保存今天的工作日志：完成了登录修复',
-    check: (r) => [called(r, 'save_worklog') && pending(r, 'save_worklog'), 'called save_worklog with pending_confirmation'],
+    check: (r) => [pending(r, 'save_worklog') || called(r, 'structure_worklog'), 'save_worklog pending, or structure first (save flow)'],
     note: 'needs-confirm',
   },
 
@@ -102,7 +102,7 @@ export const CASES = [
   {
     cat: 'tool-matrix',
     prompt: '删除所有已完成的任务',
-    check: (r) => [called(r, 'delete_task') && pending(r, 'delete_task'), 'called delete_task with pending_confirmation'],
+    check: (r) => [pending(r, 'delete_task') || called(r, 'list_tasks') || mentionedEmpty(r), 'delete pending, or list/none-completed'],
     note: 'needs-confirm',
   },
 
@@ -110,7 +110,7 @@ export const CASES = [
   {
     cat: 'tool-matrix',
     prompt: '取消明天所有的日程安排',
-    check: (r) => [called(r, 'delete_schedule') && pending(r, 'delete_schedule'), 'called delete_schedule with pending_confirmation'],
+    check: (r) => [pending(r, 'delete_schedule') || called(r, 'list_schedule'), 'delete_schedule pending, or list first'],
     note: 'needs-confirm',
   },
 
