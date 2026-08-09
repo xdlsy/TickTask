@@ -17,6 +17,14 @@ async function unwrap<T>(p: Promise<AxiosResponse<T>>): Promise<T> {
   return (await p).data
 }
 
+// Monotonic id for locally-synthesized messages (read-tool events carry no id).
+let localSeq = 0
+const nextLocalId = (prefix: string) => `${prefix}-${++localSeq}`
+
+function safeStringify(v: unknown): string {
+  try { return JSON.stringify(v) } catch { return String(v) }
+}
+
 export const useAgentStore = defineStore('agent', {
   state: () => ({
     isOpen: false,
@@ -68,33 +76,78 @@ export const useAgentStore = defineStore('agent', {
       this.pendingConfirm = null
     },
     onAgentMessage(e: Extract<AgentWsEvent, { type: 'agent_message' }>) {
-      // Accept events when no conversation is bound yet (so streaming works
-      // before the first response resolves) or when ids match.
       if (this.currentConvId !== null && e.conversation_id !== this.currentConvId) return
+      // A new message_id means the prior assistant segment is complete.
+      if (this.streamingMessageId !== null && this.streamingMessageId !== e.message_id && this.streamingText) {
+        this.flushStreaming()
+      }
       this.streamingMessageId = e.message_id
       this.streamingText += e.delta_text
     },
     onAgentTool(e: Extract<AgentWsEvent, { type: 'agent_tool' }>) {
       if (this.currentConvId !== null && e.conversation_id !== this.currentConvId) return
+      // Tool arrives after the preceding text segment: flush it so order is text → tool.
+      this.flushStreaming()
       if (e.status === 'pending_confirmation') {
         this.pendingConfirm = {
           messageId: e.message_id!, toolName: e.tool_name, args: e.args, preview: e.preview,
         }
+      } else if (this.pendingConfirm && e.message_id && e.message_id === this.pendingConfirm.messageId) {
+        this.pendingConfirm = null
       }
-      // Update or append the tool_call message locally based on message_id
+      const base = {
+        role: 'tool_call' as const,
+        conversation_id: this.currentConvId!,
+        content: '',
+        tool_name: e.tool_name,
+        tool_args: safeStringify(e.args),
+        tool_status: e.status,
+        created_at: new Date().toISOString(),
+      }
+      if (e.message_id) {
+        const idx = this.messages.findIndex((m) => m.id === e.message_id)
+        const msg: AgentMessage = {
+          id: e.message_id, ...base,
+          tool_result: e.result != null ? safeStringify(e.result) : (e.error ? `{"error":${JSON.stringify(e.error)}}` : undefined),
+        }
+        if (idx >= 0) this.messages[idx] = { ...this.messages[idx], ...msg }
+        else this.messages.push(msg)
+      } else {
+        // Read tool: started creates a row; a terminal status updates the most recent
+        // same-named row still in 'started' (backend runs tools serially within a turn).
+        if (e.status === 'started') {
+          this.messages.push({ id: nextLocalId('tool'), ...base })
+        } else {
+          for (let i = this.messages.length - 1; i >= 0; i--) {
+            const m = this.messages[i]
+            if (m.tool_name === e.tool_name && m.tool_status === 'started') {
+              this.messages[i] = {
+                ...m, tool_status: e.status,
+                tool_result: e.result != null ? safeStringify(e.result) : (e.error ? `{"error":${JSON.stringify(e.error)}}` : m.tool_result),
+              }
+              break
+            }
+          }
+        }
+      }
     },
     onAgentDone(e: Extract<AgentWsEvent, { type: 'agent_done' }>) {
       if (this.currentConvId !== null && e.conversation_id !== this.currentConvId) return
+      this.flushStreaming()
+      this.isThinking = false
+    },
+    flushStreaming() {
       if (this.streamingText) {
         this.messages.push({
-          id: this.streamingMessageId || 'ast-' + Date.now(),
+          id: this.streamingMessageId || nextLocalId('ast'),
           conversation_id: this.currentConvId!,
-          role: 'assistant', content: this.streamingText, created_at: new Date().toISOString(),
+          role: 'assistant',
+          content: this.streamingText,
+          created_at: new Date().toISOString(),
         })
       }
       this.streamingText = ''
       this.streamingMessageId = null
-      this.isThinking = false
     },
     handleWsEvent(e: AgentWsEvent) {
       if (e.type === 'agent_message') this.onAgentMessage(e)

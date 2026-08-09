@@ -1,96 +1,91 @@
 <template>
-  <div class="messages">
-    <div v-for="m in messages" :key="m.id" :class="['msg', m.role]">
-      <div class="role">{{ roleLabel(m.role) }}</div>
-      <div v-if="m.content" class="bubble">{{ m.content }}</div>
-      <ToolCard
-        v-if="m.role === 'tool_call' || m.role === 'tool_result'"
-        :message="m"
-      />
-    </div>
-    <div v-if="streamingText || isThinking" class="msg agent">
-      <div class="role">Agent</div>
-      <div class="bubble">
-        {{ streamingText
-        }}<span v-if="isThinking && !streamingText" class="typing"
-          ><span></span><span></span><span></span></span>
-      </div>
-    </div>
+  <div ref="root" class="messages" data-testid="messages">
+    <AgentTurn v-for="t in turns" :key="t.id" :turn="t" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { AgentMessage } from '@/types'
-import ToolCard from './ToolCard.vue'
+import AgentTurn from './AgentTurn.vue'
+import { useAgentTurns } from './useAgentTurns'
 
-defineProps<{ messages: AgentMessage[]; streamingText: string; isThinking: boolean }>()
+const props = defineProps<{
+  messages: AgentMessage[]
+  streamingText: string
+  isThinking: boolean
+}>()
 
-const roleLabel = (r: string) => (r === 'user' ? '你' : 'Agent')
+const turns = useAgentTurns(
+  computed(() => props.messages),
+  computed(() => props.streamingText),
+  computed(() => props.isThinking),
+)
+
+const root = ref<HTMLElement | null>(null)
+
+// `.messages` itself isn't the scroll container — Element Plus' `.el-drawer__body`
+// is. Walk up to the first scrollable ancestor so this stays decoupled from the
+// drawer's layout and class names.
+function scrollParent(): HTMLElement | null {
+  let node: HTMLElement | null = root.value
+  while (node) {
+    const { overflowY } = window.getComputedStyle(node)
+    if (overflowY === 'auto' || overflowY === 'scroll') return node
+    node = node.parentElement
+  }
+  return null
+}
+
+const STICK_THRESHOLD_PX = 80
+
+function isNearBottom(): boolean {
+  const sc = scrollParent()
+  if (!sc) return true
+  return sc.scrollHeight - sc.scrollTop - sc.clientHeight <= STICK_THRESHOLD_PX
+}
+
+function stickToBottom() {
+  const sc = scrollParent()
+  if (sc) sc.scrollTop = sc.scrollHeight
+}
+
+// Conversation switched/cleared → array replaced. Jump to bottom unconditionally.
+watch(
+  () => props.messages,
+  () => nextTick(stickToBottom),
+  { flush: 'post' },
+)
+
+// New committed message arrived. User's own input always pins; agent/tool replies
+// follow only if the user is still watching the tail.
+watch(
+  () => props.messages.length,
+  (newLen, oldLen) => {
+    if (newLen <= (oldLen ?? 0)) return
+    const last = props.messages[newLen - 1]
+    if (last?.role === 'user' || isNearBottom()) nextTick(stickToBottom)
+  },
+  { flush: 'post' },
+)
+
+// Streaming tokens + typing indicator: follow only while already at the bottom.
+watch(
+  () => [props.streamingText, props.isThinking],
+  () => {
+    if (isNearBottom()) nextTick(stickToBottom)
+  },
+  { flush: 'post' },
+)
+
+onMounted(() => nextTick(stickToBottom))
 </script>
 
 <style scoped>
 .messages {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
   padding: 4px 0 16px;
-}
-.msg {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.msg.user {
-  align-items: flex-end;
-}
-.role {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.bubble {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  color: var(--text-primary);
-  font-family: var(--font-body);
-  font-size: 13px;
-  line-height: 1.6;
-  max-width: 90%;
-  word-wrap: break-word;
-}
-.msg.user .bubble {
-  background: var(--accent-primary);
-  color: var(--bg-primary);
-  border-color: transparent;
-}
-.typing span {
-  display: inline-block;
-  width: 4px;
-  height: 4px;
-  margin: 0 1px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.45;
-  animation: blink 1.2s infinite ease-in-out;
-}
-.typing span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.typing span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-@keyframes blink {
-  0%,
-  80%,
-  100% {
-    opacity: 0.25;
-  }
-  40% {
-    opacity: 0.9;
-  }
 }
 </style>

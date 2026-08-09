@@ -23,7 +23,6 @@
         :streaming-text="store.streamingText"
         :is-thinking="store.isThinking"
       />
-      <ToolConfirmDialog v-if="store.pendingConfirm" />
     </template>
     <template #footer>
       <div v-if="!store.status.configured" class="not-configured-hint">
@@ -45,7 +44,6 @@ import { useAgentStore } from '@/stores/agent'
 import AgentMessageList from './AgentMessageList.vue'
 import AgentInput from './AgentInput.vue'
 import ConversationList from './ConversationList.vue'
-import ToolConfirmDialog from './ToolConfirmDialog.vue'
 
 const store = useAgentStore()
 const router = useRouter()
