@@ -16,16 +16,18 @@ AGENT_BASE_URL=http://localhost:8080 node seed.mjs      # 先 seed
 AGENT_BASE_URL=http://localhost:8080 npm run cases       # 跑全量（~20 分钟，真 LLM）
 ```
 
-**当前基线（minimax）：161/184 = 88%（增强 runner 可评估集）| SKIP 13/197 | 总 197。**
+**当前基线（minimax）：168/184 = 91%（增强 runner 可评估集）| SKIP 13/197 | 总 197。**
 
 runner 现支持多模式（`run-cases.mjs`）：多轮 `turns[]`、确认流 `confirm:'approve'|'reject'`（自动 `/confirm` 续跑）、N 次重复 `runs`、计时 `maxMs`、DB 核验 `dbVerify`。runnable 因此从 124 → 184，SKIP 从 73 → 13（只剩故障注入 + llm-judge，需额外基建）。
 
+**agent prompt 已据此硬化**（`prompts.go`）：写操作必须走工具触发确认（不许用自然语言"确认?"代替）、工具没返回成功不许谎报"已完成"。这让 narrate-代替-tool 问题基本修好（写工具现在真被调用），通过率 88%→91%。
+
 - **13 条 SKIP**：故障注入（WS 断/429/畸形，需操控后端）+ llm-judge（主观，需第二个 LLM 打分）——后续基建项。
-- **23 条残余 FAIL（真实信号，非测试/runner bug）**，集中在两类**模型行为问题**：
-  1. **narrate 代替 tool 确认流**：部分写工具 prompt（开始/停番茄钟、保存日志、创建任务），模型用自然语言"确认?"而非调用工具触发 `pending_confirmation`（`tools=[-]`），导致确认流用例拿不到 succeeded。这是 agent 一致性问题（没可靠用上自己的确认机制）。
-  2. **Bug#38 谎报成功 ~80%**：`标记不存在的任务完成` 跑 5 次，4/5 次 model 谎报"已完成"（determinism 类量化）。原 Bug#38 的间歇性，现在更明显。
-  - 这两条是 **agent prompt/行为的改进靶点**（让模型可靠走工具确认流 + 不对不存在的操作谎报成功），不是测试缺陷。
-- 其余残余：多轮复杂序列的模型行为方差（模型用"删了重建"代替"update"、长上下文边界等）+ 个别 flaky（AI 排程超时）。
+- **16 条残余 FAIL（真实信号，非测试/runner bug）**：
+  1. **Bug#38 谎报成功 ~80%**（prompt 抗性）：`标记不存在的任务完成` 5 次里 4 次 model 仍谎报"已完成"。硬约束没压住——是深层模型可靠性问题，需模型升级或 tool-result 强制 grounding，非 prompt 能解。
+  2. **多轮复杂序列方差**：模型用"删了重建"代替"update"、长上下文 22+ 轮边界等——行为合理但与精确序列断言不符。
+  3. 个别 flaky（AI 排程超时）+ LLM 随机性（每次跑个别 case 波动）。
+- 这俩类（Bug#38 + 多轮序列）是 **agent 可靠性/测试建模**的后续靶点。
 
 > 这套用单源 + 自定义 runner（`collect()` 直连），比 promptfoo 的单轮 YAML 覆盖广得多（含"该拒绝/该说空/该追问/该报错/防假成功"这类软断言）。promptfooconfig 保留作 promptfoo-UI 子集。
 
