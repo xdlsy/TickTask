@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useAgentStore } from './agent'
+import { useTaskStore } from './task'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -12,6 +13,9 @@ vi.mock('@/api/client', () => ({
       confirm: vi.fn(),
       status: vi.fn().mockResolvedValue({ data: { configured: true, supports_function_calling: true, provider: 'openai' } }),
     },
+    // Task store refresh hooks (exercised by the agent->task sync tests / side-effects).
+    getTasks: vi.fn().mockResolvedValue({ data: [] }),
+    getTasksByQuadrant: vi.fn().mockResolvedValue({ data: { 1: [], 2: [], 3: [], 4: [] } }),
   },
 }))
 
@@ -73,5 +77,31 @@ describe('useAgentStore', () => {
     expect(s.streamingText).toBe('')
     expect(s.messages.find((m) => m.id === 'm1')).toMatchObject({ role: 'assistant', content: 'final' })
     expect(s.isThinking).toBe(false)
+  })
+
+  it('refreshes the task store when an agent task-mutation tool succeeds', () => {
+    const s = useAgentStore()
+    const tasks = useTaskStore()
+    const fetchSpy = vi.spyOn(tasks, 'fetchTasks').mockResolvedValue(undefined)
+    const quadSpy = vi.spyOn(tasks, 'fetchTasksByQuadrant').mockResolvedValue(undefined)
+    s.onAgentTool({ type: 'agent_tool', conversation_id: 'c1', tool_name: 'create_task', args: {}, status: 'succeeded', result: { id: 't1' } })
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(quadSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not refresh the task store for a non-task tool', () => {
+    const s = useAgentStore()
+    const tasks = useTaskStore()
+    const fetchSpy = vi.spyOn(tasks, 'fetchTasks').mockResolvedValue(undefined)
+    s.onAgentTool({ type: 'agent_tool', conversation_id: 'c1', tool_name: 'generate_schedule', args: {}, status: 'succeeded', result: {} })
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not refresh the task store when a task tool fails', () => {
+    const s = useAgentStore()
+    const tasks = useTaskStore()
+    const fetchSpy = vi.spyOn(tasks, 'fetchTasks').mockResolvedValue(undefined)
+    s.onAgentTool({ type: 'agent_tool', conversation_id: 'c1', tool_name: 'create_task', args: {}, status: 'failed', error: 'oops' })
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
