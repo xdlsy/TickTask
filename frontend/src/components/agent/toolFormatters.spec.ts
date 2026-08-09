@@ -51,4 +51,18 @@ describe('summarizeTool', () => {
     const s = summarizeTool(msg({ tool_name: 'start_pomodoro', tool_result: '{"started":true}' }))
     expect(s.resultHint).toBe('完成')
   })
+  it('started tool with no result yields no resultHint', () => {
+    const s = summarizeTool(msg({ tool_name: 'list_tasks', tool_status: 'started', tool_result: undefined }))
+    expect(s.resultHint).toBeUndefined()
+  })
+  it('handles a missing tool_name defensively', () => {
+    const s = summarizeTool(msg({ tool_name: undefined, tool_args: '{"title":"x"}' }))
+    // no LABELS match → argHint falls back to first scalar arg by priority
+    expect(s.argHint).toBe('title=x')
+    expect(s.resultHint).toBeUndefined()
+  })
+  it('survives malformed tool_args JSON', () => {
+    const s = summarizeTool(msg({ tool_name: 'list_tasks', tool_args: '{not json' }))
+    expect(s.argHint).toBeUndefined()
+  })
 })
