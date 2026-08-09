@@ -21,6 +21,8 @@ type ScheduleService interface {
 	GetSchedules(start, end time.Time) ([]service.ScheduleEvent, error)
 	GenerateSchedule(startTime, endTime string) ([]service.ScheduleEvent, string, error)
 	DeleteSchedule(id string) error
+	UpdateSchedule(id string, dto *service.UpdateScheduleDTO) error
+	CreateScheduleEvent(dto *service.CreateScheduleDTO) (*service.ScheduleEvent, error)
 }
 
 // =====================================================================
@@ -238,4 +240,194 @@ func (t *DeleteScheduleTool) Preview(ctx context.Context, args json.RawMessage) 
 	}
 	_ = json.Unmarshal(args, &in)
 	return map[string]any{"action": "delete_schedule", "schedule_id": in.ScheduleID}, nil
+}
+
+// =====================================================================
+// update_schedule
+// =====================================================================
+
+// UpdateScheduleTool partially updates a schedule event (from list_schedule):
+// title/description/start/end/status/color. Only provided fields change. To mark
+// a schedule finished set status="completed". PermWrite: requires confirmation.
+// NOTE: use schedule ids from list_schedule; do NOT pass task ids here (use
+// update_task for tasks) — crossing id domains was the original failure mode.
+type UpdateScheduleTool struct {
+	Svc ScheduleService
+}
+
+var scheduleStatuses = map[string]bool{
+	"planned": true, "in_progress": true, "completed": true, "cancelled": true,
+}
+
+func (t *UpdateScheduleTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "update_schedule",
+		Function: agent.FunctionSpec{
+			Name:        "update_schedule",
+			Description: "Partially update a schedule event (from list_schedule). Only provided fields change. Set status='completed' to mark a schedule done. Use update_task for tasks, not this.",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"schedule_id":  map[string]any{"type": "string", "description": "id from list_schedule"},
+					"title":        map[string]any{"type": "string"},
+					"description":  map[string]any{"type": "string"},
+					"start":        map[string]any{"type": "string", "description": "RFC3339"},
+					"end":          map[string]any{"type": "string", "description": "RFC3339"},
+					"status":       map[string]any{"type": "string", "description": "planned|in_progress|completed|cancelled"},
+					"color":        map[string]any{"type": "string"},
+				},
+				"required": []any{"schedule_id"},
+			},
+		},
+		Permission: agent.PermWrite,
+	}
+}
+
+func (t *UpdateScheduleTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		ScheduleID  string  `json:"schedule_id"`
+		Title       *string `json:"title"`
+		Description *string `json:"description"`
+		Start       *string `json:"start"`
+		End         *string `json:"end"`
+		Status      *string `json:"status"`
+		Color       *string `json:"color"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	if in.ScheduleID == "" {
+		return nil, fmt.Errorf("schema: missing required field schedule_id")
+	}
+	if in.Status != nil && *in.Status != "" && !scheduleStatuses[*in.Status] {
+		return nil, fmt.Errorf("schema: status must be planned|in_progress|completed|cancelled, got %q", *in.Status)
+	}
+	dto := &service.UpdateScheduleDTO{}
+	if in.Title != nil {
+		dto.Title = *in.Title
+	}
+	if in.Description != nil {
+		dto.Description = *in.Description
+	}
+	if in.Start != nil {
+		dto.StartTime = *in.Start
+	}
+	if in.End != nil {
+		dto.EndTime = *in.End
+	}
+	if in.Status != nil {
+		dto.Status = *in.Status
+	}
+	if in.Color != nil {
+		dto.Color = *in.Color
+	}
+	if err := t.Svc.UpdateSchedule(in.ScheduleID, dto); err != nil {
+		return nil, err
+	}
+	return map[string]any{"schedule_id": in.ScheduleID, "updated": true}, nil
+}
+
+func (t *UpdateScheduleTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	var in struct {
+		ScheduleID string `json:"schedule_id"`
+	}
+	_ = json.Unmarshal(args, &in)
+	return map[string]any{"action": "update_schedule", "schedule_id": in.ScheduleID, "args": json.RawMessage(args)}, nil
+}
+
+// =====================================================================
+// create_schedule
+// =====================================================================
+
+// CreateScheduleTool creates a single ad-hoc schedule event (e.g. "加个会，明天
+// 下午3点"). PermWrite: requires confirmation. Distinct from generate_schedule,
+// which AI-generates a whole day.
+type CreateScheduleTool struct {
+	Svc ScheduleService
+}
+
+var scheduleTypes = map[string]bool{
+	"task": true, "pomodoro": true, "break": true, "custom": true,
+}
+
+func (t *CreateScheduleTool) Schema() agent.ToolSchema {
+	return agent.ToolSchema{
+		Name: "create_schedule",
+		Function: agent.FunctionSpec{
+			Name:        "create_schedule",
+			Description: "Create a single ad-hoc schedule event with explicit start/end times (RFC3339). Use generate_schedule for AI bulk scheduling.",
+			Parameters: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"title":       map[string]any{"type": "string"},
+					"description": map[string]any{"type": "string"},
+					"start":       map[string]any{"type": "string", "description": "RFC3339"},
+					"end":         map[string]any{"type": "string", "description": "RFC3339"},
+					"type":        map[string]any{"type": "string", "description": "task|pomodoro|break|custom (default task)"},
+					"color":       map[string]any{"type": "string"},
+				},
+				"required": []any{"title", "start", "end"},
+			},
+		},
+		Permission: agent.PermWrite,
+	}
+}
+
+func (t *CreateScheduleTool) Execute(ctx context.Context, args json.RawMessage) (any, error) {
+	if err := agent.ValidateArgs(t.Schema().Function.Parameters, args); err != nil {
+		return nil, err
+	}
+	var in struct {
+		Title       string  `json:"title"`
+		Description *string `json:"description"`
+		Start       string  `json:"start"`
+		End         string  `json:"end"`
+		Type        *string `json:"type"`
+		Color       *string `json:"color"`
+	}
+	if err := json.Unmarshal(args, &in); err != nil {
+		return nil, fmt.Errorf("parse args: %w", err)
+	}
+	if in.Title == "" {
+		return nil, fmt.Errorf("schema: missing required field title")
+	}
+	if in.Start == "" {
+		return nil, fmt.Errorf("schema: missing required field start")
+	}
+	if in.End == "" {
+		return nil, fmt.Errorf("schema: missing required field end")
+	}
+	dto := &service.CreateScheduleDTO{
+		Title:     in.Title,
+		StartTime: in.Start,
+		EndTime:   in.End,
+	}
+	if in.Description != nil {
+		dto.Description = *in.Description
+	}
+	if in.Type != nil && *in.Type != "" {
+		if !scheduleTypes[*in.Type] {
+			return nil, fmt.Errorf("schema: type must be task|pomodoro|break|custom, got %q", *in.Type)
+		}
+		dto.Type = *in.Type
+	} else {
+		dto.Type = "task"
+	}
+	if in.Color != nil {
+		dto.Color = *in.Color
+	}
+	return t.Svc.CreateScheduleEvent(dto)
+}
+
+func (t *CreateScheduleTool) Preview(ctx context.Context, args json.RawMessage) (any, error) {
+	var in struct {
+		Title string `json:"title"`
+		Start string `json:"start"`
+		End   string `json:"end"`
+	}
+	_ = json.Unmarshal(args, &in)
+	return map[string]any{"action": "create_schedule", "title": in.Title, "start": in.Start, "end": in.End}, nil
 }

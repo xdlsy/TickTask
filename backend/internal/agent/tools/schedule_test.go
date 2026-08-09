@@ -32,12 +32,39 @@ type mockScheduleSvc struct {
 	delErr    error
 	delCalls  int
 	delIDs    []string
+
+	updErr    error
+	updCalls  int
+	updIDs    []string
+	updDTOs   []*service.UpdateScheduleDTO
+
+	createEvt *service.ScheduleEvent
+	createErr error
+	createDTOs []*service.CreateScheduleDTO
 }
 
 func (m *mockScheduleSvc) DeleteSchedule(id string) error {
 	m.delCalls++
 	m.delIDs = append(m.delIDs, id)
 	return m.delErr
+}
+
+func (m *mockScheduleSvc) UpdateSchedule(id string, dto *service.UpdateScheduleDTO) error {
+	m.updCalls++
+	m.updIDs = append(m.updIDs, id)
+	m.updDTOs = append(m.updDTOs, dto)
+	return m.updErr
+}
+
+func (m *mockScheduleSvc) CreateScheduleEvent(dto *service.CreateScheduleDTO) (*service.ScheduleEvent, error) {
+	m.createDTOs = append(m.createDTOs, dto)
+	if m.createErr != nil {
+		return nil, m.createErr
+	}
+	if m.createEvt != nil {
+		return m.createEvt, nil
+	}
+	return &service.ScheduleEvent{ID: "new-1", Title: dto.Title, Start: dto.StartTime, End: dto.EndTime, Type: dto.Type}, nil
 }
 
 // --- DeleteScheduleTool ---
@@ -257,5 +284,104 @@ func TestListSchedule_Preview_EqualsExecute(t *testing.T) {
 	m, _ := json.Marshal(preview)
 	if !strings.Contains(string(m), `"x"`) {
 		t.Fatalf("preview should mirror execute for read tool: %s", m)
+	}
+}
+
+// --- UpdateScheduleTool ---
+
+func TestUpdateSchedule_DelegatesAndRequiresID(t *testing.T) {
+	svc := &mockScheduleSvc{}
+	tool := &UpdateScheduleTool{Svc: svc}
+	res, err := tool.Execute(context.Background(), json.RawMessage(`{"schedule_id":"s-1","status":"completed"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if svc.updCalls != 1 || len(svc.updIDs) != 1 || svc.updIDs[0] != "s-1" {
+		t.Errorf("UpdateSchedule calls = %+v", svc.updIDs)
+	}
+	if svc.updDTOs[0].Status != "completed" {
+		t.Errorf("dto.Status = %q, want completed", svc.updDTOs[0].Status)
+	}
+	m, _ := res.(map[string]any)
+	if m["updated"] != true || m["schedule_id"] != "s-1" {
+		t.Errorf("result = %+v", res)
+	}
+	// missing id fails BEFORE touching the service
+	svc.updCalls = 0
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"status":"completed"}`)); err == nil {
+		t.Error("expected error for missing schedule_id")
+	}
+	if svc.updCalls != 0 {
+		t.Errorf("service called on invalid args")
+	}
+}
+
+func TestUpdateSchedule_StatusEnumValidation(t *testing.T) {
+	svc := &mockScheduleSvc{}
+	tool := &UpdateScheduleTool{Svc: svc}
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"schedule_id":"s-1","status":"bogus"}`))
+	if err == nil || !strings.Contains(err.Error(), "status") {
+		t.Fatalf("expected status enum error, got %v", err)
+	}
+	if svc.updCalls != 0 {
+		t.Errorf("service must not be called on bad enum")
+	}
+}
+
+func TestUpdateSchedule_PreviewNoSideEffect(t *testing.T) {
+	svc := &mockScheduleSvc{}
+	tool := &UpdateScheduleTool{Svc: svc}
+	pv, err := tool.Preview(context.Background(), json.RawMessage(`{"schedule_id":"s-1","status":"completed"}`))
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+	m, _ := json.Marshal(pv)
+	if !strings.Contains(string(m), `"update_schedule"`) || svc.updCalls != 0 {
+		t.Fatalf("preview must echo plan and not call service: %s calls=%d", m, svc.updCalls)
+	}
+}
+
+// --- CreateScheduleTool ---
+
+func TestCreateSchedule_DelegatesAndReturnsEvent(t *testing.T) {
+	svc := &mockScheduleSvc{}
+	tool := &CreateScheduleTool{Svc: svc}
+	res, err := tool.Execute(context.Background(), json.RawMessage(`{"title":"和 Bob 1:1","start":"2026-08-10T15:00:00Z","end":"2026-08-10T15:30:00Z"}`))
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(svc.createDTOs) != 1 || svc.createDTOs[0].Title != "和 Bob 1:1" {
+		t.Errorf("create DTO = %+v", svc.createDTOs)
+	}
+	m, _ := json.Marshal(res)
+	if !strings.Contains(string(m), `"new-1"`) {
+		t.Errorf("result should include created event id: %s", m)
+	}
+}
+
+func TestCreateSchedule_RequiresTitleAndTimes(t *testing.T) {
+	svc := &mockScheduleSvc{}
+	tool := &CreateScheduleTool{Svc: svc}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"start":"x","end":"y"}`)); err == nil {
+		t.Error("expected error for missing title")
+	}
+	if _, err := tool.Execute(context.Background(), json.RawMessage(`{"title":"t","start":"x"}`)); err == nil {
+		t.Error("expected error for missing end")
+	}
+	if len(svc.createDTOs) != 0 {
+		t.Errorf("service must not be called on invalid args")
+	}
+}
+
+func TestCreateSchedule_PreviewNoSideEffect(t *testing.T) {
+	svc := &mockScheduleSvc{}
+	tool := &CreateScheduleTool{Svc: svc}
+	pv, err := tool.Preview(context.Background(), json.RawMessage(`{"title":"t","start":"s","end":"e"}`))
+	if err != nil {
+		t.Fatalf("preview: %v", err)
+	}
+	m, _ := json.Marshal(pv)
+	if !strings.Contains(string(m), `"create_schedule"`) || len(svc.createDTOs) != 0 {
+		t.Fatalf("preview must echo plan and not call service: %s", m)
 	}
 }

@@ -24,8 +24,7 @@ type Deps struct {
 }
 
 // RegisterAll wires every tool the agent package exposes into the given
-// registry. After Task 12 it registers 13 tools: 5 task tools + 3 timer tools
-// + 2 schedule tools + 1 insight tool + 2 work-log tools.
+// registry. After Task 1 it registers 16 tools: 5 task + 3 timer + 5 schedule + 1 insight + 2 work-log.
 func RegisterAll(reg agent.ToolRegistry, deps Deps) {
 	// Task tools (Task 10)
 	reg.MustRegister(&ListTasksTool{Svc: deps.Tasks})
@@ -43,6 +42,8 @@ func RegisterAll(reg agent.ToolRegistry, deps Deps) {
 	reg.MustRegister(&GenerateScheduleTool{Svc: deps.Schedule})
 	reg.MustRegister(&ListScheduleTool{Svc: deps.Schedule})
 	reg.MustRegister(&DeleteScheduleTool{Svc: deps.Schedule})
+	reg.MustRegister(&UpdateScheduleTool{Svc: deps.Schedule})
+	reg.MustRegister(&CreateScheduleTool{Svc: deps.Schedule})
 
 	// Insight tools (Task 11)
 	reg.MustRegister(&GetDailyInsightsTool{Svc: deps.Analytics})
