@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { Task, TaskResponse, PomodoroSession, ClassificationResult, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkItem, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput, CreateQuickEntryInput, UpdateQuickEntryInput, UpdateSummaryInput, ImportPreview, ApplyImportRequest, ApplyResult, ClearResult, AgentConversation, AgentMessage, AgentStatus, AgentTestResult } from '@/types'
+import type { Task, TaskResponse, PomodoroSession, PrioritySuggestion, AIStatus, PomodoroSettings, AISettings, TaskTimeStats, DailySummary, TrendData, DistributionStats, ScheduleEvent, CreateScheduleDTO, UpdateScheduleDTO, MoveScheduleDTO, RescheduleResult, DailyInsights, ReviseResponse, PomodoroByTaskResult, PomodoroTrendsResult, WorkLog, WorkItem, WorkReport, WorkReportType, TodayContext, StructuredWorkLog, SaveWorkLogInput, CreateQuickEntryInput, UpdateQuickEntryInput, UpdateSummaryInput, ImportPreview, ApplyImportRequest, ApplyResult, ClearResult, AgentConversation, AgentMessage, AgentStatus, AgentTestResult } from '@/types'
 
 const client = axios.create({
   baseURL: '/api',
@@ -49,9 +49,6 @@ export const api = {
 
   // AI 智能功能
   getAIStatus: () => client.get<AIStatus>('/ai/status'),
-  classifyTask: (taskId: string) => client.post<ClassificationResult>('/ai/classify', { task_id: taskId }),
-  classifyTasks: (taskIds: string[]) => client.post<{ results: ClassificationResult[] }>('/ai/classify/batch', { task_ids: taskIds }),
-  classifyTaskByText: (title: string, description?: string) => client.post<ClassificationResult>('/ai/classify-task-text', { title, description }),
   generateSchedule: (startTime: string, endTime: string) => client.post<{ events: ScheduleEvent[] }>('/ai/schedule', { start_time: startTime, end_time: endTime }),
   rescheduleAfterInterrupt: (data: { task_id: string; completed_minutes?: number; planned_minutes: number; interrupt_reason?: string; work_end_time: string }) => client.post<RescheduleResult>('/ai/reschedule-after-interrupt', data),
   getPrioritySuggestions: () => client.get<PrioritySuggestion>('/ai/priority'),

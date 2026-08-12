@@ -9,15 +9,6 @@
       <el-form-item label="标题" required>
         <div class="title-row">
           <el-input v-model="formData.title" placeholder="输入任务标题" style="flex: 1" />
-          <el-button
-            v-if="!task && agentStore.status.configured"
-            type="primary"
-            link
-            :loading="aiClassifying"
-            @click="getAIRecommendation"
-          >
-            AI 推荐
-          </el-button>
         </div>
       </el-form-item>
 
@@ -41,19 +32,6 @@
           <el-radio-button :label="4">不重要不紧急</el-radio-button>
         </el-radio-group>
       </el-form-item>
-
-      <div v-if="aiRecommendation" class="ai-recommendation">
-        <div class="recommendation-header">
-          <span>AI 推荐象限</span>
-          <el-tag :type="getQuadrantTagType(aiRecommendation.quadrant)">
-            {{ getQuadrantName(aiRecommendation.quadrant) }}
-          </el-tag>
-        </div>
-        <p class="recommendation-reason">{{ aiRecommendation.reason }}</p>
-        <el-button type="primary" size="small" @click="applyRecommendation">
-          采纳建议
-        </el-button>
-      </div>
 
       <el-form-item label="预估时间">
         <el-input-number v-model="formData.estimated_time" :min="0" :step="5" />
@@ -146,10 +124,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import type { Task, Quadrant, ClassificationResult } from '@/types'
-import { QUADRANT_INFO } from '@/types'
-import { useAgentStore } from '@/stores/agent'
+import type { Task, Quadrant } from '@/types'
 
 interface Props {
   visible: boolean
@@ -163,10 +138,7 @@ const emit = defineEmits<{
   save: [data: any]
 }>()
 
-const agentStore = useAgentStore()
 const tagInput = ref('')
-const aiClassifying = ref(false)
-const aiRecommendation = ref<ClassificationResult | null>(null)
 
 const formData = ref({
   title: '',
@@ -219,7 +191,6 @@ function resetForm() {
     recurrence_pattern: '',
     tags: []
   }
-  aiRecommendation.value = null
 }
 
 function addTag() {
@@ -234,50 +205,6 @@ function removeTag(tag: string) {
   const index = formData.value.tags.indexOf(tag)
   if (index > -1) {
     formData.value.tags.splice(index, 1)
-  }
-}
-
-function getQuadrantName(quadrant: number): string {
-  return QUADRANT_INFO[quadrant as 1 | 2 | 3 | 4]?.name || `象限 ${quadrant}`
-}
-
-function getQuadrantTagType(quadrant: number): 'danger' | 'warning' | 'primary' | 'info' {
-  const types: Record<number, 'danger' | 'warning' | 'primary' | 'info'> = {
-    1: 'danger',
-    2: 'warning',
-    3: 'primary',
-    4: 'info'
-  }
-  return types[quadrant] || 'info'
-}
-
-async function getAIRecommendation() {
-  if (!formData.value.title.trim()) {
-    ElMessage.warning('请先输入任务标题')
-    return
-  }
-
-  aiClassifying.value = true
-  try {
-    const result = await agentStore.runTool('classify_task', {
-      title: formData.value.title,
-      description: formData.value.description,
-    }) as ClassificationResult | null
-    if (result) {
-      aiRecommendation.value = result
-    }
-  } catch (error) {
-    ElMessage.error('AI 推荐失败')
-  } finally {
-    aiClassifying.value = false
-  }
-}
-
-function applyRecommendation() {
-  if (aiRecommendation.value) {
-    formData.value.quadrant = aiRecommendation.value.quadrant as Quadrant
-    ElMessage.success('已采纳 AI 推荐')
-    aiRecommendation.value = null
   }
 }
 
@@ -317,34 +244,4 @@ function onSave() {
   gap: 12px;
 }
 
-.ai-recommendation {
-  background: var(--accent-fill);
-  border: 1px solid rgba(230, 162, 60, 0.22);
-  border-radius: var(--radius-md);
-  padding: 16px;
-  margin-bottom: 18px;
-}
-
-.recommendation-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.recommendation-header span:first-child {
-  font-family: var(--font-mono);
-  font-weight: 500;
-  color: var(--accent-primary);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.recommendation-reason {
-  margin: 0 0 14px 0;
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.6;
-}
 </style>

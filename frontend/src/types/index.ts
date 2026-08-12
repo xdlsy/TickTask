@@ -117,15 +117,6 @@ export interface TerminalStatusMessage {
 
 export type WSMessage = TimerTickMessage | SessionStateMessage | TimerCompleteMessage | TerminalOutputMessage | TerminalStatusMessage | AgentWsEvent
 
-// AI 相关类型
-export interface ClassificationResult {
-  task_id: string
-  important: boolean
-  urgent: boolean
-  quadrant: number
-  reason: string
-}
-
 export interface ScheduleItem {
   task_id: string
   title: string

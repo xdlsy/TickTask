@@ -20,7 +20,6 @@
             <el-dropdown-menu>
               <el-dropdown-item v-if="task.status !== 'completed'" command="startTimer">开始番茄</el-dropdown-item>
               <el-dropdown-item command="edit">编辑</el-dropdown-item>
-              <el-dropdown-item command="ai-classify" :disabled="aiClassifying">AI 智能分类</el-dropdown-item>
               <el-dropdown-item v-if="task.status !== 'completed'" command="complete">完成</el-dropdown-item>
               <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
             </el-dropdown-menu>
@@ -48,7 +47,6 @@
           <el-dropdown-menu>
             <el-dropdown-item v-if="task.status !== 'completed'" command="startTimer">开始番茄</el-dropdown-item>
             <el-dropdown-item command="edit">编辑</el-dropdown-item>
-            <el-dropdown-item command="ai-classify" :disabled="aiClassifying">AI 智能分类</el-dropdown-item>
             <el-dropdown-item command="complete" v-if="task.status !== 'completed'">完成</el-dropdown-item>
             <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
           </el-dropdown-menu>
@@ -61,27 +59,13 @@
       <el-tag v-if="task.deadline" type="warning" size="small">{{ formatDate(task.deadline) }}</el-tag>
       <el-tag size="small" :type="task.status === 'completed' ? 'success' : 'info'">{{ statusLabel }}</el-tag>
     </div>
-    <el-dialog v-model="showClassifyResult" title="AI 分类建议" width="400px" @click.stop>
-      <div v-if="classifyResult" class="classify-result">
-        <div class="result-item"><span class="label">推荐象限：</span><el-tag :type="getQuadrantTagType(classifyResult.quadrant)">{{ getQuadrantName(classifyResult.quadrant) }}</el-tag></div>
-        <div class="result-item"><span class="label">重要性：</span><span>{{ classifyResult.important ? '重要' : '不重要' }}</span></div>
-        <div class="result-item"><span class="label">紧急度：</span><span>{{ classifyResult.urgent ? '紧急' : '不紧急' }}</span></div>
-        <div class="result-reason"><span class="label">理由：</span><p>{{ classifyResult.reason }}</p></div>
-      </div>
-      <template #footer>
-        <el-button @click="showClassifyResult = false">取消</el-button>
-        <el-button type="primary" @click="applyClassification">采纳建议</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { TaskResponse, TaskStatus, ClassificationResult } from '@/types'
-import { QUADRANT_INFO } from '@/types'
-import { useAgentStore } from '@/stores/agent'
+import type { TaskResponse, TaskStatus } from '@/types'
 import { useTaskStore } from '@/stores/task'
 import { useTimerStore } from '@/stores/timer'
 import { useRouter } from 'vue-router'
@@ -89,19 +73,13 @@ import { useRouter } from 'vue-router'
 interface Props { task: TaskResponse; mode?: 'card' | 'row' }
 const props = defineProps<Props>()
 const emit = defineEmits<{ 'drag-start': [event: DragEvent, task: TaskResponse]; 'edit': [task: TaskResponse]; 'complete': [id: string]; 'delete': [id: string]; 'start-pomodoro': [taskId: string]; 'show-detail': [task: TaskResponse] }>()
-const agentStore = useAgentStore()
 const taskStore = useTaskStore()
 const timerStore = useTimerStore()
 const router = useRouter()
-const showClassifyResult = ref(false)
-const classifyResult = ref<ClassificationResult | null>(null)
-const aiClassifying = ref(false)
 const statusLabels: Record<TaskStatus, string> = { todo: '待办', in_progress: '进行中', completed: '已完成', cancelled: '已取消' }
 const statusLabel = computed(() => statusLabels[props.task.status])
 
 function formatDate(d: string): string { const dt = new Date(d); return `${dt.getMonth() + 1}/${dt.getDate()}` }
-function getQuadrantName(q: number): string { return QUADRANT_INFO[q as 1|2|3|4]?.name || `象限 ${q}` }
-function getQuadrantTagType(q: number): string { return ({1:'danger',2:'warning',3:'primary',4:'info'} as Record<number,string>)[q] || 'info' }
 
 async function handleCommand(cmd: string) {
   switch (cmd) {
@@ -109,28 +87,11 @@ async function handleCommand(cmd: string) {
     case 'edit': emit('edit', props.task); break
     case 'complete': emit('complete', props.task.id); break
     case 'delete': emit('delete', props.task.id); break
-    case 'ai-classify': await doClassify(); break
   }
 }
 
 async function startTimerForTask() {
   try { await timerStore.createSession(props.task.id, 'work'); ElMessage.success(`开始专注：${props.task.title}`); router.push('/timer') } catch { ElMessage.error('启动计时器失败') }
-}
-
-async function doClassify() {
-  if (!agentStore.status.configured) { ElMessage.warning('请先在设置中配置 AI API Key'); router.push('/settings'); return }
-  aiClassifying.value = true
-  try {
-    const r = await agentStore.runTool('classify_task', { task_id: props.task.id }) as ClassificationResult | null
-    if (r) { classifyResult.value = r; showClassifyResult.value = true }
-  } catch { ElMessage.error('AI 分类失败') } finally {
-    aiClassifying.value = false
-  }
-}
-
-async function applyClassification() {
-  if (classifyResult.value && classifyResult.value.quadrant !== props.task.quadrant) { await taskStore.moveTask(props.task.id, classifyResult.value.quadrant as 1|2|3|4); ElMessage.success('已应用 AI 分类建议') }
-  showClassifyResult.value = false
 }
 
 function showDetail() { emit('show-detail', props.task) }
@@ -230,40 +191,6 @@ function onRowCheckbox() {
   --el-tag-bg-color: var(--sage-fill);
   --el-tag-border-color: rgba(143, 178, 140, 0.22);
   --el-tag-text-color: var(--accent-sage);
-}
-
-.classify-result { padding: 8px 0 }
-
-.result-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.result-item .label {
-  color: var(--text-secondary);
-  min-width: 70px;
-  font-size: 13px;
-}
-
-.result-reason {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border-color);
-}
-
-.result-reason .label {
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-  display: block;
-  font-size: 13px;
-}
-
-.result-reason p {
-  margin: 0;
-  line-height: 1.6;
-  color: var(--text-primary);
 }
 
 /* Row mode */

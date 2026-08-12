@@ -49,23 +49,6 @@ test.describe('@p1 Task Extended', () => {
     expect(updated.completed_at).toBeTruthy()
   })
 
-  test('TASK-E2E-009: Batch AI classification', async ({ apiClient }) => {
-    // Given AI is configured
-    const status = await apiClient.getAIStatus()
-    test.skip(!status.configured, 'AI not configured')
-
-    // Given 3 tasks exist
-    const t1 = await apiClient.createTask({ title: '批量测试1', quadrant: 2 })
-    const t2 = await apiClient.createTask({ title: '批量测试2', quadrant: 2 })
-    const t3 = await apiClient.createTask({ title: '批量测试3', quadrant: 2 })
-
-    // When batch classifying
-    const results = await apiClient.batchClassifyTasks([t1.id, t2.id, t3.id])
-
-    // Then results contain classification for each task
-    expect(Object.keys(results).length).toBe(3)
-  })
-
   test('TASK-E2E-010: Tags display in task card', async ({
     page,
     taskFactory,

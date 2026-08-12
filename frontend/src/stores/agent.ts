@@ -30,7 +30,7 @@ function safeStringify(v: unknown): string {
 // list/quadrant views reflect agent-made changes live — the agent writes through
 // the backend directly and otherwise bypasses the task store's own actions
 // (createTask/updateTask/etc. only fire when the USER acts in the UI).
-const TASK_MUTATION_TOOLS = new Set(['create_task', 'update_task', 'delete_task', 'move_task', 'classify_task'])
+const TASK_MUTATION_TOOLS = new Set(['create_task', 'update_task', 'delete_task', 'move_task'])
 
 export const useAgentStore = defineStore('agent', {
   state: () => ({
