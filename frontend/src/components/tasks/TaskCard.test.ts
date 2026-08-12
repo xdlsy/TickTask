@@ -30,7 +30,7 @@ vi.mock('element-plus', () => ({
 }))
 
 const elStubs = {
-  'el-dropdown': true,
+  'el-dropdown': { template: '<div><slot /></div>' },
   'el-dropdown-menu': true,
   'el-dropdown-item': true,
   'el-tag': true,
