@@ -11,6 +11,8 @@ node_modules/
 # ===== Build output =====
 frontend/dist/
 *.tsbuildinfo
+backend/web/dist/*
+!backend/web/dist/index.html
 
 # ===== Database (runtime data) =====
 backend/data/*.db
