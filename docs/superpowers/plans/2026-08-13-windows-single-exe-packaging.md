@@ -171,8 +171,8 @@ func writeConfig(t *testing.T, path, portYAML string) {
 }
 
 func TestResolvePrefersCwdConfig(t *testing.T) {
-	cwd := t.MkdirTemp("", "cfg-cwd")
-	appdata := t.MkdirTemp("", "cfg-appdata")
+	cwd := t.TempDir()
+	appdata := t.TempDir()
 	writeConfig(t, filepath.Join(cwd, "configs", "config.yaml"), "9999")
 	writeConfig(t, filepath.Join(appdata, "TickTask", "config.yaml"), "7777")
 	chdir(t, cwd)
@@ -188,8 +188,8 @@ func TestResolvePrefersCwdConfig(t *testing.T) {
 }
 
 func TestResolveFallsBackToAppDirConfig(t *testing.T) {
-	cwd := t.MkdirTemp("", "cfg-empty")
-	appdata := t.MkdirTemp("", "cfg-appdata2")
+	cwd := t.TempDir()
+	appdata := t.TempDir()
 	writeConfig(t, filepath.Join(appdata, "TickTask", "config.yaml"), "7777")
 	chdir(t, cwd)
 	setUserConfigDir(t, appdata)
@@ -205,8 +205,8 @@ func TestResolveFallsBackToAppDirConfig(t *testing.T) {
 }
 
 func TestResolveDefaultsPutDataUnderAppDir(t *testing.T) {
-	cwd := t.MkdirTemp("", "cfg-empty2")
-	appdata := t.MkdirTemp("", "cfg-appdata3")
+	cwd := t.TempDir()
+	appdata := t.TempDir()
 	chdir(t, cwd)
 	setUserConfigDir(t, appdata)
 
@@ -221,7 +221,7 @@ func TestResolveDefaultsPutDataUnderAppDir(t *testing.T) {
 }
 
 func TestResolveDefaultsFallbackWhenNoUserDir(t *testing.T) {
-	cwd := t.MkdirTemp("", "cfg-empty3")
+	cwd := t.TempDir()
 	chdir(t, cwd)
 	unsetUserConfigDir(t)
 
@@ -235,7 +235,7 @@ func TestResolveDefaultsFallbackWhenNoUserDir(t *testing.T) {
 }
 
 func TestAppDirJoinsTickTask(t *testing.T) {
-	base := t.MkdirTemp("", "appdir")
+	base := t.TempDir()
 	setUserConfigDir(t, base)
 	dir, ok := AppDir()
 	if !ok {
@@ -363,7 +363,7 @@ func TestIsStubTrueInRepoState(t *testing.T) {
 }
 
 func TestFindDiskDistEmptyOutsideRepo(t *testing.T) {
-	dir := t.MkdirTemp("", "nodist")
+	dir := t.TempDir()
 	chdir(t, dir)
 	if got := FindDiskDist(); got != "" {
 		t.Fatalf("FindDiskDist() = %q, want empty", got)
@@ -517,7 +517,7 @@ func chdir(t *testing.T, dir string) {
 // 注意：依赖"仓库默认只含占位页"这一不变式（构建脚本打完 exe 会恢复占位页）。
 func TestServeFrontendFallbackServesStub(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	dir := t.MkdirTemp("", "static")
+	dir := t.TempDir()
 	chdir(t, dir)
 
 	r := gin.New()
