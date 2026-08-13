@@ -32,6 +32,7 @@ TickTask/
 │   │   │   └── middleware/     # CORS middleware
 │   │   └── websocket/          # WebSocket hub for real-time timer broadcasts
 │   ├── pkg/                    # Shared: config (YAML), database (SQLite+seed), logger (slog)
+│   ├── web/                  # Embedded frontend (go:embed dist + placeholder page)
 │   └── configs/                # config.yaml — server, DB, CORS, AI settings
 ├── frontend/                   # Vue 3 + TypeScript + Element Plus SPA
 │   ├── src/
@@ -72,7 +73,8 @@ cd backend && go run cmd/server/main.go                     # Start backend only
 cd backend && go test ./...                                 # All Go tests
 cd backend && go test -v ./internal/service/...             # Service tests
 cd backend && go test -v ./internal/api/handler/...         # Handler tests
-cd backend && CGO_ENABLED=1 go build -o bin/ticktask-server cmd/server/main.go  # Build binary
+cd backend && CGO_ENABLED=0 go build -o bin/ticktask-server ./cmd/server  # Build binary (pure-Go SQLite, no gcc needed)
+bash scripts/build.sh exe       # Build single-file ticktask.exe (frontend embedded)
 
 # --- Frontend (Vue/TS) ---
 cd frontend && npm install               # Install deps
@@ -132,6 +134,14 @@ cd frontend && npx vitest                # Watch mode
 - Stores: test initial state, each action (success + error paths), computed
 - Type checking: `npx vue-tsc --noEmit`
 - Coverage: `@vitest/coverage-v8` installed
+
+## 打包分发（Windows 单文件 exe）
+
+- 构建：`bash scripts/build.sh exe`（或 `make exe`）→ `backend/bin/ticktask.exe`，前端已嵌入，目标机器零依赖。
+- 数据位置：`%APPDATA%\TickTask\data\`（`ticktask.db` + `.keyvault` 必须成对迁移）。
+- 可选配置：`%APPDATA%\TickTask\config.yaml`（缺省用默认值；AI 设置存在数据库里）。
+- 存量数据迁移：把旧 `backend/data/ticktask.db` 与 `.keyvault` 成对拷到上述目录即可。
+- 打包模式启动会自动打开浏览器；开发模式（仓库内有磁盘 dist）不会。
 
 ## Commit & PR Conventions [✓ auto]
 

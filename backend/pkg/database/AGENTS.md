@@ -18,5 +18,5 @@ Key functions:
 
 ## Dependencies [✓ auto]
 
-- Depends on: `internal/model` (all 5 GORM entities), `gorm.io/gorm`, `gorm.io/driver/sqlite`
+- Depends on: `internal/model` (all 5 GORM entities), `gorm.io/gorm`, `github.com/glebarez/sqlite`（纯 Go，CGO-free）
 - Depended on by: `cmd/server/main.go` (DB init + seed at startup)
