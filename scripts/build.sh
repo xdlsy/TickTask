@@ -37,7 +37,7 @@ build_backend() {
 
     # 编译
     echo "编译后端..."
-    CGO_ENABLED=1 go build -o bin/ticktask-server cmd/server/main.go
+    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o bin/ticktask-server ./cmd/server
 
     echo -e "${GREEN}✅ 后端构建完成: backend/bin/ticktask-server${NC}"
 }
@@ -72,6 +72,32 @@ build_frontend() {
     echo -e "${GREEN}✅ 前端构建完成: frontend/dist/${NC}"
 }
 
+# 构建单文件 exe：前端产物嵌入二进制，目标机器无需 Go/Node/gcc
+build_exe() {
+    echo -e "${YELLOW}📦 构建单文件 exe...${NC}"
+
+    # 1) 构建前端
+    "$SCRIPT_DIR/build.sh" frontend
+
+    # 2) 拷贝前端产物到嵌入目录（覆盖占位页）
+    echo "拷贝前端产物到 backend/web/dist ..."
+    rm -rf "$PROJECT_DIR/backend/web/dist"
+    cp -r "$PROJECT_DIR/frontend/dist" "$PROJECT_DIR/backend/web/dist"
+
+    # 3) 纯 Go 构建（无 CGO）
+    cd "$PROJECT_DIR/backend"
+    export GOPROXY=https://goproxy.cn,direct
+    go mod download
+    CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o bin/ticktask.exe ./cmd/server
+    cd "$PROJECT_DIR"
+
+    # 4) 恢复占位页：保证 go test 的 stub 语义与 git 状态干净
+    rm -rf "$PROJECT_DIR/backend/web/dist"
+    git -C "$PROJECT_DIR" checkout -- backend/web/dist
+
+    echo -e "${GREEN}✅ 单文件 exe 构建完成: backend/bin/ticktask.exe${NC}"
+}
+
 # 主函数
 main() {
     case "${1:-all}" in
@@ -85,8 +111,11 @@ main() {
             build_backend
             build_frontend
             ;;
+        exe)
+            build_exe
+            ;;
         *)
-            echo "用法: $0 [backend|frontend|all]"
+            echo "用法: $0 [backend|frontend|all|exe]"
             exit 1
             ;;
     esac
