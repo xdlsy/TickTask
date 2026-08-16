@@ -17,6 +17,13 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# 恢复 backend/web/dist 的占位页：真实产物拷入后一旦构建失败/中断，
+# 由 trap 兜底恢复，保证 go test 的 stub 语义与 git 状态干净
+restore_stub() {
+    rm -rf "$PROJECT_DIR/backend/web/dist"
+    git -C "$PROJECT_DIR" checkout -- backend/web/dist
+}
+
 # 构建后端
 build_backend() {
     echo -e "${YELLOW}📦 构建后端...${NC}"
@@ -79,10 +86,11 @@ build_exe() {
     # 1) 构建前端
     "$SCRIPT_DIR/build.sh" frontend
 
-    # 2) 拷贝前端产物到嵌入目录（覆盖占位页）
+    # 2) 拷贝前端产物到嵌入目录（覆盖占位页）；此后任何失败/中断都由 trap 兜底恢复占位页
     echo "拷贝前端产物到 backend/web/dist ..."
     rm -rf "$PROJECT_DIR/backend/web/dist"
     cp -r "$PROJECT_DIR/frontend/dist" "$PROJECT_DIR/backend/web/dist"
+    trap restore_stub EXIT
 
     # 3) 纯 Go 构建（无 CGO）
     cd "$PROJECT_DIR/backend"
@@ -92,8 +100,8 @@ build_exe() {
     cd "$PROJECT_DIR"
 
     # 4) 恢复占位页：保证 go test 的 stub 语义与 git 状态干净
-    rm -rf "$PROJECT_DIR/backend/web/dist"
-    git -C "$PROJECT_DIR" checkout -- backend/web/dist
+    restore_stub
+    trap - EXIT
 
     echo -e "${GREEN}✅ 单文件 exe 构建完成: backend/bin/ticktask.exe${NC}"
 }
