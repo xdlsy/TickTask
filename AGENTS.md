@@ -32,7 +32,7 @@ TickTask/
 │   │   │   └── middleware/     # CORS middleware
 │   │   └── websocket/          # WebSocket hub for real-time timer broadcasts
 │   ├── pkg/                    # Shared: config (YAML), database (SQLite+seed), logger (slog)
-│   ├── web/                  # Embedded frontend (go:embed dist + placeholder page)
+│   ├── web/                    # Embedded frontend (go:embed dist + placeholder page)
 │   └── configs/                # config.yaml — server, DB, CORS, AI settings
 ├── frontend/                   # Vue 3 + TypeScript + Element Plus SPA
 │   ├── src/
@@ -138,9 +138,10 @@ cd frontend && npx vitest                # Watch mode
 ## 打包分发（Windows 单文件 exe）
 
 - 构建：`bash scripts/build.sh exe`（或 `make exe`）→ `backend/bin/ticktask.exe`，前端已嵌入，目标机器零依赖。
-- 数据位置：`%APPDATA%\TickTask\data\`（`ticktask.db` + `.keyvault` 必须成对迁移）。
+- 数据位置：`%APPDATA%\TickTask\data\`（`ticktask.db` + `.keyvault` 必须成对迁移）。仓库内开发（有磁盘 dist、无 config.yaml）数据仍在 `backend/data/`。
 - 可选配置：`%APPDATA%\TickTask\config.yaml`（缺省用默认值；AI 设置存在数据库里）。
 - 存量数据迁移：把旧 `backend/data/ticktask.db` 与 `.keyvault` 成对拷到上述目录即可。
+- 迁移旧库后如 AI 调用报鉴权失败，属预期现象（旧库 API key 为掩码值）——在设置页重新录入一次 API key 即可。
 - 打包模式启动会自动打开浏览器；开发模式（仓库内有磁盘 dist）不会。
 
 ## Commit & PR Conventions [✓ auto]

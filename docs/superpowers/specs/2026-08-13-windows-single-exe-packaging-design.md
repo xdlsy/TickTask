@@ -62,6 +62,8 @@
 - 数据目录：找到配置文件时沿用其 `database.path`（现状不变）；未找到时 =
   `os.UserConfigDir()` + `\TickTask\data\`，数据库 `ticktask.db` 与 `.keyvault` 均在此
   （两者配套加密存储 API key，必须成对迁移）。
+  仓库开发布局（磁盘 dist 存在）下无配置时仍用 `./data/ticktask.db`，开发行为不变；
+  仅打包运行（无磁盘 dist）落到 `<AppDir>/data`（2026-08-14 用户裁决）。
 
 ### 5. 打包模式自动开浏览器
 
@@ -82,7 +84,9 @@
 
 ## 错误处理
 
-- `os.UserConfigDir()` 失败或目录不可创建/不可写 → 回落到 exe 旁 `./data`，日志 warning。
+- `os.UserConfigDir()` 失败 → 沿用默认 `./data`；数据目录创建失败（MkdirAll 报错）→
+  `log.Fatal` 直接终止，原因在控制台可见（2026-08-14 用户裁决：不实现回落，exe 旁目录
+  往往同样不可写）。
 - 嵌入为占位且磁盘无 dist → 服务占位页，文案指引用户重新打包。
 - 端口占用等启动失败：维持现状 `log.Fatal`，控制台窗口可见原因。
 
