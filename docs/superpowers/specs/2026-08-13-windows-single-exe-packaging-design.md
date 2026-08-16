@@ -94,7 +94,7 @@
 
 - 存量回归：service/handler 测试走 mock 不受影响；`pkg/database` 迁移测试将真实运行在
   纯 Go 驱动上，顺带验证驱动兼容性。
-- 新增单测：配置/数据目录解析（搜索顺序、APPDATA 回落、不可写回落）；router 静态服务的
+- 新增单测：配置/数据目录解析（搜索顺序、APPDATA 回落）；router 静态服务的
   嵌入兜底与占位页路径。
 - 人工验收：干净目录运行 exe → 浏览器自动打开 → 创建任务、跑一个番茄 → 重启 exe → 数据
   仍在 `%APPDATA%\TickTask\data\`；换一台无 Go/Node/gcc 的机器重复一次。
