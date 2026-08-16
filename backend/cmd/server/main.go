@@ -28,6 +28,11 @@ func main() {
 	// 注意：cfg 直接使用 Resolve 的返回值 —— 其默认值分支已把 database.path
 	// 指向 <APPDATA>/TickTask/data，不要再用 LoadDefault() 覆盖（会退回 ./data）。
 	cfg, cfgPath := config.Resolve()
+	// 仓库开发布局（能找到磁盘 dist）：无配置时沿用 ./data，保持开发行为不变；
+	// 打包运行（无磁盘 dist）才把数据落到 <AppDir>/data
+	if cfgPath == "" && web.FindDiskDist() != "" {
+		cfg.Database.Path = "./data/ticktask.db"
+	}
 	if cfgPath == "" {
 		logger.Logger.Warn("using default config")
 	} else {
