@@ -1,9 +1,10 @@
 package api
 
 import (
+	"io/fs"
 	"net/http"
-	"os"
 	"path/filepath"
+	"strings"
 	"ticktask/internal/agent"
 	"ticktask/internal/api/handler"
 	"ticktask/internal/api/middleware"
@@ -11,6 +12,7 @@ import (
 	"ticktask/internal/service"
 	"ticktask/internal/websocket"
 	"ticktask/pkg/config"
+	"ticktask/web"
 
 	"github.com/gin-gonic/gin"
 )
@@ -144,33 +146,42 @@ func SetupRouter(
 		}
 	}
 
-	// 静态文件服务（生产模式）
-	// 检查 dist 目录是否存在（相对于可执行文件或工作目录）
-	distPaths := []string{
-		"dist",
-		"../frontend/dist",
-		"../../frontend/dist",
-	}
-
-	for _, distPath := range distPaths {
-		if _, err := os.Stat(distPath); err == nil {
-			// 服务静态资源
-			r.Static("/assets", filepath.Join(distPath, "assets"))
-
-			// 对于所有非 API 和非 WebSocket 的请求，返回 index.html（支持 SPA 路由）
-			r.NoRoute(func(c *gin.Context) {
-				// 如果是 API 请求但路由不存在，返回 404
-				if len(c.Request.URL.Path) >= 4 && c.Request.URL.Path[:4] == "/api" {
-					c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
-					return
-				}
-				// 否则返回 index.html（SPA 路由支持）
-				c.File(filepath.Join(distPath, "index.html"))
-			})
-
-			break
-		}
-	}
+	// 静态文件服务：磁盘 dist 优先（仓库开发布局），嵌入式前端兜底（打包 exe）
+	serveFrontend(r)
 
 	return r
+}
+
+// serveFrontend 注册前端静态资源服务。
+// 顺序：磁盘 dist（dist / ../frontend/dist / ../../frontend/dist）→
+// 嵌入的真实前端 → 嵌入占位页。API 前缀的未匹配路由一律 404 JSON。
+func serveFrontend(r *gin.Engine) {
+	if diskPath := web.FindDiskDist(); diskPath != "" {
+		r.Static("/assets", filepath.Join(diskPath, "assets"))
+		r.NoRoute(func(c *gin.Context) {
+			if strings.HasPrefix(c.Request.URL.Path, "/api") {
+				c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+				return
+			}
+			c.File(filepath.Join(diskPath, "index.html"))
+		})
+		return
+	}
+
+	dist := web.DistFS()
+	if !web.IsStub() {
+		if assets, err := fs.Sub(dist, "assets"); err == nil {
+			r.StaticFS("/assets", http.FS(assets))
+		}
+	}
+	r.NoRoute(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api") {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+			return
+		}
+		// 注：传 "/" 而非 "index.html"。net/http 的 serveFile 会对后缀为 "/index.html"
+		// 的请求强制 301 跳转到 "./"，导致 NoRoute 返回 301 而非 200。传 "/" 时 FileServer
+		// 直接服务根目录的 index.html（Vite 构建产物与占位页均符合此布局）。
+		c.FileFromFS("/", http.FS(dist))
+	})
 }

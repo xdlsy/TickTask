@@ -62,6 +62,8 @@
 - 数据目录：找到配置文件时沿用其 `database.path`（现状不变）；未找到时 =
   `os.UserConfigDir()` + `\TickTask\data\`，数据库 `ticktask.db` 与 `.keyvault` 均在此
   （两者配套加密存储 API key，必须成对迁移）。
+  仓库开发布局（磁盘 dist 存在）下无配置时仍用 `./data/ticktask.db`，开发行为不变；
+  仅打包运行（无磁盘 dist）落到 `<AppDir>/data`（2026-08-14 用户裁决）。
 
 ### 5. 打包模式自动开浏览器
 
@@ -82,7 +84,9 @@
 
 ## 错误处理
 
-- `os.UserConfigDir()` 失败或目录不可创建/不可写 → 回落到 exe 旁 `./data`，日志 warning。
+- `os.UserConfigDir()` 失败 → 沿用默认 `./data`；数据目录创建失败（MkdirAll 报错）→
+  `log.Fatal` 直接终止，原因在控制台可见（2026-08-14 用户裁决：不实现回落，exe 旁目录
+  往往同样不可写）。
 - 嵌入为占位且磁盘无 dist → 服务占位页，文案指引用户重新打包。
 - 端口占用等启动失败：维持现状 `log.Fatal`，控制台窗口可见原因。
 
@@ -90,7 +94,7 @@
 
 - 存量回归：service/handler 测试走 mock 不受影响；`pkg/database` 迁移测试将真实运行在
   纯 Go 驱动上，顺带验证驱动兼容性。
-- 新增单测：配置/数据目录解析（搜索顺序、APPDATA 回落、不可写回落）；router 静态服务的
+- 新增单测：配置/数据目录解析（搜索顺序、APPDATA 回落）；router 静态服务的
   嵌入兜底与占位页路径。
 - 人工验收：干净目录运行 exe → 浏览器自动打开 → 创建任务、跑一个番茄 → 重启 exe → 数据
   仍在 `%APPDATA%\TickTask\data\`；换一台无 Go/Node/gcc 的机器重复一次。

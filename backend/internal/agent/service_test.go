@@ -14,7 +14,7 @@ import (
 	"ticktask/internal/repository"
 	"ticktask/internal/websocket"
 
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 

@@ -1,6 +1,6 @@
 # TickTask Makefile
 
-.PHONY: all dev prod build build-backend build frontend clean test test-e2e help
+.PHONY: all dev prod build build-backend build frontend clean test test-e2e exe help
 
 # 默认目标
 all: build
@@ -23,6 +23,10 @@ build-backend:
 # 仅构建前端
 build-frontend:
 	@./scripts/build.sh frontend
+
+# 构建单文件 Windows exe（前端嵌入，无 CGO）
+exe:
+	@./scripts/build.sh exe
 
 # 安装依赖
 install:

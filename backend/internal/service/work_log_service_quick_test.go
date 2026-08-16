@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"ticktask/internal/model"
 	"ticktask/internal/repository"

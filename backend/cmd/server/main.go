@@ -3,8 +3,12 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"ticktask/internal/agent"
 	"ticktask/internal/agent/tools"
 	"ticktask/internal/ai"
@@ -16,14 +20,23 @@ import (
 	"ticktask/pkg/database"
 	"ticktask/pkg/logger"
 	"ticktask/pkg/vault"
+	"ticktask/web"
 )
 
 func main() {
-	// 加载配置
-	cfg, err := config.Load("configs/config.yaml")
-	if err != nil {
-		cfg = config.LoadDefault()
+	// 加载配置：CWD configs/config.yaml → <APPDATA>/TickTask/config.yaml → 默认值
+	// 注意：cfg 直接使用 Resolve 的返回值 —— 其默认值分支已把 database.path
+	// 指向 <APPDATA>/TickTask/data，不要再用 LoadDefault() 覆盖（会退回 ./data）。
+	cfg, cfgPath := config.Resolve()
+	// 仓库开发布局（能找到磁盘 dist）：无配置时沿用 ./data，保持开发行为不变；
+	// 打包运行（无磁盘 dist）才把数据落到 <AppDir>/data
+	if cfgPath == "" && web.FindDiskDist() != "" {
+		cfg.Database.Path = "./data/ticktask.db"
+	}
+	if cfgPath == "" {
 		logger.Logger.Warn("using default config")
+	} else {
+		logger.Logger.Info("loaded config", "path", cfgPath)
 	}
 
 	// 初始化日志
@@ -151,15 +164,39 @@ func main() {
 	// 设置路由
 	router := api.SetupRouter(cfg, taskService, timerService, analyticsService, scheduleService, workLogService, wsHub, settingRepo, dataService, agentSvc, agentRepo)
 
-	// 启动服务器
+	// 先绑定端口再服务，确保自动开浏览器时页面已可访问
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatal(err)
+	}
 	logger.Logger.Info("server listening", "addr", addr)
-	if err := router.Run(addr); err != nil {
+
+	// 打包运行（无磁盘 dist 且嵌入了真实前端）时自动打开默认浏览器
+	if web.FindDiskDist() == "" && !web.IsStub() {
+		go openBrowser(fmt.Sprintf("http://localhost:%d", cfg.Server.Port))
+	}
+
+	if err := (&http.Server{Handler: router}).Serve(ln); err != nil {
 		log.Fatal(err)
 	}
 }
 
 func ensureDataDir(path string) error {
-	// 简化处理，确保目录存在
-	return nil
+	return os.MkdirAll(filepath.Dir(path), 0o755)
+}
+
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	if err := cmd.Start(); err != nil {
+		logger.Logger.Warn("failed to open browser", "err", err)
+	}
 }

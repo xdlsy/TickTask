@@ -9,7 +9,7 @@ import (
 	"ticktask/internal/model"
 	"ticktask/pkg/vault"
 
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
